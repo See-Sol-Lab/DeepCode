@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>DeepCode</title>
+<!--
+  窗口背景页：主窗口自己的 webContents，天生在所有 WebContentsView 之下。
+  Compatibility View 透明之后，这层的海就从官方内容后面透上来。
+
+  只画背景，不承载任何交互：所有可点的东西都在上层的两个 view 里。
+
+  两张底图**同时挂载、始终常驻**，切换只改透明度——早先是换 `--sea` 变量，
+  于是切主题那一刻浏览器才开始下另一张图，官方 UI 已经变完、海还慢一两秒，
+  看起来像卡了一下。预挂之后切换是纯合成，没有加载。
+  代价是常驻多一张解码后的位图，相对它解决的观感问题很划算。
+-->
+<style>
+  :root {
+    --veil-dark: linear-gradient(rgba(10, 10, 10, 0.18), rgba(10, 10, 10, 0.34));
+    --veil-light: linear-gradient(rgba(249, 248, 248, 0.42), rgba(249, 248, 248, 0.58));
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    /* 图取不到时的兜底底色，绝不留下一块白。 */
+    background: #0a0a0a;
+  }
+  html[data-theme='light'], html[data-theme='light'] body { background: #f9f8f8; }
+
+  .sea {
+    position: fixed;
+    inset: 0;
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    /* 切换用透明度：图已在内存里，过渡是纯合成。
+       时长要压得很短——顶栏的原生按钮条是瞬间换色的，底图慢一拍就会
+       被看成两次切换（实机肉眼可辨：条先变、图后变）。60ms 只用来抹掉
+       硬切的生硬感，不制造可察觉的先后。 */
+    transition: opacity 60ms linear;
+    opacity: 0;
+  }
+  .sea-dark { background-image: var(--veil-dark), url('sea-dark.jpg'); }
+  .sea-light { background-image: var(--veil-light), url('sea-light.jpg'); }
+
+  html[data-theme='dark'] .sea-dark { opacity: 1; }
+  html[data-theme='light'] .sea-light { opacity: 1; }
+</style>
+</head>
+<body>
+  <div class="sea sea-dark"></div>
+  <div class="sea sea-light"></div>
+</body>
+</html>

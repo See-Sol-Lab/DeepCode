@@ -1,0 +1,20 @@
+/*
+ * DSH Terminal 窗口样式：深色终端表面，占满窗口。
+ * 底色与 chrome 的深色 --surface 同值（官方深色页底色），两个窗口摆在
+ * 一起时不会有色差。这里不做玻璃/圆角：终端内容是 xterm 的 canvas，
+ * 给它套半透明或裁剪容易伤字形，而用户开终端就是来看字的。
+ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: #0a0a0a;
+}
+
+#terminal {
+  position: fixed;
+  inset: 0;
+  padding: 8px 4px 4px 10px;
+}

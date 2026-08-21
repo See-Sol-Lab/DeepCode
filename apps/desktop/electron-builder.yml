@@ -1,0 +1,63 @@
+# electron-builder configuration for the DeepCode distribution.
+# Outputs an unpacked win32-x64 directory (for development verification) and a
+# per-user NSIS installer (for end users). No signing, no auto-update.
+# electron-builder 26 resolves relative paths against the project directory
+# (the repository root), except `files` and `icon`, which resolve against
+# `directories.app`.
+
+# Final product identity: DeepCode, an unofficial community client owned by
+# See-Sol-Lab — deliberately NOT under com.deepseek-ai, so the app never
+# impersonates an official DeepSeek publication. Frozen as of the first
+# commit; changing it later orphans installed users' registry entries.
+appId: io.github.see-sol-lab.deepcode
+productName: DeepCode
+directories:
+  app: apps/desktop
+  output: dist/desktop
+
+# Same payload policy as the npm `files` list: compiled lib without sourcemaps.
+files:
+  - lib/**/*
+  - '!lib/**/*.map'
+  # Desktop Chrome 的静态资产（html/css/icon）：开发与打包同一套文件，
+  # main 经 lib/ 相对路径加载 src/chrome/。
+  - src/chrome/**/*
+  # DSH Terminal 的静态资产（html/css/vendored xterm）：同一套文件。
+  - src/terminal/**/*
+
+# Ship the licensing boundary with every packaged binary. `extraResources`
+# paths resolve from the repository root and land under the app's resources
+# directory, so both win-unpacked and the NSIS installer carry these notices.
+extraResources:
+  - from: apps/desktop/LICENSE
+    to: licenses/DeepCode-PolyForm-Perimeter-1.0.1.txt
+  - from: DEEPCODE-LICENSE.md
+    to: licenses/DEEPCODE-LICENSE.md
+  # The upstream MIT text lives in LICENSE-MIT-UPSTREAM. The repository root
+  # LICENSE is a layered-licensing notice, not a license text, so it must never
+  # be the source of the shipped MIT notice: MIT requires the full license text
+  # and copyright notice to travel with every binary.
+  - from: LICENSE-MIT-UPSTREAM
+    to: licenses/DeepSeek-Harness-MIT.txt
+  - from: THIRD_PARTY_NOTICES.md
+    to: licenses/THIRD_PARTY_NOTICES.md
+
+# The DSH runtime is copied into resources/dsh by scripts/build-desktop-dist.ts
+# after electron-builder finishes (its path resolution differs across versions).
+
+win:
+  # Resolved against the project directory (repository root), like every
+  # electron-builder 26 path.
+  icon: apps/desktop/build/icon.ico
+
+nsis:
+  # Assisted (wizard) installer: normal users see a familiar flow, and the
+  # uninstall entry always exists.
+  oneClick: false
+  # Current-user install: no administrator rights required.
+  perMachine: false
+  artifactName: DeepCode-Setup-${version}.exe
+
+# Reuse the already-downloaded Electron binary; nothing to rebuild or fetch.
+npmRebuild: false
+electronDist: node_modules/electron/dist

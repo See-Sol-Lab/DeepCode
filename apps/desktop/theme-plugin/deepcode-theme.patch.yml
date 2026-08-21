@@ -1,0 +1,20 @@
+# DeepCode 皮肤的 launcher overlay。
+#
+# 由 DeepCode 在启动 Harness 时经 `--patch` 传入，落在合成顺序的最后一层
+# （bundle 各层 → profile 自己的 cordis.patch.yml → launcher 层）。
+#
+# 这么做的意义在于**它不进用户的 profile**：
+#   · 用户自己跑 `dsh web` 时没有这一层，看到的是原版 Harness
+#   · 卸载 DeepCode 不会在 profile 的 package.json / cordis.patch.yml 留残留
+#   · 我们对 profile「零写入」的承诺完好
+#
+# 相对地，`dsh plugin add` 会写进 profile 的清单——那是用户的东西，
+# 装我们的皮肤不该动它。
+#
+# 这一层只插一行：把 DeepCode 的主题插件加进本轮 composition。
+# 插件自身只调用官方 ui-theme 的 overrideTokens，不接管 layout、
+# 不注册 root、不碰官方 DOM。
+
+- insert:
+    - id: deepcode-theme
+      name: '@see-sol-lab/deepcode-theme'

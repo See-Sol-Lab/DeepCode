@@ -1,0 +1,27 @@
+{
+  "name": "@see-sol-lab/deepcode-theme",
+  "description": "DeepCode skin: stacks a token override layer on the official theme service so the deep-sea backdrop shows through the Harness UI",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-theme"
+      ],
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "license": "SEE LICENSE IN ../../../DEEPCODE-LICENSE.md",
+  "files": [
+    "lib/client.js",
+    "lib/index.js"
+  ]
+}

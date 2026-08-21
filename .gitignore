@@ -1,0 +1,55 @@
+CLAUDE.local.md
+.env
+node_modules/
+lib/
+*.tsbuildinfo
+pnpm-debug.log
+.pnpm-store/
+.cache/
+examples/*/*.jsonl
+.storages/
+.sessions/
+examples/*/.sessions/
+coverage/
+.doc-typecheck-*/
+.node-next-types-*/
+.oxlint-contract-*/
+.oxlintrc.contract-*.json
+oxlint-contract-*.ts
+.humanize/
+tmp/
+.claude/commands/
+.claude/launch.json
+.claude/settings.json
+.vscode/
+.DS_Store
+.idea
+mise.toml
+dist-exe/
+python/sdk-runtime/src/deepseek_harness_runtime/runtime/dsh-jsonrpc-agent-*
+python/sdk-runtime/src/deepseek_harness_runtime/runtime/node/
+python/**/__pycache__/
+python/**/.pytest_cache/
+apps/web/dist/
+dist/
+.artifacts/
+.playwright-mcp/
+.orig
+.worktrees/
+worktrees/
+.agents/worktrees/
+.typert-*/
+
+# Vendored 上游只提交 TypeScript 源码。tsconfig.base.json 把 @deepseek-ai/*
+# 的 paths 指到 vendor/*/src，tsc 因此会就地编译出 .js/.d.ts/.map——那是本地
+# 构建产物，不是上游的一部分。范围收在 src/ 下：vendor/cordis/bin.js 是真源码。
+/vendor/*/src/**/*.js
+/vendor/*/src/**/*.js.map
+/vendor/*/src/**/*.d.ts
+/vendor/*/src/**/*.d.ts.map
+
+# 例外：DeepCode 皮肤插件的 lib/ 是**手写产物**，不是编译输出。
+# 它的形状（__ModuleLoader__.load 自注册）是官方 client 运行时的契约，
+# 没有对应的 TS 源码可以重新生成——被忽略掉就等于插件整个丢失。
+!/apps/desktop/theme-plugin/lib/
+!/apps/desktop/theme-plugin/lib/*.js

@@ -1,0 +1,11 @@
+# DeepCode Licensing Notice
+
+DeepCode uses layered licensing. No single license applies to this entire repository.
+
+- Original DeepCode product work by See-Sol-Lab is licensed under the PolyForm Perimeter License 1.0.1 where stated. The full license text for the current product layer is in `apps/desktop/LICENSE`.
+- Upstream DeepSeek Harness code and upstream-derived material remain under DeepSeek's MIT License. The preserved upstream MIT text is in `LICENSE-MIT-UPSTREAM`.
+- Third-party components remain under their respective licenses.
+
+See `DEEPCODE-LICENSE.md` for the exact scope and repository licensing policy.
+
+This notice is a scope guide. It does not replace, narrow, or expand the license terms that apply to any particular file or component.

@@ -1,0 +1,166 @@
+# DeepCode Desktop CI lane.
+#
+# DeepCode-owned, desktop-focused verification. The upstream full matrix stays
+# in ci.yml; a desktop pull request must never pay for the whole repository,
+# and this lane must never turn green while skipping every DeepCode job:
+# pull requests always run the PR lane, and main pushes / manual dispatches
+# always run the Windows native packaged job.
+#
+# Remote triggering of this workflow (real runs and deliberate-failure proofs)
+# happens only after an authorized push; locally, the structure and every
+# command entry are verified against the checkout.
+
+name: DeepCode Desktop
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel superseded runs so stale pull requests and main pushes do not retain runner capacity.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PRIMARY_NODE_VERSION: '24'
+  # CI runs must never report to the production telemetry endpoint baked
+  # into apps/cli/cordis.yml (same invariant as ci.yml).
+  DSH_TELEMETRY_DISABLED: '1'
+
+jobs:
+
+  # ---- PR lane: focused desktop verification on hosted Linux ----------------
+  desktop-pr-lane:
+    name: desktop / PR focused
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Full history is not needed here, but a deep checkout keeps the archive
+      # and note gates reading a consistent tree when they need the PR base.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Desktop unit tests
+        run: pnpm exec vitest run apps/desktop/tests
+
+      # Repository-level typecheck. `build:desktop` below compiles
+      # apps/desktop/tsconfig.json, whose `include` is `src` alone — it is
+      # structurally unable to see type errors in tests/ or tests-e2e/.
+      # P7 shipped two such errors: unit tests passed, the desktop build
+      # passed, and the drift only surfaced when the packaged build ran on
+      # main. This gate moves that discovery to the pull request.
+      - name: Repository typecheck (covers desktop tests and e2e)
+        run: pnpm run typecheck
+
+      - name: Desktop build (emits lib/ for packaging)
+        run: pnpm run build:desktop
+
+      - name: Desktop lint
+        run: pnpm exec tsx scripts/run-oxlint.ts apps/desktop scripts/build-desktop-dist.ts
+
+      - name: Desktop docs pairing gates
+        run: |
+          pnpm run verify-translation-pairing
+          pnpm run verify-agent-note-format
+          pnpm run verify-md-wrap
+
+      - name: Working-tree whitespace check
+        run: git diff --check
+
+  # ---- Windows native job: packaged distribution and acceptance -------------
+  # main pushes and manual dispatches only. Rebuilds everything from the
+  # current source, builds the sanitized distribution, runs the packaged
+  # parity + acceptance suite (Case A–F) against the real DeepCode.exe, and
+  # uploads the installer (sanitized: no user data, credentials, or logs)
+  # plus an acceptance report.
+  desktop-windows-native:
+    name: desktop / windows native packaged
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    # Fork reality (See-Sol-Lab/DeepCode): this repository has no upstream
+    # dsh-*-16core hosted runner groups and no self-hosted runners. A label
+    # that does not exist here leaves the job queued forever, which is how
+    # fourteen runs stalled before B2-P1 — so this must stay a real
+    # GitHub-hosted label.
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Enable Developer Mode (symlink support)
+        shell: pwsh
+        run: >-
+          reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
+          /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Install (frozen lockfile)
+        shell: pwsh
+        run: pnpm install --frozen-lockfile
+
+      # Release gate, stated explicitly rather than relied on as a side effect:
+      # build:desktop-dist happens to run tsc against tsconfig.host.json on its
+      # way to packaging, but it does not cover the client side, and a gate that
+      # only holds by accident is not a gate.
+      - name: Repository typecheck (release gate)
+        shell: pwsh
+        run: pnpm run typecheck
+
+      - name: Rebuild and package distribution from current source
+        shell: pwsh
+        run: pnpm run build:desktop-dist
+
+      - name: Packaged parity + acceptance (Case A–F)
+        shell: pwsh
+        run: pnpm run test:desktop-parity
+
+      # The verification script already reads every identity fact it asserts,
+      # so it also renders the acceptance report: one source, no second lookup
+      # in workflow YAML that could disagree with what was verified.
+      - name: Packaged distribution verification and acceptance report
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File scripts/verify-desktop-dist.ps1 -ReportPath 'dist\desktop\acceptance-report.txt'
+          Add-Content 'dist\desktop\acceptance-report.txt' "workflow: $env:GITHUB_WORKFLOW / $env:GITHUB_SHA"
+          Get-Content 'dist\desktop\acceptance-report.txt'
+
+      - name: Upload installer and acceptance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: deepcode-desktop-${{ github.sha }}
+          # Hosted-runner artifact quota: upload the installer (~150MB) and
+          # the acceptance report only. The unpacked directory (~540MB per
+          # run) stays local — the delivery package allows either the
+          # installer/unpacked artifact or the acceptance report.
+          path: |
+            dist/desktop/DeepCode-Setup-*.exe
+            dist/desktop/acceptance-report.txt
+          if-no-files-found: error

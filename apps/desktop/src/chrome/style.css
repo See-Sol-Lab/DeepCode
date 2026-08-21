@@ -1,0 +1,511 @@
+/*
+ * DeepCode Desktop Chrome：双主题（dark/light）、克制、低对比度边框。
+ * 页面背景透明（菜单展开时 Compatibility View 从面板外透出）；
+ * 只有顶栏与面板是不透明表面。状态色只用于圆点与小面积提示。
+ * 主题由 renderer 依据 ControlModel.effectiveTheme 挂 data-theme；
+ * 系统 high contrast 时挂 data-highcontrast 保持基本可读。
+ * Compatibility View（官方 Web UI）从不被注入任何主题逻辑。
+ */
+
+:root {
+  --chrome-height: 47px;
+
+  /* 官方圆角阶梯（两个主题共用）。 */
+  --r-pill: 100px;
+  --r-panel: 16px;
+  --r-input: 10px;
+  --r-small: 8px;
+
+  /* 深色：底色与官方深色页一致，面板用「6% 白叠在底色上」的等效实色。
+     不用半透明 + backdrop-filter——面板背后是另一个 WebContentsView，
+     模糊糊不到它，半透明只会把官方页面的字漏上来（实测 0.92 与 0.985
+     都能看见下层大标题）。玻璃感由内描边 + 外阴影承担。 */
+  --surface: #0a0a0a;
+  --surface-raised: #191919;
+  --surface-hover: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.10);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --text: #ffffff;
+  --text-dim: rgba(255, 255, 255, 0.56);
+  --brand: #6799fe;
+  --focus: #6799fe;
+  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 8px 24px rgba(0, 0, 0, 0.22);
+  --dot-grey: #6e6e78;
+  --dot-blue: #6799fe;
+  --dot-green: #3fae6a;
+  --dot-yellow: #d9a13b;
+  --dot-red: #d95757;
+  --notice-bg: #2a2416;
+  --notice-text: #f0dfae;
+  --bar-image: url('bar-dark.jpg');
+  /* 压住底图，保证顶栏文字与胶囊始终可读——底图是氛围，不是主角。 */
+  --bar-veil: linear-gradient(rgba(10, 10, 10, 0.30), rgba(10, 10, 10, 0.44));
+}
+
+:root[data-theme='light'] {
+  --surface: #f9f8f8;
+  --surface-raised: #ffffff;
+  --surface-hover: rgba(0, 0, 0, 0.03);
+  --border: rgba(0, 0, 0, 0.10);
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --text: #1e232c;
+  --text-dim: rgba(0, 0, 0, 0.65);
+  --brand: #4d6bfe;
+  --focus: #3a65c2;
+  --shadow-card: 0 0 0 1px #f1f5f9, 0 2px 4px rgba(0, 0, 0, 0.05), 0 12px 24px rgba(0, 0, 0, 0.05);
+  --dot-grey: #8691a1;
+  --dot-blue: #4d6bfe;
+  --dot-green: #1f8a4c;
+  --dot-yellow: #b07c1f;
+  --dot-red: #c93f3f;
+  --notice-bg: #fff1cf;
+  --notice-text: #6b4d08;
+  --bar-image: url('bar-light.jpg');
+  --bar-veil: linear-gradient(rgba(249, 248, 248, 0.34), rgba(249, 248, 248, 0.50));
+}
+
+/* 系统 high contrast：顶栏与面板强制实色表面，文字对比靠色板本身。 */
+:root[data-highcontrast='true'] #topbar,
+:root[data-highcontrast='true'] .panel {
+  border-width: 1px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: transparent;
+  height: 100%;
+  overflow: hidden;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  user-select: none;
+}
+
+/* ---- 顶栏：整条可拖动，交互件单独 no-drag ---- */
+
+#topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--chrome-height);
+  /* 底图只取全宽 × 47px 的一条（资产已按此裁切，两张合计约 22KB）。
+     绝不铺到 overlay 上——那会盖住下层官方页面。 */
+  background: var(--bar-veil), var(--bar-image) center / cover no-repeat, var(--surface);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  /* 右侧给 Windows 原生窗口按钮（titleBarOverlay）留位。 */
+  padding-right: 150px;
+  -webkit-app-region: drag;
+}
+
+/* 顶栏下沿渐隐：底色淡出到透明，避免与官方页面硬切一条边。
+   画在 chrome view 自己的高度内，不额外覆盖下层内容。 */
+#topbar::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 100%;
+  height: 14px;
+  background: linear-gradient(var(--surface), transparent);
+  pointer-events: none;
+}
+
+.no-drag { -webkit-app-region: no-drag; }
+
+.icon-button {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border: none;
+  border-radius: var(--r-small);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-button:hover { background: var(--surface-raised); }
+
+.hamburger-lines { display: inline-flex; flex-direction: column; gap: 4px; }
+.hamburger-lines i { display: block; width: 16px; height: 2px; background: var(--text); border-radius: 1px; }
+
+#brand { display: flex; align-items: center; gap: 8px; }
+#brand-icon { width: 20px; height: 20px; }
+#brand-name { font-weight: 600; }
+
+#window-title {
+  flex: 1;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* 窄窗口优先隐藏中间标题，保留汉堡、状态与原生窗口按钮。 */
+@media (max-width: 900px) {
+  #window-title { visibility: hidden; }
+}
+
+/* ---- 状态胶囊 ---- */
+
+#status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-pill);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+#status-pill:hover { border-color: var(--border); }
+
+#status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dot-grey); }
+#status-pill[data-tone='grey'] #status-dot { background: var(--dot-grey); }
+#status-pill[data-tone='blue'] #status-dot { background: var(--dot-blue); }
+#status-pill[data-tone='green'] #status-dot { background: var(--dot-green); }
+#status-pill[data-tone='yellow'] #status-dot { background: var(--dot-yellow); }
+#status-pill[data-tone='red'] #status-dot { background: var(--dot-red); }
+
+/* ---- 菜单覆盖层与面板 ---- */
+
+#overlay {
+  position: fixed;
+  top: var(--chrome-height);
+  left: 0; right: 0; bottom: 0;
+  /* 透明点击捕获层：点面板外关闭菜单。 */
+  background: transparent;
+}
+
+.panel {
+  position: absolute;
+  top: 6px;
+  left: 10px;
+  width: 300px;
+  /* 实色：背后是官方页面，半透明会漏字（见 token 层注释）。 */
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-panel);
+  padding: 6px;
+  box-shadow: var(--shadow-card);
+}
+.panel.wide { width: 380px; max-height: calc(100vh - 70px); overflow-y: auto; }
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  border-radius: var(--r-small);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.menu-item:hover:not(:disabled) { background: var(--surface-hover); }
+.menu-item:disabled { color: var(--text-dim); cursor: default; }
+.menu-item .chevron { color: var(--text-dim); }
+.menu-item .checkmark { color: var(--dot-green); }
+.menu-item .item-note { color: var(--text-dim); font-size: 12px; }
+.menu-item .item-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.separator { height: 1px; background: var(--border-subtle); margin: 5px 8px; }
+
+/* 信息行：标签 + 值；完整路径单行省略，hover/focus 出全值（title）。 */
+.info-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 10px;
+  font-size: 12.5px;
+}
+.info-row .info-label { color: var(--text-dim); min-width: 92px; }
+.info-row .info-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section-title { color: var(--text-dim); font-size: 12px; padding: 7px 10px 3px; }
+
+/* 恢复详情块（面板内展示，双重脱敏限长后的文本）。 */
+.recovery-block {
+  margin: 4px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-small);
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+}
+
+/* 焦点环清晰可见。 */
+button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+/* ---- 恢复提示横幅（顶栏内，非阻断） ---- */
+
+#recovery-banner {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--r-small);
+  background: var(--notice-bg);
+  color: var(--notice-text);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#recovery-banner[hidden] { display: none; }
+
+#recovery-banner-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini-button {
+  border: 1px solid currentColor;
+  border-radius: var(--r-small);
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  padding: 3px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mini-button:hover { background: var(--surface-hover); }
+
+/* 主题子菜单 radio 的勾选标记复用 .checkmark。 */
+
+/* ---- 专家详情折叠区 ---- */
+
+#harness-expert {
+  margin: 2px 6px;
+  border-left: 2px solid var(--border);
+  padding-left: 6px;
+}
+
+/* ---- Plugin Manager v1 ---- */
+
+.plugin-spec-input {
+  width: calc(100% - 20px);
+  margin: 4px 10px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-input);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+}
+.plugin-spec-input:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.plugin-spec-input::placeholder { color: var(--text-dim); }
+
+.plugin-output {
+  margin: 4px 8px;
+}
+.plugin-output summary {
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 4px 2px;
+  user-select: none;
+}
+.plugin-output pre {
+  max-height: 180px;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-small);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 11.5px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+}
+
+.plugin-handoff {
+  margin: 4px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-small);
+  background: var(--notice-bg);
+  color: var(--notice-text);
+  font-size: 12px;
+}
+.plugin-handoff-actions {
+  display: flex;
+  gap: 8px;
+  padding: 4px 8px 8px;
+}
+
+/* ---- Feedback（P7-A~E）---- */
+
+/* 左下角常驻入口：bug 语义、不抢焦点（半崩状态下依然可点）。 */
+#feedback-entry {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-raised);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 120ms ease;
+}
+#feedback-entry:hover,
+#feedback-entry:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.feedback-bug {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  position: relative;
+}
+.feedback-bug::before,
+.feedback-bug::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 2px;
+  background: var(--text-dim);
+}
+.feedback-bug::before {
+  top: -3px;
+  height: 5px;
+  transform: translateX(-1px) rotate(24deg);
+}
+.feedback-bug::after {
+  top: 9px;
+  height: 4px;
+  transform: translateX(-1px) rotate(-24deg);
+}
+
+.feedback-prompt {
+  margin: 4px 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.feedback-input {
+  width: calc(100% - 20px);
+  height: 84px;
+  margin: 4px 10px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-input);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+}
+.feedback-input:focus,
+.feedback-diag-input:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.feedback-input::placeholder { color: var(--text-dim); }
+
+.feedback-diag {
+  margin: 4px 8px;
+}
+.feedback-diag summary {
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 4px 2px;
+  user-select: none;
+}
+.feedback-diag-note {
+  margin: 2px 0 4px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.feedback-diag-input {
+  width: calc(100% - 4px);
+  height: 96px;
+  margin: 2px 0;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-input);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 11.5px;
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  white-space: pre-wrap;
+  resize: vertical;
+}
+
+.feedback-reply-text {
+  margin: 4px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-small);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow: auto;
+  user-select: text;
+}
+.feedback-issue-title {
+  margin: 4px 8px;
+  font-size: 12px;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+.feedback-notice {
+  margin: 4px 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-small);
+  background: var(--notice-bg);
+  color: var(--notice-text);
+  font-size: 12px;
+}

@@ -1,0 +1,7 @@
+# S10 fixture：一个"安装成功、post-check 成功，但下一代 boot 必然失败"
+# 的坏插件 bundle。官方 reconcile 会把它写进 profile 的 bundles 层，
+# 重启后 loader 加载本行 → apply 抛错并硬退出 → DSH 进程死亡 →
+# readiness 失败。这是 Plugin Mutation Recovery 要兜住的真实失败链。
+- insert:
+    - id: recovery-bad-plugin
+      name: 'deepcode-recovery-bad-plugin'

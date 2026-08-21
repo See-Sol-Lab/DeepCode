@@ -1,0 +1,562 @@
+/**
+ * Build the portable Windows distribution directory for DeepCode.
+ *
+ * Pipeline: pack both release families (dsh + vendor) exactly like
+ * `release/pack.ts`, compute the shipped Web profile's runtime closure, npm
+ * install exactly the closure tarballs (relative `file:` specs, external
+ * registry dependencies pinned by the committed
+ * `apps/desktop/runtime.package-lock.json`), copy the resulting node_modules
+ * into the staging area, run electron-builder `--dir`, sanitize and scan the
+ * distribution before the NSIS installer wraps it, then scan the whole
+ * prepared release set. The produced folder runs without Node.js, pnpm, or
+ * the source checkout: the Electron executable acts as the Node runtime via
+ * `ELECTRON_RUN_AS_NODE`.
+ *
+ * Entry points: `pnpm run build:desktop-dist` is the only official entry —
+ * it rebuilds every input from the current source (`build:lib:host`,
+ * `build:web`, `build:desktop`) before running this script, so the produced
+ * distribution always reflects the checkout as it is now. This script itself
+ * is wired as the internal `build:desktop-dist:assemble` step; invoking it
+ * directly skips the rebuild and can package stale artifacts. The committed
+ * app icon is regenerated only when missing; `requirePrerequisites` stays as
+ * defense in depth, it no longer carries the freshness guarantee.
+ * @module scripts/build-desktop-dist
+ */
+
+import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import {
+  closeSync, cpSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync,
+  statSync, writeFileSync,
+} from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
+import { basename, delimiter, dirname, join } from 'node:path'
+import { releaseFamily, tarballName } from './release/families.ts'
+import { capture } from './release/process.ts'
+import { packedIdentity, tarballFiles } from './release/tarball.ts'
+// 皮肤 overlay 的文件名与运行时读取端共用同一个常量：两侧一旦不一致，
+// --patch 会指向一个不存在的文件，而官方对此是启动即失败。
+import { THEME_PATCH_FILENAME } from '../apps/desktop/src/dsh-service.ts'
+import { computeRuntimeClosure, parsePluginNames } from './runtime-closure.ts'
+import { directoryBytes, pruneNonWindowsPlatforms } from './platform-prune.ts'
+import { sanitizeAndVerify } from './leak-scan.ts'
+import { portableLockfileIssues, relativeTarballSpec } from './runtime-lock.ts'
+import { readDevSourceCommit, SOURCE_COMMIT_FILENAME } from '../apps/desktop/src/version-info.ts'
+
+/** Repository root: this script always runs from the checkout root. */
+const ROOT = process.cwd()
+/** Staging root for the distribution build outputs. */
+const DIST_ROOT = join(ROOT, 'dist', 'desktop')
+/** Pack output directory for the dsh family. */
+const PACK_DHS = join(ROOT, 'dist', 'npm-dsh')
+/** Pack output directory for the vendor family. */
+const PACK_VENDOR = join(ROOT, 'dist', 'npm-vendor')
+/** The DSH runtime payload copied into `resources/dsh`. */
+const RUNTIME_DIR = join(DIST_ROOT, 'dsh')
+/** electron-builder `--dir` output. */
+const WIN_UNPACKED = join(DIST_ROOT, 'win-unpacked')
+/** Staging consumer for the npm install; inside dist so tarball specs stay relative and portable. */
+const STAGING = join(DIST_ROOT, 'npm-staging')
+/** The committed runtime lockfile pinning every external registry dependency. */
+const COMMITTED_LOCK = join(ROOT, 'apps', 'desktop', 'runtime.package-lock.json')
+
+/**
+ * The pnpm executable this run uses: `npm_execpath` (pnpm injects its own
+ * module path when a pnpm script invokes this script) or `pnpm` from PATH.
+ * @returns The pnpm module path or command name.
+ */
+function pnpmModule(): string {
+  const execpath = process.env.npm_execpath
+  if (execpath !== undefined && basename(execpath) === 'pnpm.mjs') return execpath
+  return 'pnpm'
+}
+
+/** Run a command with inherited streams, failing loud on a non-zero exit. */
+function runNode(args: readonly string[], cwd = ROOT, options: { env?: NodeJS.ProcessEnv } = {}): void {
+  const result = spawnSync(process.execPath, [...args], { cwd, stdio: 'inherit', env: options.env })
+  if (result.error !== undefined) throw result.error
+  if (result.status !== 0) throw new Error(`node ${args.join(' ')} exited with ${String(result.status)}`)
+}
+
+/** Run pnpm through its module path (works without pnpm on PATH). */
+function runPnpm(args: readonly string[], cwd = ROOT): void {
+  runNode([pnpmModule(), ...args], cwd)
+}
+
+/**
+ * A temporary `pnpm.cmd` shim so subprocesses that invoke `pnpm` (electron-builder's
+ * node-modules collector) find it even when pnpm is absent from PATH.
+ * @returns The shim directory.
+ */
+function pnpmShimDirectory(): string {
+  const dir = join(tmpdir(), 'deepcode-pnpm-shim')
+  mkdirSync(dir, { recursive: true })
+  // Always rewritten: a shim left by an earlier build may point at a pnpm
+  // module path that no longer exists on this machine.
+  writeFileSync(join(dir, 'pnpm.cmd'), `@echo off\r\nnode "${pnpmModule()}" %*\r\n`)
+  return dir
+}
+
+/**
+ * The npm CLI this run uses: `npm-cli.js` beside the running Node when present
+ * (the standard Windows Node layout, reachable even when pnpm trims PATH),
+ * otherwise `npm` from PATH.
+ * @returns The npm-cli.js path or the `npm` command name.
+ */
+function npmCli(): string {
+  const sibling = join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js')
+  return existsSync(sibling) ? sibling : 'npm'
+}
+
+/** Run npm (through Node when its CLI path is known), failing loud on a non-zero exit. */
+function runNpm(args: readonly string[], cwd: string): void {
+  const cli = npmCli()
+  const result = spawnSync(cli === 'npm' ? 'npm' : process.execPath, cli === 'npm' ? [...args] : [cli, ...args], {
+    cwd,
+    stdio: 'inherit',
+  })
+  if (result.error !== undefined) throw result.error
+  if (result.status !== 0) throw new Error(`npm ${args.join(' ')} exited with ${String(result.status)}`)
+}
+
+/**
+ * Fail loud when a distribution prerequisite is missing (defense in depth
+ * behind the public `build:desktop-dist` chain, which rebuilds them from
+ * current source).
+ */
+function requirePrerequisites(): void {
+  // The icons are committed assets outside the rebuild chain: generate them
+  // only when a checkout lacks one (generation output is stable for a given
+  // source favicon and toolchain, but regenerating on every build would churn
+  // the committed binaries).
+  const appIcon = join(ROOT, 'apps', 'desktop', 'build', 'icon.ico')
+  const trayIcon = join(ROOT, 'apps', 'desktop', 'src', 'chrome', 'tray.ico')
+  if (!existsSync(appIcon) || !existsSync(trayIcon)) {
+    runPnpm(['run', 'generate:desktop-icon'])
+  }
+  const required: [string, string][] = [
+    ['Web UI dist', join(ROOT, 'apps', 'web', 'dist', 'index.html')],
+    ['dsh CLI built bin', join(ROOT, 'apps', 'cli', 'lib', 'bin.js')],
+    ['desktop shell build', join(ROOT, 'apps', 'desktop', 'lib', 'main.js')],
+    ['app icon', appIcon],
+    // P7-I：托盘图标是多尺寸 .ico 运行时资产（16/20/24/32），缺失时
+    // 打包必须失败——托盘是常驻应用"回来的门"，与 app icon 同一层门禁。
+    ['tray icon', trayIcon],
+  ]
+  const missing = required.filter(([, path]) => !existsSync(path)).map(([name]) => name)
+  if (missing.length === 0) return
+  throw new Error(
+    'build-desktop-dist: missing ' + missing.join(', ')
+    + '; run `pnpm run build:lib:host`, `pnpm run build:web`, `pnpm run build:desktop`,'
+    + ' and `pnpm run generate:desktop-icon` first',
+  )
+}
+
+/**
+ * Refuse to start while the previous build output is still locked.
+ *
+ * electron-builder clears `win-unpacked` before repopulating it. A running
+ * DeepCode — or a diagnostic script that crashed without closing the app —
+ * holds its executable open, the delete fails with EPERM, and the build stops
+ * having produced nothing new. The old artefacts stay on disk with their old
+ * timestamps, so the next investigation happily inspects a stale package and
+ * concludes the source change never took effect. That misdiagnosis costs far
+ * more than the build failure itself, which is why this check exists.
+ *
+ * Windows refuses a write handle on a running executable, so asking for one is
+ * a direct test of the condition rather than a guess from process names.
+ */
+function requireUnlockedOutput(): void {
+  const exe = join(WIN_UNPACKED, 'DeepCode.exe')
+  if (!existsSync(exe)) return
+  try {
+    closeSync(openSync(exe, 'r+'))
+  } catch {
+    throw new Error(
+      `build-desktop-dist: ${exe} is locked by a running process, so this build`
+      + ' would fail while clearing the directory and leave the previous package'
+      + ' in place. Close DeepCode (including instances left behind by a crashed'
+      + ' diagnostic run) and rebuild:\n'
+      + '  Get-Process -Name DeepCode -ErrorAction SilentlyContinue | Stop-Process -Force',
+    )
+  }
+}
+
+/** Pack one release family into `out` with the same per-member checks as release/pack.ts. */
+function packFamily(familyId: string, out: string): void {
+  const family = releaseFamily(familyId)
+  const members = family.publishOrder(family.members(ROOT))
+  family.verifyVersions(members)
+  rmSync(out, { recursive: true, force: true })
+  mkdirSync(out, { recursive: true })
+  for (const member of members) {
+    runPnpm(['--dir', member.directory, 'pack', '--pack-destination', out])
+    const tarball = join(out, tarballName(member))
+    if (!existsSync(tarball)) throw new Error(`${member.name} produced no tarball at ${tarball}`)
+    family.validatePayload(member, tarballFiles(tarball))
+  }
+  console.log(`build-desktop-dist: packed ${familyId} family (${String(members.length)} tarballs) into ${out}`)
+}
+
+/** Every packed tarball's absolute path by package name. */
+function packedDependencies(directories: readonly string[]): Map<string, string> {
+  const dependencies = new Map<string, string>()
+  for (const directory of directories) {
+    for (const filename of readdirSync(directory).filter(name => name.endsWith('.tgz')).sort()) {
+      const tarball = join(directory, filename)
+      const { name } = packedIdentity(tarball)
+      dependencies.set(name, tarball)
+    }
+  }
+  return dependencies
+}
+
+/** Read every tarball manifest's version and production dependency sections. */
+function tarballManifests(directories: readonly string[]): Map<string, {
+  name: string
+  version?: string
+  dependencies?: Record<string, string>
+  optionalDependencies?: Record<string, string>
+  peerDependencies?: Record<string, string>
+}> {
+  const manifests = new Map<string, {
+    name: string
+    version?: string
+    dependencies?: Record<string, string>
+    optionalDependencies?: Record<string, string>
+    peerDependencies?: Record<string, string>
+  }>()
+  for (const directory of directories) {
+    for (const filename of readdirSync(directory).filter(name => name.endsWith('.tgz')).sort()) {
+      const tarball = join(directory, filename)
+      const manifest = JSON.parse(capture('tar', ['-xOzf', tarball, 'package/package.json'])) as {
+        name?: unknown
+        version?: unknown
+        dependencies?: Record<string, string>
+        optionalDependencies?: Record<string, string>
+        peerDependencies?: Record<string, string>
+      }
+      if (typeof manifest.name !== 'string') throw new Error(`build-desktop-dist: tarball ${tarball} has no name`)
+      manifests.set(manifest.name, {
+        name: manifest.name,
+        ...typeof manifest.version === 'string' && { version: manifest.version },
+        ...manifest.dependencies !== undefined && { dependencies: manifest.dependencies },
+        ...manifest.optionalDependencies !== undefined && { optionalDependencies: manifest.optionalDependencies },
+        ...manifest.peerDependencies !== undefined && { peerDependencies: manifest.peerDependencies },
+      })
+    }
+  }
+  return manifests
+}
+
+/** Every vendored tarball's package name (the Cordis framework layer). */
+function vendoredPackageNames(directory: string): string[] {
+  return readdirSync(directory)
+    .filter(name => name.endsWith('.tgz'))
+    .map(filename => packedIdentity(join(directory, filename)).name)
+    .sort()
+}
+
+/**
+ * The closure roots: every package the shipped Web profile mounts — the base
+ * and web-app bundle patches, and every agent preset shipped inside the
+ * `@deepseek-ai/dsh` tarball (its `files` list carries the whole `config`
+ * directory, and the preset picker lets a session mount any of them) — plus
+ * the launcher entry itself and the frontend package the web-app bundle
+ * resolves dynamically (`require.resolve` of the built dist, invisible to
+ * static edges).
+ * @returns The root package names, deduplicated.
+ */
+function profileRoots(): string[] {
+  const roots = new Set<string>(['@deepseek-ai/dsh', '@deepseek-ai/dsh-web-frontend'])
+  const presetsDir = join(ROOT, 'apps', 'cli', 'config', 'agent-presets')
+  const presets = readdirSync(presetsDir, { withFileTypes: true })
+    .filter(entry => entry.isDirectory())
+    .map((entry) => {
+      const composition = join(presetsDir, entry.name, 'agent.cordis.yml')
+      // Every shipped preset directory must carry its composition; a missing
+      // file is a broken preset, not an empty seed.
+      if (!existsSync(composition)) {
+        throw new Error(`build-desktop-dist: shipped preset ${entry.name} lacks agent.cordis.yml at ${composition}`)
+      }
+      return composition
+    })
+  if (presets.length === 0) throw new Error(`build-desktop-dist: no agent presets found under ${presetsDir}`)
+  for (const patch of [
+    join(ROOT, 'packages', 'bundle', 'base', 'cordis.patch.yml'),
+    join(ROOT, 'packages', 'bundle', 'web-app', 'cordis.patch.yml'),
+    ...presets,
+  ]) {
+    if (!existsSync(patch)) throw new Error(`build-desktop-dist: shipped profile file missing: ${patch}`)
+    for (const name of parsePluginNames(readFileSync(patch, 'utf8'))) roots.add(name)
+  }
+  return [...roots].sort()
+}
+
+/** Install the closure into the staging consumer and copy its node_modules into the runtime payload. */
+/**
+ * Ship DeepCode's skin into the DSH runtime tree.
+ *
+ * The plugin is loaded by the harness's own Node process, which cannot read
+ * the Electron asar — both the package and the overlay have to exist as real
+ * files under the runtime directory. Dropping the package into the runtime's
+ * `node_modules` also makes it resolvable from every profile without touching
+ * any profile's manifest: the skin is applied through a launcher `--patch`
+ * overlay, so it exists only for the composition DeepCode starts.
+ *
+ * Fails loud on a missing build: a packaged app whose skin silently vanished
+ * looks like the theme code is broken, and that lie costs far more to chase
+ * than a failed build does.
+ * @param runtimeDir - assembled DSH runtime directory.
+ */
+function shipThemePlugin(runtimeDir: string): void {
+  const source = join(ROOT, 'apps', 'desktop', 'theme-plugin')
+  const bundle = join(source, 'lib', 'client.js')
+  if (!existsSync(bundle)) {
+    throw new Error(`build-desktop-dist: theme plugin bundle ${bundle} is missing`)
+  }
+  // The client bundle must register itself with the official module loader.
+  // A plain ESM file loads, throws "Cannot use import statement outside a
+  // module" in the browser, and leaves the whole page stuck on boot — a
+  // failure that looks nothing like "the theme is broken", so catch its
+  // shape here rather than in a user's window.
+  if (!readFileSync(bundle, 'utf8').includes('__ModuleLoader__.load')) {
+    throw new Error(`build-desktop-dist: ${bundle} does not register through __ModuleLoader__ — the client runtime cannot load it`)
+  }
+  const target = join(runtimeDir, 'node_modules', '@see-sol-lab', 'deepcode-theme')
+  mkdirSync(target, { recursive: true })
+  cpSync(join(source, 'lib'), join(target, 'lib'), { recursive: true })
+  cpSync(join(source, 'package.json'), join(target, 'package.json'))
+  // The overlay sits at the runtime root: resolveThemePatchFile() points
+  // `--patch` at <resources>/dsh/<name>, and both sides must agree.
+  const overlay = join(source, THEME_PATCH_FILENAME)
+  if (!existsSync(overlay)) {
+    throw new Error(`build-desktop-dist: theme overlay ${overlay} is missing`)
+  }
+  cpSync(overlay, join(runtimeDir, THEME_PATCH_FILENAME))
+  console.log(`build-desktop-dist: DeepCode theme plugin + overlay shipped into ${runtimeDir}`)
+}
+
+function assembleRuntime(): void {
+  rmSync(STAGING, { recursive: true, force: true })
+  mkdirSync(STAGING, { recursive: true })
+  try {
+    const manifests = tarballManifests([PACK_DHS, PACK_VENDOR])
+    const roots = [...profileRoots(), ...vendoredPackageNames(PACK_VENDOR)]
+    // The Landlock launcher is a workspace member but ships through its own
+    // three-package release family (native/README.md), published to the npm
+    // registry with platform prebuilds as optionalDependencies; the staging
+    // install resolves it from the registry, not from these tarballs.
+    const registryExternal = new Set(['@deepseek-ai/node-addon-landlock-run'])
+    const { included, excluded } = computeRuntimeClosure(manifests, roots, registryExternal)
+    console.log(`build-desktop-dist: runtime closure ${included.length} included, ${excluded.length} excluded of ${manifests.size} tarballs`)
+    console.log(`build-desktop-dist: closure roots (${roots.length}): ${roots.join(', ')}`)
+    const all = packedDependencies([PACK_DHS, PACK_VENDOR])
+    const dependencies = new Map<string, string>()
+    for (const name of included) {
+      const tarball = all.get(name)
+      if (tarball === undefined) throw new Error(`build-desktop-dist: closure member ${name} has no tarball`)
+      // Relative specs keep the generated package.json and its lockfile free
+      // of build-machine paths.
+      dependencies.set(name, relativeTarballSpec(STAGING, tarball))
+    }
+    // pnpm 私有 Runtime：与仓库 packageManager pin 同版本，经锁文件
+    // 可重复打包；Terminal 与维护命令经 ELECTRON_RUN_AS_NODE 运行它，
+    // 绝不读系统 pnpm、绝不依赖 global PATH。
+    const rootManifest = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as { packageManager?: unknown }
+    const pnpmPin = typeof rootManifest.packageManager === 'string' && rootManifest.packageManager.startsWith('pnpm@')
+      ? rootManifest.packageManager.slice('pnpm@'.length)
+      : null
+    if (pnpmPin === null) throw new Error('build-desktop-dist: root package.json lacks a pnpm@<version> packageManager pin')
+    dependencies.set('pnpm', pnpmPin)
+    writeFileSync(join(STAGING, 'package.json'), `${JSON.stringify({
+      name: 'deepcode-dist',
+      version: '0.0.0',
+      private: true,
+      dependencies: Object.fromEntries(dependencies),
+    }, null, 2)}\n`)
+    // Reproducibility: seed the committed lockfile so npm resolves every
+    // external registry dependency at its locked version; the result is
+    // written back below, so external drift is visible as a git diff.
+    if (existsSync(COMMITTED_LOCK)) cpSync(COMMITTED_LOCK, join(STAGING, 'package-lock.json'))
+    // No --omit=optional: koffi (Windows ACL sandbox) and the Landlock
+    // platform packages ship prebuilt binaries as optionalDependencies, and
+    // skipping them makes koffi's install script attempt a source build.
+    runNpm(['install', '--no-audit', '--no-fund'], STAGING)
+    const lockText = readFileSync(join(STAGING, 'package-lock.json'), 'utf8')
+    const lockIssues = portableLockfileIssues(lockText)
+    if (lockIssues.length > 0) {
+      throw new Error(`build-desktop-dist: staging lockfile is not machine-portable: ${lockIssues.join('; ')}`)
+    }
+    if (!existsSync(COMMITTED_LOCK) || readFileSync(COMMITTED_LOCK, 'utf8') !== lockText) {
+      writeFileSync(COMMITTED_LOCK, lockText)
+      console.log(`build-desktop-dist: runtime lockfile updated at ${COMMITTED_LOCK} — review and commit it`)
+    } else {
+      console.log('build-desktop-dist: runtime lockfile unchanged (external dependency set is pinned)')
+    }
+    const entry = join(STAGING, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')
+    if (!existsSync(entry)) throw new Error('build-desktop-dist: installed tree lacks @deepseek-ai/dsh/lib/bin.js')
+    const pnpmEntry = join(STAGING, 'node_modules', 'pnpm', 'bin', 'pnpm.cjs')
+    if (!existsSync(pnpmEntry)) throw new Error('build-desktop-dist: installed tree lacks pnpm/bin/pnpm.cjs')
+    // 版本一致性门禁：声明版本（本次打包的 dsh tarball manifest）必须等于
+    // 实际安装进 Runtime 的版本。npm 缓存复用旧 tarball 的坑在此现形——
+    // 不一致立即失败，绝不把旧货装进发行目录（B1 第 6 扇窗教训二）。
+    const declaredDshVersion = manifests.get('@deepseek-ai/dsh')?.version
+    if (typeof declaredDshVersion !== 'string') throw new Error('build-desktop-dist: dsh tarball manifest has no version')
+    const installedManifest = join(STAGING, 'node_modules', '@deepseek-ai', 'dsh', 'package.json')
+    let installedDshVersion: unknown
+    try {
+      installedDshVersion = (JSON.parse(readFileSync(installedManifest, 'utf8')) as { version?: unknown }).version
+    } catch (error) {
+      throw new Error(`build-desktop-dist: cannot read installed DSH manifest ${installedManifest}: ${String(error instanceof Error ? error.message : error)}`)
+    }
+    if (installedDshVersion !== declaredDshVersion) {
+      throw new Error(
+        `build-desktop-dist: declared DSH version ${declaredDshVersion} does not match installed runtime version ${String(installedDshVersion)} — the npm cache served a stale tarball; clear the cache and rebuild`,
+      )
+    }
+    rmSync(RUNTIME_DIR, { recursive: true, force: true })
+    mkdirSync(RUNTIME_DIR, { recursive: true })
+    cpSync(join(STAGING, 'node_modules'), join(RUNTIME_DIR, 'node_modules'), { recursive: true })
+    // npm's hidden lockfile records every tarball's `resolved` as a file: URL
+    // relative to the staging directory — a path through the build user's home
+    // and repository location. The packaged app never runs npm, so the file
+    // has no runtime consumer; the leak scan treats any surviving copy as a
+    // finding.
+    rmSync(join(RUNTIME_DIR, 'node_modules', '.package-lock.json'), { force: true })
+    shipThemePlugin(RUNTIME_DIR)
+    const pruned = pruneNonWindowsPlatforms(RUNTIME_DIR)
+    console.log(`build-desktop-dist: platform prune removed ${pruned.length} artifacts (${formatBytes(directoryBytes(RUNTIME_DIR))} runtime after prune)`)
+    console.log(`build-desktop-dist: DSH runtime assembled at ${RUNTIME_DIR}`)
+  } finally {
+    rmSync(STAGING, { recursive: true, force: true })
+  }
+}
+
+/** Print the distribution summary. */
+function summarize(): void {
+  const exe = join(WIN_UNPACKED, 'DeepCode.exe')
+  if (!existsSync(exe)) throw new Error(`build-desktop-dist: ${exe} was not produced`)
+  const totalBytes = directoryBytes(WIN_UNPACKED)
+  const installers = readdirSync(DIST_ROOT).filter(name => name.endsWith('.exe') && name.includes('Setup'))
+  // 交付身份：installer 文件名必须携带 DeepCode app version（唯一手写源头
+  // 是 apps/desktop/package.json）。文件名与产品版本不一致立即失败。
+  let appVersion: unknown
+  try {
+    appVersion = (JSON.parse(readFileSync(join(ROOT, 'apps', 'desktop', 'package.json'), 'utf8')) as { version?: unknown }).version
+  } catch (error) {
+    throw new Error(`build-desktop-dist: cannot read DeepCode app manifest: ${String(error instanceof Error ? error.message : error)}`)
+  }
+  for (const installer of installers) {
+    if (!installer.includes(String(appVersion))) {
+      throw new Error(`build-desktop-dist: installer ${installer} does not carry the DeepCode app version ${String(appVersion)}`)
+    }
+  }
+  console.log(`build-desktop-dist: distribution at ${WIN_UNPACKED}`)
+  console.log(`build-desktop-dist: executable ${exe} (${formatBytes(statSync(exe).size)})`)
+  console.log(`build-desktop-dist: total ${formatBytes(totalBytes)}`)
+  for (const installer of installers) {
+    const path = join(DIST_ROOT, installer)
+    console.log(`build-desktop-dist: installer ${path} (${formatBytes(statSync(path).size)})`)
+  }
+  if (installers.length === 0) throw new Error('build-desktop-dist: no NSIS installer produced')
+}
+
+/** Format a byte count for the summary. */
+function formatBytes(bytes: number): string {
+  const mb = bytes / 1024 / 1024
+  return mb >= 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb.toFixed(1)} MB`
+}
+
+if (import.meta.main) {
+  requirePrerequisites()
+  requireUnlockedOutput()
+  packFamily('dsh', PACK_DHS)
+  packFamily('vendor', PACK_VENDOR)
+  assembleRuntime()
+  // electron-builder toolchain binaries (NSIS, winCodeSign) download from
+  // GitHub; a mirror keeps network-restricted builds working.
+  const builderEnv = {
+    ...process.env,
+    PATH: `${pnpmShimDirectory()}${delimiter}${process.env.PATH ?? ''}`,
+    ...process.env.ELECTRON_BUILDER_BINARIES_MIRROR === undefined
+      ? { ELECTRON_BUILDER_BINARIES_MIRROR: 'https://npmmirror.com/mirrors/electron-builder-binaries/' }
+      : {},
+  }
+  runNode([join(ROOT, 'node_modules', 'electron-builder', 'out', 'cli', 'cli.js'),
+    '--dir', '--config', join(ROOT, 'apps', 'desktop', 'electron-builder.yml')], ROOT, {
+    env: builderEnv,
+  })
+  // The DSH runtime lands in resources/dsh, where the main process launches it
+  // via ELECTRON_RUN_AS_NODE. Copied here (not via extraResources) so the
+  // distribution build owns the copy and its timing.
+  const resourcesDsh = join(WIN_UNPACKED, 'resources', 'dsh')
+  cpSync(RUNTIME_DIR, resourcesDsh, { recursive: true })
+  // The staging copy has served its purpose; dropping it halves disk use and
+  // keeps the final release-set scan scoped to what actually ships.
+  rmSync(RUNTIME_DIR, { recursive: true, force: true })
+  console.log(`build-desktop-dist: DSH runtime copied to ${resourcesDsh}`)
+  // 交付身份：embedded DSH source/commit 标识与 Runtime 一起出厂。
+  // About 面板据此展示产物可溯源事实；git 不可用时打包直接失败
+  // （打包必须发生在 git checkout 里，产物必须可溯源）。
+  const sourceCommit = readDevSourceCommit(ROOT)
+  if (sourceCommit === null) {
+    throw new Error('build-desktop-dist: git HEAD is unavailable; a packaged DeepCode must carry its source/commit identifier')
+  }
+  writeFileSync(join(WIN_UNPACKED, 'resources', SOURCE_COMMIT_FILENAME), `${sourceCommit}\n`, 'utf8')
+  console.log(`build-desktop-dist: source/commit identifier ${sourceCommit} written to resources/${SOURCE_COMMIT_FILENAME}`)
+  // （终端 shims 在运行时由 main 生成到 userData/deepcode-bin——转发当前
+  // exact executable，见 apps/desktop/src/terminal-service.ts。）
+  // Sanitize and verify BEFORE building the installer: any finding fails the
+  // build here, so the NSIS package can only ever wrap a sanitized payload.
+  const findings = sanitizeAndVerify(WIN_UNPACKED, ROOT, homedir())
+  if (findings.length > 0) {
+    throw new Error(`build-desktop-dist: distribution leaked sensitive content:\n${findings.join('\n')}`)
+  }
+  console.log('build-desktop-dist: sanitize and leak scan passed')
+  // The NSIS installer is built from the sanitized win-unpacked
+  // (--prepackaged), so resources/dsh and the checked payload are exactly
+  // what ships.
+  runNode([join(ROOT, 'node_modules', 'electron-builder', 'out', 'cli', 'cli.js'),
+    '--prepackaged', WIN_UNPACKED, '--win', 'nsis', '--config', join(ROOT, 'apps', 'desktop', 'electron-builder.yml')],
+  ROOT, { env: builderEnv })
+  console.log(`build-desktop-dist: NSIS installer built from sanitized ${WIN_UNPACKED}`)
+  // electron-builder's debug dump records the full NSIS command line —
+  // build-machine repository, user, temp, and cache paths. It is not a
+  // release artifact; the release-set scan reports any survivor.
+  rmSync(join(DIST_ROOT, 'builder-debug.yml'), { force: true })
+  // Final scan over the whole prepared release set (win-unpacked, installer
+  // metadata such as latest.yml, and anything else left in dist/desktop):
+  // scan-only, so files the installer already wrapped are never modified.
+  const releaseFindings = sanitizeAndVerify(DIST_ROOT, ROOT, homedir(), { rewrite: false })
+  if (releaseFindings.length > 0) {
+    throw new Error(`build-desktop-dist: release set leaked sensitive content:\n${releaseFindings.join('\n')}`)
+  }
+  console.log('build-desktop-dist: release-set leak scan passed')
+  // Release artifact SHA-256 manifest (P4 发行物完整性 gate)：installer 与
+  // 打包 exe 的 digest 随发布集出厂，verify-desktop-dist.ps1 逐项比对。
+  writeSha256Manifest()
+  summarize()
+}
+
+/** 生成发布集的 SHA-256 manifest（installer + win-unpacked exe）。
+ * 清单记**相对 dist/desktop 的路径**（统一正斜杠），verify-desktop-dist.ps1
+ * 按同一约定解析——两端共用一套路径约定，绝不各写各的。 */
+function writeSha256Manifest(): void {
+  const lines: string[] = []
+  const installer = readdirSync(DIST_ROOT).find(name => /^DeepCode-Setup-.*\.exe$/.test(name))
+  const targets: { rel: string; abs: string }[] = [
+    ...installer === undefined ? [] : [{ rel: installer, abs: join(DIST_ROOT, installer) }],
+    { rel: 'win-unpacked/DeepCode.exe', abs: join(WIN_UNPACKED, 'DeepCode.exe') },
+  ]
+  for (const target of targets) {
+    if (!existsSync(target.abs)) {
+      throw new Error(`build-desktop-dist: cannot hash missing artifact ${target.abs}`)
+    }
+    const digest = createHash('sha256').update(readFileSync(target.abs)).digest('hex')
+    lines.push(`${digest}  ${target.rel}`)
+  }
+  const manifest = join(DIST_ROOT, 'SHA256SUMS.txt')
+  writeFileSync(manifest, `${lines.join('\n')}\n`, 'utf8')
+  console.log(`build-desktop-dist: SHA-256 manifest written to ${manifest}`)
+}

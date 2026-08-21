@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<!--
+  DeepCode Desktop Chrome：顶栏 + 菜单面板 + Harness 控制面。
+  作为置顶 WebContentsView 渲染：平时只占顶栏高度，菜单展开时由 main
+  扩展到全窗（本页背景透明，只有绘制的表面不透明）。
+  Compatibility View（官方 Web UI）在它下方，永不被注入。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+  <title>DeepCode</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header id="topbar">
+    <button id="hamburger" class="icon-button no-drag" aria-haspopup="menu" aria-expanded="false" aria-controls="main-menu" title="菜单">
+      <span class="hamburger-lines" aria-hidden="true"><i></i><i></i><i></i></span>
+    </button>
+    <div id="brand" aria-hidden="true">
+      <img id="brand-icon" src="./icon.png" alt="">
+      <span id="brand-name">DeepCode</span>
+    </div>
+    <div id="window-title" role="heading" aria-level="1">DeepCode</div>
+    <div id="recovery-banner" role="status" hidden>
+      <span id="recovery-banner-text"></span>
+      <button id="recovery-banner-details" class="mini-button no-drag" data-i18n="notice.details">查看详情</button>
+      <button id="recovery-banner-ack" class="mini-button no-drag" data-i18n="notice.ack">知道了</button>
+    </div>
+    <button id="status-pill" class="no-drag" aria-haspopup="menu" aria-controls="harness-panel">
+      <span id="status-dot" aria-hidden="true"></span>
+      <span id="status-text"></span>
+    </button>
+  </header>
+
+  <div id="overlay" hidden>
+    <div id="main-menu" class="panel" role="menu" aria-label="DeepCode 菜单" hidden>
+      <button class="menu-item" role="menuitem" data-open="harness">
+        <span data-i18n="menu.harness">Harness</span><span class="chevron" aria-hidden="true">›</span>
+      </button>
+      <button class="menu-item" role="menuitem" data-open="theme">
+        <span data-i18n="menu.theme">主题</span><span class="chevron" aria-hidden="true">›</span>
+      </button>
+      <button class="menu-item" role="menuitem" id="menu-terminal" data-command="terminal" data-i18n="menu.terminal">DSH 终端</button>
+      <button class="menu-item" role="menuitem" id="menu-about" data-command="about" data-i18n="menu.about">关于 DeepCode</button>
+      <button class="menu-item" role="menuitem" data-command="check-updates" data-i18n="menu.update">检查更新</button>
+      <button class="menu-item" role="menuitem" id="menu-diagnostics" data-command="diagnostics" data-i18n="menu.diagnostics">诊断中心</button>
+      <div class="separator" role="separator"></div>
+      <button class="menu-item" role="menuitem" id="menu-quit" data-command="quit" data-i18n="menu.quit">退出 DeepCode</button>
+    </div>
+
+    <div id="theme-panel" class="panel" role="menu" aria-label="主题" hidden>
+      <button class="menu-item" role="menuitemradio" id="theme-system" data-theme="system">
+        <span data-i18n="theme.system">跟随系统</span><span class="checkmark" aria-hidden="true">✓</span>
+      </button>
+      <button class="menu-item" role="menuitemradio" id="theme-light" data-theme="light">
+        <span data-i18n="theme.light">浅色</span><span class="checkmark" aria-hidden="true">✓</span>
+      </button>
+      <button class="menu-item" role="menuitemradio" id="theme-dark" data-theme="dark">
+        <span data-i18n="theme.dark">深色</span><span class="checkmark" aria-hidden="true">✓</span>
+      </button>
+    </div>
+
+    <div id="harness-panel" class="panel wide" role="menu" aria-label="Harness" hidden>
+      <div id="harness-info"><!-- 信息行由 renderer 填充 --></div>
+      <div id="harness-permissions"><!-- 权限事实（Harness 唯一真相源）由 renderer 填充 --></div>
+      <button class="menu-item" id="harness-toggle-expert" aria-expanded="false">
+        <span data-i18n="action.expert">专家详情</span>
+      </button>
+      <div id="harness-expert" hidden><!-- pending / boot-failing 详情由 renderer 填充 --></div>
+      <div class="separator" role="separator"></div>
+      <div id="harness-actions"><!-- 动作与 profile 列表由 renderer 填充 --></div>
+      <!-- Plugin Manager v1：Harness 面板二级页面（只展示/操作事实，无 Marketplace/推荐） -->
+      <div id="plugin-view" hidden>
+        <div id="plugin-target"><!-- 目标 Profile 选择由 renderer 填充 --></div>
+        <div id="plugin-inventory"><!-- bundles/dependencies/effective 三区由 renderer 填充 --></div>
+        <div id="plugin-operation"><!-- 运行中操作：步骤/输出/Cancel/handoff 由 renderer 填充 --></div>
+      </div>
+    </div>
+
+    <!-- Diagnostics Center：独立面板（Build Info + Update + 诊断操作） -->
+    <div id="diagnostics-panel" class="panel wide" role="dialog" aria-label="诊断中心" hidden>
+      <div id="diagnostics-build-info"><!-- Build Info 行由 renderer 填充 --></div>
+      <div id="diagnostics-update"><!-- 更新状态与操作由 renderer 填充 --></div>
+      <div class="separator" role="separator"></div>
+      <div id="diagnostics-actions"><!-- Open Log Folder / Copy Build Info / Export 由 renderer 填充 --></div>
+    </div>
+
+    <!-- Feedback：先发泄后排查（P7-A~E）。发送永不因 AI 不可用而不可用。 -->
+    <div id="feedback-panel" class="panel wide" role="dialog" aria-label="发送反馈" hidden>
+      <div id="feedback-user"><!-- 问题描述输入由 renderer 填充 --></div>
+      <div id="feedback-diagnostics"><!-- 诊断包预览（折叠、可编辑）由 renderer 填充 --></div>
+      <div id="feedback-send-row"><!-- 发送按钮由 renderer 填充 --></div>
+      <div id="feedback-reply"><!-- AI 排查回复 / issue 预览由 renderer 填充 --></div>
+      <div id="feedback-submit-row"><!-- 复制 + 打开 GitHub 由 renderer 填充 --></div>
+    </div>
+  </div>
+
+  <!-- Feedback 入口：左下角常驻，bug 语义（不抢焦点，半崩状态下仍可点）。 -->
+  <button id="feedback-entry" class="no-drag" aria-haspopup="dialog" aria-controls="feedback-panel" title="发送反馈">
+    <span class="feedback-bug" aria-hidden="true"></span>
+  </button>
+
+  <script type="module" src="../../lib/chrome/renderer.js"></script>
+</body>
+</html>

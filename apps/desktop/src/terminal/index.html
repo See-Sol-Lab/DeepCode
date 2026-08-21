@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<!--
+  DSH Terminal 窗口：xterm（vendored 静态资产）渲染 pty 字节流。
+  无 Node 权限（sandbox），经窄 preload 与 main 桥接 pty host。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self';">
+  <title>DSH Terminal</title>
+  <link rel="stylesheet" href="./vendor/xterm.css">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div id="terminal" role="log" aria-label="DSH Terminal"></div>
+  <script type="module" src="../../lib/terminal/renderer.js"></script>
+</body>
+</html>

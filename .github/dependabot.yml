@@ -1,0 +1,46 @@
+version: 2
+
+# DeepCode receives dependency versions through upstream Harness synchronization.
+# Raise these limits only when DeepCode starts maintaining dependencies independently.
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    open-pull-requests-limit: 0
+    exclude-paths:
+      # Vendored Cordis sources follow vendor/README.md instead of registry updates.
+      - "vendor/**"
+    schedule:
+      interval: "cron"
+      cronjob: "0 4 * * *"
+      timezone: "Asia/Shanghai"
+    cooldown:
+      default-days: 30
+    labels:
+      - "kind/dependency"
+      - "area/infra"
+
+  - package-ecosystem: "uv"
+    directory: "/python/sdk"
+    open-pull-requests-limit: 0
+    schedule:
+      interval: "cron"
+      cronjob: "0 4 * * *"
+      timezone: "Asia/Shanghai"
+    cooldown:
+      default-days: 30
+    labels:
+      - "kind/dependency"
+      - "area/infra"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    open-pull-requests-limit: 0
+    schedule:
+      interval: "cron"
+      cronjob: "0 4 * * *"
+      timezone: "Asia/Shanghai"
+    cooldown:
+      default-days: 30
+    labels:
+      - "kind/dependency"
+      - "area/infra"
