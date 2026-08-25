@@ -29,26 +29,18 @@ contextBridge.exposeInMainWorld('deepCodeDesktop', {
   /** 菜单开合时请求 main 调整 Chrome view bounds（顶栏高 ↔ 全窗覆盖）。 */
   setChromeExpanded: (expanded: boolean): Promise<void> => ipcRenderer.invoke('deepcode:set-chrome-expanded', expanded === true),
   /**
-   * 订阅"打开 Harness 面板"请求（Tray 的 Open Harness Panel 经此到达）。
+   * 订阅"打开更新面板"请求（Tray 的 Check for Updates 经此到达）。
+   * Harness/反馈面板的订阅已随 P8-D39 移除：那些面板移居官方设置页，
+   * Chrome 不再有可打开的对应容器。
    * @returns 取消订阅函数。
    */
-  onOpenHarnessPanel: (listener: () => void): (() => void) => {
+  onOpenUpdatePanel: (listener: () => void): (() => void) => {
     const wrapped = (): void => {
       listener()
     }
-    ipcRenderer.on('deepcode:open-harness-panel', wrapped)
+    ipcRenderer.on('deepcode:open-update-panel', wrapped)
     return () => {
-      ipcRenderer.removeListener('deepcode:open-harness-panel', wrapped)
-    }
-  },
-  /** 订阅"打开诊断面板"请求（Tray 的 Check for Updates 经此到达）。 */
-  onOpenDiagnosticsPanel: (listener: () => void): (() => void) => {
-    const wrapped = (): void => {
-      listener()
-    }
-    ipcRenderer.on('deepcode:open-diagnostics-panel', wrapped)
-    return () => {
-      ipcRenderer.removeListener('deepcode:open-diagnostics-panel', wrapped)
+      ipcRenderer.removeListener('deepcode:open-update-panel', wrapped)
     }
   },
 })

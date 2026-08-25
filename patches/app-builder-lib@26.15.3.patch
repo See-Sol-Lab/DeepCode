@@ -1,0 +1,101 @@
+diff --git a/out/targets/targetUtil.js b/out/targets/targetUtil.js
+index 1e1891371b13892c688d6414bcf07243f34b11e4..ce181bc14b32e5089e7ed46dd7c0a62ad8bd0698 100644
+--- a/out/targets/targetUtil.js
++++ b/out/targets/targetUtil.js
+@@ -38,7 +38,13 @@ async function createStageDirPath(target, packager, arch) {
+ // https://github.com/electron-userland/electron-builder/issues/3100
+ // https://github.com/electron-userland/electron-builder/commit/2539cfba20dc639128e75c5b786651b652bb4b78
+ function getWindowsInstallationDirName(appInfo, isTryToUseProductName) {
+-    return isTryToUseProductName && /^[-_+0-9a-zA-Z .]+$/.test(appInfo.productFilename) ? appInfo.productFilename : appInfo.sanitizedName;
++    // DeepCode local patch: upstream refuses the product name for one-click
++    // per-user installs and falls back to sanitizedName -- for a scoped
++    // package that yields "@see-sol-labdeepcode" under LOCALAPPDATA\Programs.
++    // Our product name ("DeepCode") passes the safe-charset test, so always
++    // try it. Existing installs are unaffected: the per-user branch reads
++    // InstallLocation from HKCU first and keeps upgrading in place.
++    return /^[-_+0-9a-zA-Z .]+$/.test(appInfo.productFilename) ? appInfo.productFilename : appInfo.sanitizedName;
+ }
+ // https://github.com/electron-userland/electron-builder/issues/6747
+ function getWindowsInstallationAppPackageName(appName) {
+diff --git a/templates/nsis/installSection.nsh b/templates/nsis/installSection.nsh
+index 053772f55ca6ece52f0a34c4fa0f05c9a5f07bd2..a25459a5f631a42331284bb2e20cc6982dfb0f94 100644
+--- a/templates/nsis/installSection.nsh
++++ b/templates/nsis/installSection.nsh
+@@ -16,19 +16,31 @@ StrCpy $appExe "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
+     File /oname=$PLUGINSDIR\installerHeaderico.ico "${HEADER_ICO}"
+   !endif
+   ${IfNot} ${Silent}
+-    !ifdef HEADER_ICO
+-      SpiderBanner::Show /MODERN /ICON "$PLUGINSDIR\installerHeaderico.ico"
++    !ifdef DEEPCODE_USE_MUI_INSTFILES
++      # DeepCode local patch: compile-time display-layer switch. Do not create
++      # the SpiderBanner at all -- the MUI InstFiles page is already compiled
++      # and sitting behind it; the banner is display-only and owns no install
++      # lifecycle. With it gone, the include's MUI_PAGE_CUSTOMFUNCTION_SHOW
++      # skin runs on a window the user actually sees. Silent installs never
++      # reach this branch.
++      ShowWindow $HWNDPARENT ${SW_SHOW}
++      BringToFront
+     !else
+-      SpiderBanner::Show /MODERN
++      !ifdef HEADER_ICO
++        SpiderBanner::Show /MODERN /ICON "$PLUGINSDIR\installerHeaderico.ico"
++      !else
++        SpiderBanner::Show /MODERN
++      !endif
++  
++      FindWindow $0 "#32770" "" $hwndparent
++      FindWindow $0 "#32770" "" $hwndparent $0
++      GetDlgItem $0 $0 1000
++      SendMessage $0 ${WM_SETTEXT} 0 "STR:$(installing)"
+     !endif
+ 
+-    FindWindow $0 "#32770" "" $hwndparent
+-    FindWindow $0 "#32770" "" $hwndparent $0
+-    GetDlgItem $0 $0 1000
+-    SendMessage $0 ${WM_SETTEXT} 0 "STR:$(installing)"
+-
+     StrCpy $1 $hwndparent
+ 		System::Call 'user32::ShutdownBlockReasonCreate(${SYSTYPE_PTR}r1, w "$(installing)")'
++
+   ${endif}
+   !insertmacro CHECK_APP_RUNNING
+ !else
+diff --git a/templates/nsis/oneClick.nsh b/templates/nsis/oneClick.nsh
+index 01d007ed273c72ea5efb191f823c203faefdf177..735aefb937bd314a8fcd31a37eb191684bdc0026 100644
+--- a/templates/nsis/oneClick.nsh
++++ b/templates/nsis/oneClick.nsh
+@@ -7,6 +7,14 @@
+ 
+ !insertmacro MUI_PAGE_INSTFILES
+ !ifdef BUILD_UNINSTALLER
++  # DeepCode local patch: MUI page-hook defines are consumed first-come-first-
++  # served, and the installer page above also expands in the uninstaller
++  # build -- so an un. SHOW hook defined up front gets eaten by a page that
++  # never shows, failing the compile. This seam lets user scripts define the
++  # uninstall page's hooks after the installer page has expanded.
++  !ifmacrodef customUnpageInstfilesPre
++    !insertmacro customUnpageInstfilesPre
++  !endif
+   !insertmacro MUI_UNPAGE_INSTFILES
+ !endif
+ 
+diff --git a/templates/nsis/uninstaller.nsh b/templates/nsis/uninstaller.nsh
+index c3f4f11982689baa220de5051bbf144adbd9accc..6b3e43bb1cbfc59138e5a8d32e9b0cbfcfe034bc 100644
+--- a/templates/nsis/uninstaller.nsh
++++ b/templates/nsis/uninstaller.nsh
+@@ -24,7 +24,13 @@ Function un.onInit
+ 
+       # one-click installer executes uninstall section in the silent mode, but we must show message dialog if silent mode was not explicitly set by user (using /S flag)
+       call un.checkAppRunning
+-      SetSilent silent
++      # DeepCode local patch: with the skinned MUI InstFiles page enabled, an
++      # interactive uninstall keeps its UI (the skin lives on that page).
++      # Explicit /S (upgrades, QuietUninstallString) is handled above and
++      # stays fully silent.
++      !ifndef DEEPCODE_USE_MUI_INSTFILES
++        SetSilent silent
++      !endif
+     !endif
+   ${endIf}
+ 

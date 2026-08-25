@@ -146,6 +146,16 @@ export interface DshLaunch {
  * @param timeoutMs - 超时上限。
  * @returns 校验通过的 discovery 文档。
  */
+/**
+ * discovery 输出的容量上限。真实的 `dsh profiles --json` 只有几 KB；一个
+ * 出错、损坏或被替换掉的 CLI 却能在超时窗口里一直往 stdout 灌数据，而那
+ * 些字符全都堆在 Electron 主进程的内存里。
+ */
+export const DISCOVERY_STDOUT_LIMIT = 4 * 1024 * 1024
+
+/** stderr 只留尾部：诊断要的是最后那几行，不是全部。 */
+export const DISCOVERY_STDERR_TAIL = 64 * 1024
+
 export function runDshProfilesDiscovery(launch: DshLaunch, timeoutMs: number): Promise<ProfileDiscoveryV1> {
   return new Promise((resolve, reject) => {
     const child = spawn(launch.command, launch.args, {
@@ -170,8 +180,22 @@ export function runDshProfilesDiscovery(launch: DshLaunch, timeoutMs: number): P
         reject(new ProfileDiscoveryError(redactSecrets(`dsh profiles --json 在 ${timeoutMs}ms 内未完成`)))
       })
     }, timeoutMs)
-    child.stdout.on('data', (chunk: string) => { stdout += chunk })
-    child.stderr.on('data', (chunk: string) => { stderr += chunk })
+    child.stdout.on('data', (chunk: string) => {
+      if (stdout.length + chunk.length > DISCOVERY_STDOUT_LIMIT) {
+        child.kill()
+        settle(() => {
+          reject(new ProfileDiscoveryError(
+            `dsh profiles --json 的输出超过 ${String(DISCOVERY_STDOUT_LIMIT)} 字符上限，已中止`,
+          ))
+        })
+        return
+      }
+      stdout += chunk
+    })
+    // 只保留尾部：出错时有用的是最后几行，而不是无限增长的全文。
+    child.stderr.on('data', (chunk: string) => {
+      stderr = (stderr + chunk).slice(-DISCOVERY_STDERR_TAIL)
+    })
     child.once('error', (error) => {
       settle(() => {
         reject(new ProfileDiscoveryError(redactSecrets(`无法启动 dsh profiles --json: ${error.message}`)))

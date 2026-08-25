@@ -17,7 +17,9 @@ import {
   packagedExists,
   userDataDir,
 } from './fixtures.ts'
-import { portConnectable } from './chrome-driver.ts'
+import {
+  portConnectable,
+} from './chrome-driver.ts'
 
 /** 本套件的隔离根：无空格（headless argv 无需空格路径，保持断言简单）。 */
 const isolationRoot = (suffix: string): string => sharedIsolationRoot(`dsh-s11-${suffix}-`, 's11headless')

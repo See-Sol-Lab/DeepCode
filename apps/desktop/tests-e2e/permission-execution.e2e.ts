@@ -230,10 +230,19 @@ describe.runIf(packagedExists)('S2/S3/S6/S13 — 权限执行（打包态）', (
 
   async function launchWithMock(temp: string): Promise<ElectronApplication> {
     if (mock === undefined) throw new Error('mock LLM server 未启动')
+    // Managed Home intentionally drops the host DEEPSEEK_API_KEY so the
+    // official Models page can edit it. Seed the same credentials-local
+    // document that page owns instead of bypassing the product policy.
+    const dshHome = join(userDataDir(temp), 'dsh')
+    mkdirSync(dshHome, { recursive: true })
+    writeFileSync(
+      join(dshHome, '.credentials.yaml'),
+      'version: 1\nrefs:\n  DEEPSEEK_API_KEY: mock-key\n',
+      'utf8',
+    )
     const instance = await launchPackaged(temp, {
       env: {
         DEEPSEEK_BASE_URL: `${mock.baseURL}/v1`,
-        DEEPSEEK_API_KEY: 'mock-key',
       },
     })
     app = instance
@@ -293,7 +302,11 @@ describe.runIf(packagedExists)('S2/S3/S6/S13 — 权限执行（打包态）', (
     void rpc('session.prompt', { sessionId, mode: 'queue', content: [{ type: 'text', text: '请按工具要求执行' }] })
 
     // approval 真实可见：DeepCode 不自动批准，也不替用户作答。
-    await expect.poll(async () => approvalVisible(app!), { timeout: 120_000, message: 'approval UI 未出现' }).toBe(true)
+    // 120s → 240s：这一步等的是完整 agent 回合（mock LLM 应答 → 工具调用 →
+    // 审批卡渲染）。单跑整套只要 49 秒，全套连跑时机器满载，同一条要 120
+    // 秒以上——2026-08-24 六套件跑齐时它是唯一的 flaky。超时按最坏负载给，
+    // 否则这条会周期性假红、把真问题盖掉。
+    await expect.poll(async () => approvalVisible(app!), { timeout: 240_000, message: 'approval UI 未出现' }).toBe(true)
     // 按钮文字不足以证明审批真的发生过——页面别处也可能出现"拒绝"二字。
     // 权威是会话日志：escalation 必须真的抵达过 user-approval 通道。
     expect(await sessionEventTypes(sessionId), '会话日志里没有 approval/asked：审批从未真正发生').toContain('approval/asked')
@@ -324,7 +337,11 @@ describe.runIf(packagedExists)('S2/S3/S6/S13 — 权限执行（打包态）', (
     const sessionId = await createVisibleSession(app!, workspaceA)
     void rpc('session.prompt', { sessionId, mode: 'queue', content: [{ type: 'text', text: '请按工具要求执行' }] })
 
-    await expect.poll(async () => approvalVisible(app!), { timeout: 120_000, message: 'approval UI 未出现' }).toBe(true)
+    // 120s → 240s：这一步等的是完整 agent 回合（mock LLM 应答 → 工具调用 →
+    // 审批卡渲染）。单跑整套只要 49 秒，全套连跑时机器满载，同一条要 120
+    // 秒以上——2026-08-24 六套件跑齐时它是唯一的 flaky。超时按最坏负载给，
+    // 否则这条会周期性假红、把真问题盖掉。
+    await expect.poll(async () => approvalVisible(app!), { timeout: 240_000, message: 'approval UI 未出现' }).toBe(true)
     await clickApproval(app!, '允许一次')
     await waitTurnSettled(app!, sessionId)
 

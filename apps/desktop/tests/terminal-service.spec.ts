@@ -117,19 +117,21 @@ describe('resolveTerminalCwd（Profile 目录 → Harness Home + 说明）', () 
   }
 
   it('active Profile 目录存在 → 用目录，无说明', () => {
-    const choice = resolveTerminalCwd(discovery, 'web', 'C:\\home', path => path === 'C:\\home\\profiles\\web')
+    const choice = resolveTerminalCwd(discovery, 'web', 'C:\\home', path => path === 'C:\\home\\profiles\\web', 'zh')
     expect(choice).toEqual({ cwd: 'C:\\home\\profiles\\web', note: null })
   })
 
-  it('目录不存在 → Harness Home + 说明（绝不锚到 install dir）', () => {
-    const choice = resolveTerminalCwd(discovery, 'web', 'C:\\home', () => false)
+  it('目录不存在 → Harness Home + 说明（绝不锚到 install dir）；en 同样含 Harness Home', () => {
+    const choice = resolveTerminalCwd(discovery, 'web', 'C:\\home', () => false, 'zh')
     expect(choice.cwd).toBe('C:\\home')
     expect(choice.note).toContain('Harness Home')
+    const enChoice = resolveTerminalCwd(discovery, 'web', 'C:\\home', () => false, 'en')
+    expect(enChoice.note).toContain('Harness Home')
   })
 
   it('discovery 未完成或没有该 Profile → Harness Home + 说明', () => {
-    expect(resolveTerminalCwd(null, 'web', 'C:\\home', () => true).cwd).toBe('C:\\home')
-    expect(resolveTerminalCwd({ ...discovery, profiles: [] }, 'web', 'C:\\home', () => true).note).toContain('Harness Home')
+    expect(resolveTerminalCwd(null, 'web', 'C:\\home', () => true, 'zh').cwd).toBe('C:\\home')
+    expect(resolveTerminalCwd({ ...discovery, profiles: [] }, 'web', 'C:\\home', () => true, 'zh').note).toContain('Harness Home')
   })
 
   it('spaces/Unicode 目录原样保留', () => {
@@ -138,13 +140,13 @@ describe('resolveTerminalCwd（Profile 目录 → Harness Home + 说明）', () 
       dshHome: 'C:\\深 度 home',
       profiles: [{ name: 'web', dir: 'C:\\深 度 home\\我的 profile', bundles: [], staticStatus: 'web-capable', evidence: [] }],
     }
-    const choice = resolveTerminalCwd(unicode, 'web', 'C:\\深 度 home', path => path === 'C:\\深 度 home\\我的 profile')
+    const choice = resolveTerminalCwd(unicode, 'web', 'C:\\深 度 home', path => path === 'C:\\深 度 home\\我的 profile', 'zh')
     expect(choice.cwd).toBe('C:\\深 度 home\\我的 profile')
   })
 })
 
 describe('buildTerminalWelcome', () => {
-  it('含 DeepCode/DSH/Profile/DSH_HOME/私有 Runtime 来源/宿主/cwd，cwd 回退加说明', () => {
+  it('含 DeepCode/DSH/Profile/DSH_HOME/私有 Runtime 来源/宿主/cwd，cwd 回退加说明（zh 原样）', () => {
     const lines = buildTerminalWelcome({
       appVersion: '0.1.0-alpha.1',
       dshVersion: '0.1.0-rc.5',
@@ -155,7 +157,7 @@ describe('buildTerminalWelcome', () => {
       shellLabel: 'PowerShell',
       cwd: 'C:\\home',
       cwdNote: '未在 discovery 中找到当前 Profile 目录，已使用 Harness Home 作为工作目录。',
-    })
+    }, 'zh')
     expect(lines.join('\n')).toContain('DeepCode 0.1.0-alpha.1')
     expect(lines.join('\n')).toContain('DSH 0.1.0-rc.5')
     expect(lines.join('\n')).toContain('Active Profile: web')
@@ -165,11 +167,29 @@ describe('buildTerminalWelcome', () => {
     expect(lines.join('\n')).toContain('已使用 Harness Home')
   })
 
+  it('en welcome：引导行与 Runtime 来源为英文，事实行不变', () => {
+    const lines = buildTerminalWelcome({
+      appVersion: '0.1.0-alpha.1',
+      dshVersion: '0.1.0-rc.5',
+      nodeVersion: 'v22.18.0',
+      pnpmVersion: '11.7.0',
+      activeProfile: 'web',
+      dshHome: 'C:\\home',
+      shellLabel: 'PowerShell',
+      cwd: 'C:\\home',
+      cwdNote: null,
+    }, 'en')
+    const text = lines.join('\n')
+    expect(text).toContain('DeepCode 0.1.0-alpha.1')
+    expect(text).toContain('all from the DeepCode private runtime')
+    expect(text).toContain('This command line is pre-configured with the DSH environment')
+  })
+
   it('无 cwd 说明时不追加空行', () => {
     const lines = buildTerminalWelcome({
       appVersion: 'x', dshVersion: 'y', nodeVersion: 'v1', pnpmVersion: null,
       activeProfile: 'web', dshHome: 'H', shellLabel: 'cmd', cwd: 'C:\\p', cwdNote: null,
-    })
+    }, 'zh')
     expect(lines.some(line => line === 'unknown')).toBe(false)
     expect(lines.join('\n')).toContain('pnpm unknown')
   })
@@ -312,7 +332,11 @@ describe('真实 CLI spawn（dev 入口 apps/cli/src/bin.ts）', () => {
       expect(resolved).toEqual(['--profile', 'tui', '--version'])
       const result = runDsh(resolved, home)
       expect(result.stderr).not.toContain('takes none of parent')
-      expect(result.stdout).toContain('0.1.0')
+      // 断言版本号的**形状**而不是具体值：这条要证明的是「launcher 层直接结算了
+      // --version 并打印出来」，版本是多少与它要防的回归无关。写死 '0.1.0' 会在
+      // 每次升级上游时假报失败——2026-08-22 升到 dsh-v0.1.1-rc.2 就红了一次，
+      // 而红的原因跟 --profile 透传毫无关系。
+      expect(result.stdout).toMatch(/\d+\.\d+\.\d+/)
     } finally {
       rmSync(home, { recursive: true, force: true })
     }

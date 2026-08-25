@@ -24,7 +24,7 @@ Status: proposed
 
 ## Alternatives considered
 
-**恢复已删除的 TUI 包。** 不予采纳：桌面壳是本里程碑选定的界面形态，且 [TUI 移除笔记](../../implemented/simplification/2026-08-04-remove-tui-package.md) 要求任何未来终端前端从实际宿主需求重新开始，而不是继承已删除的实现。
+**恢复已删除的 TUI 包。** 不予采纳：桌面壳是本里程碑选定的界面形态，且 [TUI 移除笔记](../../implemented/simplification/2026-08-04-remove-tui-package.zh.md) 要求任何未来终端前端从实际宿主需求重新开始，而不是继承已删除的实现。
 
 **在同一改动中引入 electron-builder 直接产出安装器。** 不予采纳：本阶段是可运行的开发壳；打包属于后续里程碑，现在引入会扩大依赖与验证面。
 

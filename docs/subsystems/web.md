@@ -12,13 +12,14 @@ Search and fetch share no request schema and no business logic, but they are del
 
 ## Search request and result
 
-The model-facing tool argument is just a `query`; `maxResults` is a consumer-owned bound (`dsh-tool-web`'s `searchMaxResults` config, default `8`) passed through the seam and enforced on the way back — if a provider over-returns, the seam truncates `sources[]` and sets `truncated`.
+Each seam request carries exactly one `query`. The `dsh-tool-web` consumer accepts a required `queries` array and fans it out into separate seam requests; a one-item array performs one search. `maxResults` is a consumer-owned bound (`dsh-tool-web`'s `searchMaxResults` config, default `8`) passed through the seam and enforced on the way back — if a provider over-returns, the seam truncates `sources[]` and sets `truncated`.
 
 ```ts type-equiv
 /**
- * What one search-capable backend can return. The model-facing argument is just
- * a query; `maxResults` is a `dsh-tool-web`-layer bound passed through unchanged
- * and enforced on the way back by the seam (see {@link WebSearchResult}).
+ * What one search-capable backend is asked to search. Each request carries one
+ * query; a consumer may issue several requests. `maxResults` is a
+ * `dsh-tool-web`-layer bound passed through unchanged and enforced on the way
+ * back by the seam (see {@link WebSearchResult}).
  */
 interface WebSearchRequest {
   readonly query: string
@@ -137,7 +138,7 @@ Selection never depends on registration, config, or HMR order: a capability has 
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxweb--webruntime"></a>
 
@@ -195,5 +196,5 @@ async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearch
 async fetch(request: WebFetchRequest, signal?: AbortSignal): Promise<WebFetchResult>
 ```
 
-Source: [`packages/web/web/src/index.ts:74`](../../packages/web/web/src/index.ts)
+Source: [`packages/web/web/src/index.ts`](../../packages/web/web/src/index.ts)
 <!-- END GENERATED cordis-surface -->

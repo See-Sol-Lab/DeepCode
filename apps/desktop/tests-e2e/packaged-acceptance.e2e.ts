@@ -25,12 +25,14 @@ import {
 } from './fixtures.ts'
 import {
   portConnectable as portOpen,
-  shutdownApp,
-  clickChromeButton,
+  clickDeepCodeButton,
+  deepCodeSectionText,
   dumpChromeButtons,
+  openDeepCodeSection,
   openHarnessPanel,
-  waitForChromeElement,
+  shutdownApp,
   waitForCompMount,
+  waitForDeepCodeElement,
   waitForWindow,
 } from './chrome-driver.ts'
 
@@ -183,12 +185,11 @@ describe.runIf(packagedExists)('Packaged Acceptance（Case A–F）', () => {
         // production 代码零测试后门，被替换的只是对话框本身。
         await stubDialogs(app)
         await waitForCompMount(app)
-        // production 控制入口：状态胶囊 → Harness 面板 → 切换 Profile 子视图
-        // → 点目标 profile（真实 Chrome DOM 点击）。
+        // production 控制入口（P8-D39）：官方设置页 → DeepCode「Harness（桌面）」
+        // 分区 → profile 行上的切换钮（真实 DOM 点击；两级子视图已取消）。
         try {
           await openHarnessPanel(app)
-          await clickChromeButton(app, 'harness-switch-profile')
-          await clickChromeButton(app, 'harness-profile-web-two')
+          await clickDeepCodeButton(app, 'profile-switch-web-two')
         } catch (error) {
           throw new Error(`${String(error)}
 --- Chrome 按钮 dump ---
@@ -198,7 +199,7 @@ ${await dumpChromeButtons(app)}`)
         await waitForCompMount(app)
         // restart：不改变 selection（同一 production 入口）。
         await openHarnessPanel(app)
-        await clickChromeButton(app, 'harness-restart')
+        await clickDeepCodeButton(app, 'harness-restart')
         await waitForCompMount(app)
         expect(readLauncherState(temp).active.profile).toBe('web-two')
         expect(readLauncherState(temp).lastBootFailure).toBeNull()
@@ -285,8 +286,7 @@ ${await dumpChromeButtons(app)}`)
         await waitForCompMount(app)
         try {
           await openHarnessPanel(app)
-          await clickChromeButton(app, 'harness-switch-profile')
-          await clickChromeButton(app, 'harness-profile-web-bad')
+          await clickDeepCodeButton(app, 'profile-switch-web-bad')
         } catch (error) {
           throw new Error(`${String(error)}
 --- Chrome 按钮 dump ---
@@ -301,7 +301,7 @@ ${await dumpChromeButtons(app)}`)
         // fallback 成功后 Harness 面板出现恢复详情区（证据跨重启保留）。
         await waitForCompMount(app)
         await openHarnessPanel(app)
-        await waitForChromeElement(app, 'harness-recovery')
+        await waitForDeepCodeElement(app, 'harness-recovery')
       } finally {
         await shutdownApp(app)
       }
@@ -357,11 +357,23 @@ ${await dumpChromeButtons(app)}`)
         // production 代码零测试后门，被替换的只是对话框本身。
         await stubDialogs(app)
         await waitForCompMount(app)
-        // 等启动附带的自动 discovery 完成（切换 Profile 子视图有列表），
-        // 之后再取基线，保证基线覆盖"boot + 自动 discovery"之后的稳态。
+        // 等 discovery 完成（Profile 列表出现），之后再取基线，保证基线
+        // 覆盖"boot + discovery"之后的稳态。Existing Home 的 profiles 要经
+        // 一次显式 discovery 才进列表（plugin-recovery S10c 同源现象，
+        // 2026-08-24 六套件跑齐时一并抓到）；基线放在它之后取反而更严格——
+        // 这次 discovery 本身也被纳入了「不得触碰用户文件」的覆盖范围。
         await openHarnessPanel(app)
-        await clickChromeButton(app, 'harness-switch-profile')
-        await waitForChromeElement(app, 'harness-profile-web-one')
+        await clickDeepCodeButton(app, 'harness-refresh')
+        // 等的是「discovery 完成、列表里有 web-one」，**不能**等
+        // profile-switch-web-one：那个按钮只给可切换的 profile，而 active
+        // 的那个按设计不带（settings-plugin 的 switchable 明确排除
+        // profile.active）——本用例的 active 恰恰就是 web-one，所以那个锚点
+        // 永远不会出现（2026-08-24 现场：同屏锚点齐全，唯独没有任何
+        // profile-switch-*）。
+        await expect.poll(
+          async () => (await deepCodeSectionText(app)).includes('web-one'),
+          { timeout: 90_000, message: 'discovery 后 Profile 列表里没有 web-one' },
+        ).toBe(true)
         // 基线：真实 boot 已完成后（官方 Harness 可以维护它自己的 cordis.yml
         // 与 profiles/node_modules fallback），记录 DeepCode 不得触碰的文件与
         // 目录集合。
@@ -387,10 +399,13 @@ ${await dumpChromeButtons(app)}`)
         }
         const treeBefore = tree()
         // discovery-only：只读发现必须完全零写入（production 刷新入口）。
-        await clickChromeButton(app, 'harness-back')
-        await clickChromeButton(app, 'harness-refresh')
-        await clickChromeButton(app, 'harness-switch-profile')
-        await waitForChromeElement(app, 'harness-profile-web-one')
+        // 同上：等列表里有 web-one，不等 profile-switch-*——active 的那个
+        // 按设计不带切换钮。
+        await clickDeepCodeButton(app, 'harness-refresh')
+        await expect.poll(
+          async () => (await deepCodeSectionText(app)).includes('web-one'),
+          { timeout: 90_000, message: 'refresh 后 Profile 列表里没有 web-one' },
+        ).toBe(true)
         expect(tree()).toEqual(treeBefore)
         for (const { file, content } of bytes) {
           expect(readFileSync(file, 'utf8'), file).toBe(content)
@@ -407,6 +422,31 @@ ${await dumpChromeButtons(app)}`)
       rmSync(join(temp, '..'), { recursive: true, force: true })
     }
   })
+
+  it('菜单的「BUG诊断与反馈」打开合并面板，反馈输入真的渲染（D13 终态）', async () => {
+    // 浮动反馈层已删（P8-D13 终章）：反馈唯一入口是菜单项。这条守住两件事：
+    // 入口点得动，以及"菜单承诺了、内容兑现了"——feedback-text 必须真的在
+    // 合并后的 diagnostics 面板里渲染出来（D13 当年翻过的车）。
+    const temp = isolationRoot('feedbackmenu')
+    const app = await _electron.launch({
+      executablePath: EXE,
+      env: parityEnv(temp),
+      args: launchArgs(temp),
+      timeout: 120_000,
+    })
+    try {
+      await waitForWindow(app)
+      await waitForCompMount(app)
+      // P8-D39：诊断与反馈从 chrome 菜单搬进官方设置页的「BUG 诊断与反馈」
+      // 分区，chrome 侧的 menu-diagnostics 与 #diagnostics-panel 都已不存在。
+      // 用例要证的东西没变——**入口能打开面板，且反馈输入真的渲染**（D13
+      // 终态守的就是「不是一个空壳菜单项」）——只是入口换了地方。
+      await openDeepCodeSection(app, 'feedback')
+      await waitForDeepCodeElement(app, 'feedback-text')
+    } finally {
+      await shutdownApp(app)
+    }
+  }, 300_000)
 
   it('打包 exe 不读取外部 Node/pnpm/PATH', async () => {
     const temp = isolationRoot('path')

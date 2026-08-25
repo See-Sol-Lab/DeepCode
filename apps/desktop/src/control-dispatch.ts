@@ -12,7 +12,6 @@ import type { HarnessStatus } from './harness-controller.ts'
 import { redactSecrets } from './redact.ts'
 import { sameHarnessSelection } from './launcher-state.ts'
 import type { HarnessSelection, LauncherStateV1 } from './launcher-state.ts'
-import type { ThemePreference } from './ui-state.ts'
 import type { ProfileDiscoveryV1 } from './profile-discovery.ts'
 import type { PluginAction } from './plugin-service.ts'
 
@@ -49,24 +48,21 @@ export interface ControlDispatchDeps {
   confirmDisruptive: (action:
     | { kind: 'switch-profile'; profile: string }
     | { kind: 'restart-harness' }
-    | { kind: 'use-managed-home' },
+    | { kind: 'use-managed-home' }
+    // 接管既有 Home：与上面三者同等杀伤力（同样杀整个进程树），最初漏了门铃
+    // ——四条路里三条有、唯独这条没有（P8-D26，DS 第 12 扇窗走查抓获）。
+    | { kind: 'choose-existing-home'; profile: string },
   ) => Promise<boolean>
   /** 恢复详情对话框出口（show-recovery-details 命令）。 */
   showRecoveryDialog: () => void
-  /** 主题偏好落盘出口（set-theme 命令）。 */
-  setTheme: (theme: ThemePreference) => void
   /** 恢复提示确认出口（acknowledge-recovery 命令）。 */
   acknowledgeRecovery: () => void
   /** 复制完整路径出口（copy-full-path 命令；renderer 无剪贴板权限）。 */
   copyFullPath: () => void
-  /** 专家详情开合出口（toggle-expert-details 命令）。 */
-  toggleExpertDetails: () => void
   /** 关于面板出口（show-about 命令）。 */
   showAbout: () => void
   /** DSH Terminal 出口（show-terminal 命令）。 */
   showTerminal: () => void
-  /** Plugin Manager 出口（刷新 inventory；只读零写入）。 */
-  refreshPluginInventory: () => void
   /** Plugin Manager 写操作请求出口（确认 + 执行由 main 接线）。 */
   requestPluginOperation: (request: { action: PluginAction; profile: string; spec: string | null }) => void
   /** 取消当前 plugin 操作（杀完整 child tree）。 */
@@ -91,12 +87,8 @@ export interface ControlDispatchDeps {
   updateCancelDownload: () => void
   /** installer handoff 确认 + 执行。 */
   updateInstall: () => void
-  /** 取消安装（保留已验证 installer）。 */
-  updateCancelInstall: () => void
   /** Diagnostics：打开日志文件夹。 */
   openLogFolder: () => void
-  /** Diagnostics：复制 Build Info。 */
-  copyBuildInfo: () => void
   /** Diagnostics：导出 bundle（本地目录，绝不上传）。 */
   exportDiagnostics: () => void
   /** 权限模式切换出口（sandbox / full-access；确认与官方写入由 main 接线）。 */
@@ -109,6 +101,10 @@ export interface ControlDispatchDeps {
   sendFeedback: (text: string, diagnostics: string) => void
   /** Feedback：issue 正文进剪贴板 + 打开 GitHub issue 页（零后端零 Token）。 */
   feedbackCopyOpen: () => void
+  /** Feedback（P8-D32）：无 GitHub 通道——网关直传，未配置/失败降级导出文件。 */
+  feedbackSubmitGateway: () => void
+  /** 内置浏览器 pane 开合（B3-11；pane 未创建时 no-op）。 */
+  browserPaneToggle: () => void
   /** 退出应用。 */
   quit: () => void
   /** 缓存与候选的持有者。 */
@@ -174,6 +170,14 @@ export function createControlDispatcher(deps: ControlDispatchDeps): (command: De
           home: { kind: 'existing', path: candidate.path },
           profile: command.profile,
         }
+        // 接管既有 Home 与切换 Profile 的杀伤力完全一样（杀整个进程树），门铃
+        // 的条件也必须一样：只在 running 时问（P8-D26）。
+        //
+        // 位置有讲究：**问在清空候选之前**。用户点「取消」时候选要原样留着，
+        // 他多半只是想换一个 profile 再来一次；清空了他就得从选目录重走。
+        if (deps.controller.status().phase === 'running' && !await deps.confirmDisruptive({
+          kind: 'choose-existing-home', profile: command.profile,
+        })) return
         deps.holder.existingHomeCandidate = null
         await deps.controller.switchTo(selection)
         // `running` 不等于目标晋升成功：切换失败后 lastKnownGood 回退也
@@ -235,20 +239,11 @@ export function createControlDispatcher(deps: ControlDispatchDeps): (command: De
       case 'copy-full-path':
         deps.copyFullPath()
         return
-      case 'set-theme':
-        deps.setTheme(command.theme)
-        return
-      case 'toggle-expert-details':
-        deps.toggleExpertDetails()
-        return
       case 'show-about':
         deps.showAbout()
         return
       case 'show-terminal':
         deps.showTerminal()
-        return
-      case 'refresh-plugin-inventory':
-        deps.refreshPluginInventory()
         return
       case 'plugin-op-request':
         deps.requestPluginOperation({ action: command.action, profile: command.profile, spec: command.spec })
@@ -286,14 +281,8 @@ export function createControlDispatcher(deps: ControlDispatchDeps): (command: De
       case 'update-install':
         deps.updateInstall()
         return
-      case 'update-cancel-install':
-        deps.updateCancelInstall()
-        return
       case 'open-log-folder':
         deps.openLogFolder()
-        return
-      case 'copy-build-info':
-        deps.copyBuildInfo()
         return
       case 'export-diagnostics':
         deps.exportDiagnostics()
@@ -312,6 +301,12 @@ export function createControlDispatcher(deps: ControlDispatchDeps): (command: De
         return
       case 'feedback-copy-open':
         deps.feedbackCopyOpen()
+        return
+      case 'feedback-submit-gateway':
+        deps.feedbackSubmitGateway()
+        return
+      case 'browser-pane-toggle':
+        deps.browserPaneToggle()
         return
       case 'quit':
         deps.quit()

@@ -1,0 +1,31 @@
+# DeepCode 目录选择器的 launcher overlay（P8-D11，发布阻塞）。
+#
+# 由 DeepCode 在启动 Harness 时经 `--patch` 传入，与皮肤 overlay 并列落在
+# 合成顺序的最后一层。和皮肤一样，**它不进用户的 profile**：
+#   · 用户自己跑 `dsh web` 时没有这一层，用的仍是官方 picker
+#   · 卸载 DeepCode 不会在 profile 的 package.json / cordis.patch.yml 留残留
+#
+# 为什么要换掉官方那一行：
+# 官方 native picker 在打包态用 `spawn(process.execPath, ['worker.cjs'])`
+# 起一个 koffi 驱动的 COM 子进程，而打包态 process.execPath 是 DeepCode.exe。
+# 即便 ELECTRON_RUN_AS_NODE=1 一路继承下去，那仍是 Electron 的 Node realm，
+# koffi 在其中会 FATAL 崩溃，用户看到的是
+# "win32 folder dialog worker exited before reporting a result"——
+# 工作区选不了，等于用不了。
+#
+# 做法遵循官方在 web-app bundle 里给 directory-picker 行留下的指引：
+# "Mount -native or -browse directly in an overlay to pin the interaction."
+# 于是这里停掉 auto 那一行，再把**同一对**的两面直接组合上来：
+#   · backend 换成 DeepCode 自己的（不碰 koffi，回调宿主的系统对话框）
+#   · surface 仍用官方原来的 native 客户端界面，交互体验不降级
+# 顺序与官方 auto 的挂载顺序一致：backend 先落地，surface 的浏览器半边
+# 驱动的正是 backend 注册的那个 capability。
+
+- id: directory-picker
+  disabled: true
+
+- insert:
+    - id: deepcode-directory-picker
+      name: '@see-sol-lab/deepcode-directory-picker'
+    - id: deepcode-directory-picker-surface
+      name: '@deepseek-ai/dsh-client-ui-directory-picker-native'

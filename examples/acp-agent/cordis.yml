@@ -14,6 +14,8 @@
     models:
       - id: deepseek-v4-flash
       - id: deepseek-v4-pro
+      - id: deepseek-v4-flash-vision-exp
+        inputModalities: [text, image]
 
 # The default composition confines bash AND the filesystem tools to the
 # workspace and asks before a wider retry. Snapshot runs select
@@ -123,7 +125,8 @@
 
 # Fork stays one-shot because a continuable child's `report` tool and prompt
 # section precede the inherited history a fork reuses; `run_in_background` is off
-# because this example mounts no task service. See .agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md.
+# as an explicit foreground-only choice even though agent-spine-demo mounts the
+# generic Job runtime. See .agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md.
 - id: tool-subagent-fork
   name: '@deepseek-ai/dsh-tool-subagent'
   config:

@@ -25,21 +25,19 @@ function model(overrides: Partial<DesktopControlModel> = {}): DesktopControlMode
     discoveryError: null,
     recovery: null,
     existingHomeCandidate: null,
-    viewTitle: '',
-    themePreference: 'system',
     effectiveTheme: 'dark',
     highContrast: false,
-    expertDetailsExpanded: false,
     recoveryNotice: null,
     pluginManager: { profiles: [], error: null, operation: null, handoffPending: false, recovery: null },
     update: {
       channel: null, state: 'idle', result: null, latestVersion: null, releaseNotes: null,
       progressBytes: null, progressTotal: null, message: null,
     },
-    diagnostics: { buildInfo: [], logPath: null, lastExport: null, uncleanExit: null },
-    feedback: { open: false, diagnostics: '', phase: 'idle', reply: null, issueTitle: '', degradedReason: null, notice: null },
+    diagnostics: { buildInfo: [], homeDisplay: '', logPath: null, lastExport: null, uncleanExit: null },
+    feedback: { open: false, diagnostics: '', phase: 'idle', reply: null, issueTitle: '', degradedReason: null, notice: null, gatewayConfigured: false },
     permissions: { mode: 'sandbox', preset: 'workspace-write', detail: null },
     powerShell7Available: true,
+    browserPane: { present: false, open: false },
     ...overrides,
   }
 }
@@ -48,7 +46,7 @@ const labels = (items: TrayMenuItem[]): string[] =>
   items.filter(item => item.type !== 'separator').map(item => item.label ?? '')
 
 describe('trayMenuTemplate', () => {
-  it('顶层结构：打开/只读 Profile/只读状态/分隔/Profiles/Restart/Panel/Terminal/检查更新/About/Quit', () => {
+  it('顶层结构：打开/只读 Profile/只读状态/分隔/Profiles/Restart/Terminal/检查更新/About/Quit（Harness 面板项已随 P8-D39 移居设置页）', () => {
     const items = trayMenuTemplate({ model: model(), locale: 'zh' })
     expect(labels(items)).toEqual([
       '打开 DeepCode',
@@ -56,7 +54,6 @@ describe('trayMenuTemplate', () => {
       'Harness 状态：运行中 · web',
       'Profiles',
       '重启 Harness',
-      '打开 Harness 面板',
       '打开 DSH Terminal',
       '检查更新',
       '关于 DeepCode',
@@ -95,12 +92,11 @@ describe('trayMenuTemplate', () => {
     expect(profiles).toEqual([{ label: '（尚未发现，点击"刷新 Profiles"）', enabled: false }])
   })
 
-  it('动作绑定面：quit/restart/open-panel/open-terminal/check-updates/about/show-window 全部就位', () => {
+  it('动作绑定面：quit/restart/open-terminal/check-updates/about/show-window 全部就位', () => {
     const items = trayMenuTemplate({ model: model(), locale: 'zh' })
     const byLabel = new Map(items.map(item => [item.label, item]))
     expect(byLabel.get('退出 DeepCode')!.action).toEqual({ kind: 'quit' })
     expect(byLabel.get('重启 Harness')!.action).toEqual({ kind: 'restart' })
-    expect(byLabel.get('打开 Harness 面板')!.action).toEqual({ kind: 'open-panel' })
     expect(byLabel.get('打开 DSH Terminal')!.action).toEqual({ kind: 'open-terminal' })
     expect(byLabel.get('检查更新')!.action).toEqual({ kind: 'check-updates' })
     expect(byLabel.get('关于 DeepCode')!.action).toEqual({ kind: 'about' })

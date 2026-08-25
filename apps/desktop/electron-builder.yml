@@ -41,6 +41,15 @@ extraResources:
     to: licenses/DeepSeek-Harness-MIT.txt
   - from: THIRD_PARTY_NOTICES.md
     to: licenses/THIRD_PARTY_NOTICES.md
+  # The tray icon must be a real file on disk: it is loaded through
+  # nativeImage.createFromPath, which reads on the C++ side and must not be
+  # asked to resolve a path inside the asar. The multi-size .ico container
+  # (16/20/24/32) is what lets Windows pick the right size per DPI rather than
+  # scaling one bitmap (P7-I) — and createFromBuffer is not an option here
+  # because it only decodes PNG/JPEG and yields an empty image for an ICO,
+  # which silently costs the app its tray (P8-D20).
+  - from: apps/desktop/src/chrome/tray.ico
+    to: tray.ico
 
 # The DSH runtime is copied into resources/dsh by scripts/build-desktop-dist.ts
 # after electron-builder finishes (its path resolution differs across versions).
@@ -51,11 +60,27 @@ win:
   icon: apps/desktop/build/icon.ico
 
 nsis:
-  # Assisted (wizard) installer: normal users see a familiar flow, and the
-  # uninstall entry always exists.
-  oneClick: false
+  # One-click installer (P8-D4): double-click installs and launches, no wizard —
+  # the same shape VS Code, Discord and Slack ship. The audience is developers,
+  # for whom "next, next, finish" adds no value, and the step right after the
+  # SmartScreen warning is where users are lost.
+  #
+  # This also settles P8-D9. `oneClick.nsh`'s initMultiUser has exactly two
+  # branches, and the per-machine one is compiled in only when
+  # INSTALL_MODE_PER_ALL_USERS is defined — which happens only for
+  # `perMachine: true`. With `false` below, a one-click install can only take
+  # the per-user branch: %LOCALAPPDATA%\Programs\DeepCode, registered under
+  # HKCU, and `installer.nsi` accordingly emits `RequestExecutionLevel user`.
+  # The assisted installer used to be able to land in Program Files with HKLM
+  # entries, which is what made the release notes' "current-user install, no
+  # administrator rights" untrue. Verify the install location on the next
+  # packaged run — that claim is now load-bearing.
+  oneClick: true
   # Current-user install: no administrator rights required.
   perMachine: false
+  # ManifestDPIAware (the installer's own text is otherwise rendered at 96 DPI
+  # and stretched) plus the uninstall-time prompt about the data directory.
+  include: apps/desktop/build/installer.nsh
   artifactName: DeepCode-Setup-${version}.exe
 
 # Reuse the already-downloaded Electron binary; nothing to rebuild or fetch.

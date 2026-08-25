@@ -57,7 +57,27 @@ function displayName(name: string): string {
   return name.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
 }
 
-function optionLabel(option: PermissionSelectValue['options'][number]): string {
+/* The design-set preset values carry locale dictionary entries (label +
+   risk description); host-configured names outside the set keep the
+   machine-name transform and get no description row. */
+const OPTION_LABEL_KEYS = {
+  'read-only': 'access.option.read-only',
+  'workspace-write': 'access.option.workspace-write',
+  [FULL_ACCESS]: 'access.option.danger-full-access',
+} as const
+
+const OPTION_DESC_KEYS = {
+  'read-only': 'access.optionDesc.read-only',
+  'workspace-write': 'access.optionDesc.workspace-write',
+  [FULL_ACCESS]: 'access.optionDesc.danger-full-access',
+} as const
+
+function isKnownPreset(value: string): value is keyof typeof OPTION_LABEL_KEYS {
+  return value in OPTION_LABEL_KEYS
+}
+
+function optionLabel(option: PermissionSelectValue['options'][number], t: ComposerBarProps['t']): string {
+  if (isKnownPreset(option.value)) return t(OPTION_LABEL_KEYS[option.value])
   return option.value === FULL_ACCESS ? 'Full access' : displayName(option.name)
 }
 
@@ -92,7 +112,19 @@ export function PermissionSelect({ value, locked, command, t }: PermissionSelect
     .filter(o => o.value !== 'custom')
     .map((option) => {
       const icon = permissionGlyph(option.value)
-      return { id: option.value, label: optionLabel(option), ...icon === undefined ? {} : { icon } }
+      const danger = option.value === FULL_ACCESS
+      // Known presets render two lines (localized label + risk description);
+      // the full-access row is additionally a danger row so the risk reads
+      // before the confirmation gate even opens.
+      const label = isKnownPreset(option.value)
+        ? (
+          <span className={css.optionText}>
+            <span>{optionLabel(option, t)}</span>
+            <span className={clsx(css.optionDesc, danger && css.optionDescDanger)}>{t(OPTION_DESC_KEYS[option.value])}</span>
+          </span>
+        )
+        : optionLabel(option, t)
+      return { id: option.value, label, ...icon === undefined ? {} : { icon }, ...danger ? { danger } : {} }
     })
 
   const submit = (id: string): void => {
@@ -138,7 +170,7 @@ export function PermissionSelect({ value, locked, command, t }: PermissionSelect
           <button
             type="button"
             className={css.trigger}
-            aria-label={t('input.accessMode', { name: current === undefined ? displayName(currentValue) : optionLabel(current) })}
+            aria-label={t('input.accessMode', { name: current === undefined ? displayName(currentValue) : optionLabel(current, t) })}
             title={current?.description}
             disabled={locked || busy}
             onClick={() => { setOpen(!open) }}
@@ -146,7 +178,7 @@ export function PermissionSelect({ value, locked, command, t }: PermissionSelect
             {permissionGlyph(currentValue) !== undefined && (
               <span className={css.triggerIcon} aria-hidden>{permissionGlyph(currentValue)}</span>
             )}
-            <span className={css.triggerLabel}>{current === undefined ? displayName(currentValue) : optionLabel(current)}</span>
+            <span className={css.triggerLabel}>{current === undefined ? displayName(currentValue) : optionLabel(current, t)}</span>
             {/* Same glyph + open rotation as the sibling ModelSelect trigger. */}
             <span className={clsx(css.chevron, open && css.chevronOpen)} aria-hidden>
               <IconChevronDownOutline14 />

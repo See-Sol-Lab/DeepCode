@@ -6,9 +6,9 @@ Status: implemented
 
 ## 问题
 
-[Typert Remote 方法调用](../../implemented/architecture/2026-08-02-typert-remote-method-calls.md)只覆盖「一次请求一个结果」的定向调用，明确把 Session 事件流与有状态交互留在别处；Host 向消费端的**单向事件推送**因此仍然全部压在遗留的 API Proxy 上。
+[Typert Remote 方法调用](../../implemented/architecture/2026-08-02-typert-remote-method-calls.zh.md)只覆盖「一次请求一个结果」的定向调用，明确把 Session 事件流与有状态交互留在别处；Host 向消费端的**单向事件推送**因此仍然全部压在遗留的 API Proxy 上。
 
-Host 拥有 `agent-preset/selected`、`commands/change`、`credentials/updated`、`llm/adapters-updated`、`settings/document-updated` 这五条单向事件；它们既不依赖 AgentScope，载荷也本来就是 JSON。过去每条都要穿过 host cordis 事件、apiproxy 手写帧、client/runtime 手写桥和 Client 事件别名才能抵达 UI，而这些层没有陈述 owner 事件之外的新事实。
+Host 拥有 `agent-preset/selected`、`commands/change`、`credentials/reference-updated`、`llm/adapters-updated`、`settings/document-updated` 这五条单向事件；它们既不依赖 AgentScope，载荷也本来就是 JSON。过去每条都要穿过 host cordis 事件、apiproxy 手写帧、client/runtime 手写桥和 Client 事件别名才能抵达 UI，而这些层没有陈述 owner 事件之外的新事实。
 
 那份重复声明还是**有损**的：client 侧写成 `settings/changed(ns: string)`，brand 类型在这一跳被拍平成裸 `string`，与 Remote 方法侧「消费端类型指向业务包唯一符号」的既有契约相反。
 
@@ -56,7 +56,7 @@ $on<Event extends TypertRemoteEvent>(event: Event, listener: Events[Event]): () 
 
 `Events` 按程序解析：host 程序里是 host 事件全集，client 程序里是 client 编译面看得见的那些——同一个谓词在两侧各自成立，不需要把 host 声明拖进 client。
 
-**契约把消费动词与载体交接分开**：消费方用 `$on` 订阅，持有 host 帧 sink 的一方用 `$dispatch` 把解码后的帧交进来。它**不能**是一个跨插件的模块级函数：client bundle 纯度门禁（`packages/client/tsdown.client.ts`）只放行 `CLIENT_EXTERNALS`、`INLINE_SAFE` 那层 wire 契约与 `/remote` 生成物三类值导入，而靠 inline 绕过会把 `ClientRemoteService` 复制一份进 runtime bundle、令 `instanceof` 恒假。cordis 服务方法正是该门禁指定的协作形态：
+**契约把消费动词与载体交接分开**：消费方用 `$on` 订阅，持有 host 帧 sink 的一方用 `$dispatch` 把解码后的帧交进来。它**不能**是一个跨插件的模块级函数：client bundle 纯度门禁（`packages/client/tsdown.client.ts`）只放行隐式的 `PLATFORM_MODULES` 加 `PRELOADED_CLIENT_EXTERNALS` 基座、包自身的 `dsh.client.external` 请求、`INLINE_SAFE` wire 层与 `/remote` 生成物值导入。靠 inline 绕过会把 `ClientRemoteService` 复制一份进 runtime bundle、令 `instanceof` 恒假。cordis 服务方法正是该门禁指定的协作形态：
 
 ```ts ignore-check
 $dispatch(event: string, args: readonly unknown[]): void
@@ -75,7 +75,7 @@ $dispatch(event: string, args: readonly unknown[]): void
 export const API_REMOTE_FORWARDED_EVENTS = [
   'agent-preset/selected',
   'commands/change',
-  'credentials/updated',
+  'credentials/reference-updated',
   'llm/adapters-updated',
   'settings/document-updated',
 ] as const

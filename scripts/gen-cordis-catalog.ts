@@ -3,8 +3,9 @@
  * Typert catalog projection. Every harness `ctx.<key>` service and event scope
  * maps to exactly one `docs/subsystems/` page through the curated tables below;
  * the generator injects each page's Cordis API reference between its GENERATED markers —
- * byte-identically into both language sides of the pair — and re-records a
- * pair's `.i18n.yaml` only when nothing outside the region changed. The
+ * into both language sides of the pair, localizing paired document paths for
+ * the Chinese side while retaining every other byte — and re-records a pair's
+ * `.i18n.yaml` only when nothing outside the region changed. The
  * projection enforces event modes, JSDoc parameter/return completeness, and
  * signature type-link coverage; the inherited (vendor) tier renders to
  * `docs/cordis-api/inherited.md`. `--check` verifies every generated artifact.
@@ -32,9 +33,12 @@ import { contextKeyMap, contextMergeFiles, eventNameList } from './cordis-walk.t
 import {
   blobHash,
   parsePairMeta,
+  parseTranslationPairingManifest,
   partitionGeneratedRegions,
   renderPairMeta,
+  translationPairSourcePredicate,
 } from './translation-pairing.ts'
+import { rewriteTranslationLinkLocales } from './translation-links.ts'
 
 const root = resolve(import.meta.dirname, '..')
 const SUBSYSTEMS_DIR = 'docs/subsystems'
@@ -64,10 +68,12 @@ export const SERVICE_PAGE: Record<string, string> = {
   commands: 'commands.md',
   compaction: 'compaction.md',
   cordisInspect: 'extensions.md',
+  authorization: 'credentials.md',
   credentials: 'credentials.md',
   directoryPicker: 'workspace.md',
   dynamicCordisRunner: 'extensions.md',
   e2b: 'subprocess.md',
+  fileReferences: 'session-reference.md',
   fs: 'filesystem.md',
   goals: 'goal.md',
   webServer: 'web-server.md',
@@ -97,6 +103,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   systemPrompt: 'system-prompt.md',
   jobs: 'jobs.md',
   sessionTelemetry: 'session-telemetry.md',
+  agentTeams: 'agent-team.md',
   tokenMeter: 'token-meter.md',
   toolResultPruner: 'compaction.md',
   tools: 'tools.md',
@@ -135,7 +142,8 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   dshHomePath: 'not a service: boot-provided root accessor function (typeof dshHomePath | undefined) for Loader !!js config expressions — packages/boot/app-boot/README.md owns the boot contract',
   launchEnvironment: 'not a service: launcher-provided root accessor value (LaunchEnvironmentSnapshot | undefined) — packages/util/launch-environment/README.md owns this launcher contract',
   connection: 'interface-typed (HostConnectionHandle); implementing class HostConnectionService is declared in rpc-host.ts — packages/client/connection/README.md owns the API',
-  appShell: 'client-side interface-typed browser service — packages/client/web/README.md owns the API',
+  uiRenderer: 'client-side interface-typed browser service — packages/client/ui-renderer/README.md owns the API',
+  settingsSchema: 'client-side schema introspection service — packages/client/ui-settings/README.md owns the API',
   settingsScope: 'client-side settings-namespace transport service — packages/client/ui-settings/README.md owns the API',
   chatFileMentions: 'client-side slot-contract accessor (ChatFileMentions) — packages/client/ui-conversation/README.md owns the API',
   commandUi: 'client-side interface-typed browser service — packages/client/ui-commands/README.md owns the API',
@@ -169,6 +177,7 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
   'approval': 'approval.md',
   'commands': 'commands.md',
   'cordis': 'extensions.md',
+  'authorization': 'credentials.md',
   'credentials': 'credentials.md',
   'domain': 'storage.md',
   'fs': 'filesystem.md',
@@ -181,6 +190,7 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
   'system-prompt': 'system-prompt.md',
   'session-telemetry': 'session-telemetry.md',
   'tools': 'tools.md',
+  'webserver': 'web-server.md',
   'workflow': 'workflow.md',
 }
 
@@ -268,7 +278,9 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   RequestErrorAction: 'core.md',
   RequestFailureContext: 'core.md',
   PreparedReferencedMessage: 'session-reference.md',
+  FileReferenceCandidate: 'session-reference.md',
   SessionReferenceCandidate: 'session-reference.md',
+  SessionReferenceMentionCandidate: 'session-reference.md',
   SessionReferenceInput: 'session-reference.md',
   SessionEvent: 'session.md',
   SessionId: 'core.md',
@@ -279,7 +291,10 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   ApprovalPolicy: 'approval.md',
   ApprovalRequest: 'approval.md',
   ApprovalService: 'approval.md',
+  EncodedImageAttachment: 'attachment.md',
   ImageAttachmentRef: 'attachment.md',
+  ImageRequestPolicy: 'attachment.md',
+  RequestImageAttachment: 'attachment.md',
   SaveImageAttachment: 'attachment.md',
   StoredImageAttachment: 'attachment.md',
   ShellExecRequest: 'shell.md',
@@ -422,6 +437,18 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   JobSnapshot: 'jobs.md',
   JobStart: 'jobs.md',
   JobsChangedListener: 'jobs.md',
+  CreateTeamTaskRequest: 'agent-team.md',
+  SendTeamMessageRequest: 'agent-team.md',
+  SendTeamMessageResult: 'agent-team.md',
+  SpawnTeammateRequest: 'agent-team.md',
+  SpawnTeammateResult: 'agent-team.md',
+  TeamId: 'agent-team.md',
+  TeamMemberView: 'agent-team.md',
+  TeamMembership: 'agent-team.md',
+  TeamTaskId: 'agent-team.md',
+  TeamTaskView: 'agent-team.md',
+  TeamWaitResult: 'agent-team.md',
+  UpdateTeamTaskRequest: 'agent-team.md',
   TokenMeasurement: 'token-meter.md',
   CodeDispatchLog: 'tools.md',
   PostToolDecision: 'tools.md',
@@ -445,8 +472,23 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   SettingsPathOp: 'settings.md',
   SettingsDescribeOptions: 'settings.md',
   SettingsUpdateSource: 'settings.md',
+  AuthorizationEntry: 'credentials.md',
+  AuthorizationFlow: 'credentials.md',
+  AuthorizationInteraction: 'credentials.md',
+  AuthorizationMethod: 'credentials.md',
+  AuthorizationNotice: 'credentials.md',
+  AuthorizationOutcome: 'credentials.md',
+  AuthorizationPrompt: 'credentials.md',
+  AuthorizationRequest: 'credentials.md',
+  AuthorizationSession: 'credentials.md',
+  AuthorizationSettlement: 'credentials.md',
+  AuthorizationStatus: 'credentials.md',
   CredentialRef: 'credentials.md',
+  CredentialKey: 'credentials.md',
   CredentialInfo: 'credentials.md',
+  CredentialRecord: 'credentials.md',
+  CredentialRecordEntry: 'credentials.md',
+  CredentialRecordInfo: 'credentials.md',
   ResolvedCredential: 'credentials.md',
   AskUserQuestionAnswer: 'user-questions.md',
   AskUserQuestionRequest: 'user-questions.md',
@@ -462,6 +504,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   PresetSpec: 'permission-presets.md',
   InvariantInstaller: 'invariants.md',
   WebRoute: 'web-server.md',
+  IndexInjection: 'web-server.md',
   StorageBackend: 'storage.md',
   StorageForms: 'storage.md',
   Domain: 'storage.md',
@@ -476,6 +519,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   WorkflowStartRequest: 'workflow.md',
   ProjectionDefinition: 'session-projection.md',
   SessionProjectionMap: 'session-projection.md',
+  SessionProjectionStateMap: 'session-projection.md',
   ProjectionChangeListener: 'session-projection.md',
   ProjectionSnapshot: 'session-projection.md',
   ProjectionCheckpoint: 'session-projection.md',
@@ -494,7 +538,10 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
   'AsyncIterable',
   'Context',
   'Error',
+  'Exclude',
   'Map',
+  'NonNullable',
+  'Omit',
   'Partial',
   'Pick',
   'Promise',
@@ -698,6 +745,19 @@ export interface WalkPartitionMaps {
   readonly eventWalkExemptions: Readonly<Record<string, string>>
 }
 
+/** Project paired Markdown destinations in one generated region to the page's locale. */
+export function localizePageRegion(region: string, pageRel: string, scanRoot: string = root): string {
+  if (!pageRel.endsWith('.zh.md')) return region
+  const manifest = parseTranslationPairingManifest(
+    readFileSync(resolve(scanRoot, 'scripts/translation-pairing.manifest.json'), 'utf8'),
+  )
+  return rewriteTranslationLinkLocales(region, {
+    repoRoot: scanRoot,
+    sourcePath: pageRel,
+    isTranslationPairSource: translationPairSourcePredicate(manifest),
+  }).content
+}
+
 /**
  * Judge the rendered API and the independent AST scan against the curated
  * partition maps, fail-closed in both directions for services AND events: a
@@ -821,6 +881,7 @@ export function computeOutputs(): [string, string][] {
     )
     for (const side of [page, page.replace(/\.md$/, '.zh.md')]) {
       const rel = `${SUBSYSTEMS_DIR}/${side}`
+      const localizedRegion = localizePageRegion(region, rel)
       let current: string
       try {
         current = readFileSync(resolve(root, rel), 'utf8')
@@ -831,7 +892,7 @@ export function computeOutputs(): [string, string][] {
         continue
       }
       try {
-        outputs.push([rel, spliceRegion(current, region)])
+        outputs.push([rel, spliceRegion(current, localizedRegion)])
       } catch (error) {
         problems.push(`${rel}: ${error instanceof Error ? error.message : String(error)}`)
       }

@@ -2,10 +2,6 @@
 
 DeepSeek Harness is a plugin-based agent harness on vendored Cordis: **everything is a plugin**. Read [docs/architecture.md](docs/architecture.md) before changing `packages/`; follow [docs/AGENTS.md](docs/AGENTS.md) for documentation.
 
-## Custom distribution direction
-
-DeepCode desktop client work follows [DEEPCODE.md](DEEPCODE.md); keep each change bounded to one observable improvement and its focused verification.
-
 ## Pre-release stance: foundation over blast radius
 
 **Remove this section at the first tagged release.** With no external consumers, prefer the correct foundation over compatibility shims: rename or repackage freely and update every reference together. Backends reject old on-disk formats. SQLite uses monotonic `SCHEMA_VERSION`; `dsh-session` keeps `SESSION_FORMAT_VERSION` at `0` with no compatibility promise.
@@ -41,12 +37,13 @@ packages/    @deepseek-ai/dsh-<pkg> workspaces at packages/<group>/<pkg>/
   session/     durable session data: persistence, projection, titles, telemetry
   identity/    anonymous identity
   settings/    user-settings capability + file provider
-  credentials/ credential-reference capability + env/.env provider
+  credentials/ credential/authorization capabilities + env/.env provider
   acp/         automation-only Agent Client Protocol server
   interaction/ approval/interaction capabilities, permission, commands, ask-user
   boot/        shared app-bin glue
   sdk/         JSON-RPC protocol, server, and TypeScript client
   examples/    demo bundles (agent-spine + CLI/ACP/JSON-RPC bins)
+  experimental/ private prototypes excluded from official releases
   support/     dev/test infrastructure
   util/        zero-dependency utilities
 python/      Python SDK and bundled runtime (see python/README.md)
@@ -121,13 +118,14 @@ Real-API tests and demos read `DEEPSEEK_API_KEY`, optional `DEEPSEEK_BASE_URL`, 
 - **Keep compiler faces explicit.** Each package uses one aggregate except `api/remotes`; repo-wide programs seed a face config, never the root solution ([layout](docs/development.md#typescript-project-layout)).
 - **An empty `catch` names what it swallows** and why nothing else can reach it; keep the `try` to one statement.
 - Do not comment on facts obvious from code.
-- **Prefer symmetry for parallel values**; unexplained asymmetry signals a missed extraction.
+- **Prefer symmetry for parallel values**; unexplained asymmetry usually signals a missed extraction.
 - **Tests describe behavior, not correctness.** Change obsolete behavior with its tests; explain why in the PR.
 - **Non-trivial changes MUST include an Agent Note in the same PR;** only mechanical/local edits are exempt ([scope](.agents/notes/README.md#when-to-write-one)). Archived notes are frozen: never edit or treat them as current authority ([archive policy](.agents/notes/README.md#archiving-and-deletion)).
 - **Testing policy** — [docs/testing.md](docs/testing.md). Every non-trivial model- or product-user-visible behavior change adds or updates a keyless snapshot through a real runnable example in the same PR; package tests, e2e-only assertions, and mock-only fixtures do not substitute for the assembled application transcript. Fixtures must replay on macOS/Linux; fix fixtures, not normalizers.
 - **A tool's UI render intent is part of its design**, decided up front (`generic`/`terminal`/`diff`, `locations`); presentation methods are pure functions of `args` ([cookbook](docs/cookbook/adding-a-tool.md)).
 - **Plan unit, e2e, and snapshot coverage** for capability seams, lifecycle paths, and transcript output; include missing snapshot-harness support in the same change.
-- **Choose PR history deliberately.** Split independent changes; fix the introducing PR before propagation; rewrites use `--force-with-lease`, never raw `--force` ([full policy, incl. merge-forward checkpoints](.agents/notes/implemented/process/2026-08-02-native-github-stacks-and-optional-rebases.md)).
+- **Both SDKs project the loop.** Agent-loop, session-lifecycle, and `SessionEventMap` changes update the TypeScript and Python SDK expected outputs in the same PR; `pnpm run test` covers neither ([surfaces](docs/testing.md#when-a-snapshot-test-is-required)).
+- **Choose PR history deliberately.** Split independent changes; fix the introducing PR before propagation. Standalone PRs and official stacks may merge-forward or rebase after review. Rewrites use `--force-with-lease`, abort on remote movement, never raw `--force`; an in-progress merge-forward preserves its checkpoint before taking a newer base ([rationale](.agents/notes/implemented/process/2026-08-02-native-github-stacks-and-optional-rebases.md)).
 - **Labels:** one PR `kind/*`, all material `area/*`, and native Issue Type ([taxonomy](.agents/notes/implemented/process/2026-08-08-unified-github-label-taxonomy.md)).
 - TODO markers: `FIXME`/`TODO`/`XXX` by urgency ([semantics](docs/development.md)).
 - Files end with exactly one trailing newline; `git diff --cached --check` (pre-commit) gates it.
@@ -151,3 +149,11 @@ Docs accompany every code change: update affected README and JSDoc contracts tog
 ## Vendoring policy
 
 `vendor/` packages are pinned source copies (manifest with upstream SHAs in [vendor/README.md](vendor/README.md)). Update via the sync procedure there; re-apply or retire the logged local modifications; rerun `pnpm run test && pnpm run build`.
+
+## DeepCode appendix
+
+Everything above this heading is the upstream official `AGENTS.md`, kept verbatim: carry it forward on upstream updates and never rewrite it here. This heading and everything below it is DeepCode's own layer, appended by this build.
+
+This build is **DeepCode** — the upstream DeepSeek Harness hosted in the DeepCode desktop GUI — and you are the agent (DS) now running inside it. The DeepCode window, its chrome control surface, tray, and embedded terminal are a DeepCode-authored layer over the unchanged upstream Harness; the Harness itself stays upstream.
+
+DeepCode work follows [DEEPCODE.md](DEEPCODE.md) and [apps/desktop/README.md](apps/desktop/README.md); keep each change to one observable improvement and its focused verification. Work in the GUI layer follows this appendix; work that touches the upstream Harness follows the upstream rules above.

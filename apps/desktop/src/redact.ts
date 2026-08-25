@@ -18,6 +18,52 @@ export function redactSecrets(text: string): string {
     .replace(/xox[a-z]-[A-Za-z0-9-]{8,}/g, 'xox*-<redacted>')
     .replace(/AKIA[0-9A-Z]{12,}/g, 'AKIA<redacted>')
     .replace(/Bearer [A-Za-z0-9._~+/=-]{8,}/g, 'Bearer <redacted>')
+    // URL 里的账号密码（https://user:secret@host）：诊断包、日志和 journal
+    // 都会带上完整 URL，凭据跟着一起落盘。
+    .replace(/([A-Za-z][A-Za-z0-9+.-]*:\/\/)[^\/@\s]+:[^\/@\s]+@/g, '$1<redacted>@')
+}
+
+/**
+ * 把一段字面量（主目录路径、主机名）从文本里遮掉，按 Windows 的规矩比对。
+ *
+ * Windows 的路径和主机名都不区分大小写，两种分隔符也等价，可是原先三处
+ * 遮罩用的都是精确匹配：home 是 `C:\\Users\\Alice` 时，日志里的
+ * `c:\\users\\ALICE` 一个字都遮不掉，照原样进了诊断包。
+ *
+ * 逐字符比较而不是先 toLowerCase 整段：个别 Unicode 字符转小写会改变长度，
+ * 那样下标就对不回原文了。
+ * @param text - 待处理文本。
+ * @param literal - 要遮掉的字面量；空串表示无事可做。
+ * @param replacement - 占位符。
+ * @returns 遮罩后的文本。
+ */
+export function maskWindowsLiteral(text: string, literal: string, replacement: string): string {
+  if (literal === '') return text
+  const isSeparator = (char: string): boolean => char === '/' || char === '\\'
+  const matchesAt = (at: number): boolean => {
+    if (at + literal.length > text.length) return false
+    for (let offset = 0; offset < literal.length; offset++) {
+      const left = text[at + offset] ?? ''
+      const right = literal[offset] ?? ''
+      if (left === right) continue
+      if (left.toLowerCase() === right.toLowerCase()) continue
+      if (isSeparator(left) && isSeparator(right)) continue
+      return false
+    }
+    return true
+  }
+  let result = ''
+  let cursor = 0
+  while (cursor < text.length) {
+    if (matchesAt(cursor)) {
+      result += replacement
+      cursor += literal.length
+      continue
+    }
+    result += text[cursor] ?? ''
+    cursor += 1
+  }
+  return result
 }
 
 /** redactUserContext 的上下文事实（运行时注入，不做任何猜测）。 */
@@ -45,16 +91,11 @@ export interface RedactUserContextInput {
  * @returns 脱敏后的文本。
  */
 export function redactUserContext(text: string, context: RedactUserContextInput): string {
-  const homeSlash = context.home.replace(/\\/g, '/')
-  const hostname = context.hostname
-  if (hostname !== '') text = text.split(hostname).join('<HOSTNAME>')
-  if (context.home !== '') {
-    text = text.split(context.home).join('<USER_HOME>')
-    text = text.split(homeSlash).join('<USER_HOME>')
-  }
+  text = maskWindowsLiteral(text, context.hostname, '<HOSTNAME>')
+  text = maskWindowsLiteral(text, context.home, '<USER_HOME>')
   return redactSecrets(text)
     // 任意 Windows 用户路径的用户名段：保留盘符与 Users\，打码用户名。
-    .replace(/([A-Za-z]:[\\/][Uu]sers[\\/])[^\\/]+/g, '$1[REDACTED]')
+    .replace(/([a-z]:[\\/]users[\\/])[^\\/]+/gi, '$1[REDACTED]')
     // 邮箱：本地部分与域名全部打码。
     .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[EMAIL]')
     // hex token（≥32 连续 hex）。

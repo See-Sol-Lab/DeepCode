@@ -102,15 +102,26 @@ export function runDesktopCommand(input: DesktopCommandInput): DesktopOperation 
     shell: false,
   })
 
+  // 用户回调的错误边界：回调是调用方的代码，它抛错不该连累清理与
+  // slot 释放——原先 onExit 抛一次，槽位就永久占着，后续操作全部撞
+  // "已有操作在进行中"，只能重启应用。
+  const safely = (what: string, run: () => void): void => {
+    try {
+      run()
+    } catch (error) {
+      console.error(`[deepcode] 桌面维护操作${what}回调抛错（已隔离）: ${String(error instanceof Error ? error.message : error)}`)
+    }
+  }
+
   const makeStream = (stream: 'stdout' | 'stderr') => {
     const redactor = createStreamingRedactor()
     const decoder = new StringDecoder('utf8')
     return {
       push(chunk: Buffer): void {
-        input.onOutput?.(stream, redactor.push(decoder.write(chunk)))
+        safely('输出', () => { input.onOutput?.(stream, redactor.push(decoder.write(chunk))) })
       },
       flush(): void {
-        input.onOutput?.(stream, redactor.push(decoder.end()) + redactor.flush())
+        safely('输出', () => { input.onOutput?.(stream, redactor.push(decoder.end()) + redactor.flush()) })
       },
     }
   }
@@ -120,11 +131,25 @@ export function runDesktopCommand(input: DesktopCommandInput): DesktopOperation 
   child.stderr?.on('data', (chunk: Buffer) => { stderr.push(chunk) })
 
   let exited = false
-  let finalResult: DesktopCommandResult | null = null
+  // 等待结算的人（cancel 的调用方）。挂在"结算"而不是挂在 exit 事件上：
+  // ENOENT 这类 spawn 失败只发 error，Node 不保证之后还有 exit，原先
+  // cancel() 在那种情况下永远不返回（缺失可执行文件 + 立即取消可复现）。
+  const settleWaiters: (() => void)[] = []
   const onAbort = (): void => {
     void cancel()
   }
-  input.signal?.addEventListener('abort', onAbort, { once: true })
+  /** 唯一结算口：error / close 都走这里，先清理再回调，最后唤醒等待者。 */
+  const settle = (result: DesktopCommandResult): void => {
+    if (exited) return
+    exited = true
+    stdout.flush()
+    stderr.flush()
+    // 清理先于回调：回调即使抛错（已被 safely 兜住），槽位也已经释放。
+    activeBySlot[input.slot] = null
+    input.signal?.removeEventListener('abort', onAbort)
+    safely('结束', () => { input.onExit?.(result) })
+    for (const wake of settleWaiters.splice(0)) wake()
+  }
 
   const operation: DesktopOperation = {
     running: () => !exited,
@@ -147,10 +172,19 @@ export function runDesktopCommand(input: DesktopCommandInput): DesktopOperation 
         resolvePromise()
         return
       }
-      child.once('exit', () => {
-        resolvePromise()
+      settleWaiters.push(resolvePromise)
+      if (child.pid === undefined) {
+        // spawn 根本没成功：没有进程可杀，对着 undefined pid 调 stop 只会
+        // 制造第二个错误。等 error 事件把它结算掉即可。
+        return
+      }
+      void stopProcess(child).catch((error: unknown) => {
+        // 进程停不下来时不会再有 close 事件，等待结算的人会永远等下去。
+        // 就地结算并把原因如实写进结果——绝不谎称它已经结束。
+        const detail = String(error instanceof Error ? error.message : error)
+        console.error(`[deepcode] 桌面维护操作无法终止子进程: ${detail}`)
+        settle({ exitCode: null, signal: null, error: `无法终止子进程：${detail}` })
       })
-      void stopProcess(child)
     })
     return cancelInFlight
   }
@@ -158,27 +192,20 @@ export function runDesktopCommand(input: DesktopCommandInput): DesktopOperation 
   child.once('error', (error) => {
     // spawn 阶段的 error 事件（ENOENT 等）：没有存活进程可杀。把原因
     // 放进明确结果后结算——error 监听器里绝不 re-throw（会变 uncaught）。
-    if (exited) return
-    exited = true
-    stdout.flush()
-    stderr.flush()
-    finalResult = { exitCode: null, signal: null, error: error.message }
-    input.onExit?.(finalResult)
-    activeBySlot[input.slot] = null
-    input.signal?.removeEventListener('abort', onAbort)
+    settle({ exitCode: null, signal: null, error: error.message })
   })
 
   child.once('close', (code, signal) => {
-    if (exited) return
-    exited = true
-    stdout.flush()
-    stderr.flush()
-    finalResult = { exitCode: code, signal }
-    input.onExit?.(finalResult)
-    activeBySlot[input.slot] = null
-    input.signal?.removeEventListener('abort', onAbort)
+    settle({ exitCode: code, signal })
   })
 
+  // 先登记槽位，再做 aborted 预检：预检可能立刻结算，而结算会把槽位
+  // 清空——反过来写的话，最后那次赋值又把已结算的操作塞回槽位，槽位就
+  // 再也没人释放了。
   activeBySlot[input.slot] = operation
+  input.signal?.addEventListener('abort', onAbort, { once: true })
+  // 传进来时就已经 aborted 的 signal 不会再触发 abort 事件，监听器永远
+  // 等不到——补一次立即检查，语义与"注册后立刻收到 abort"完全一致。
+  if (input.signal?.aborted === true) void cancel()
   return operation
 }

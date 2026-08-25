@@ -83,3 +83,25 @@ describe('githubNewIssueUrl', () => {
     expect(url).toContain('labels=user-feedback')
   })
 })
+
+describe('githubNewIssueUrl 带正文预填（P8-D30 收尾）', () => {
+  it('有正文：body 进 query、template 不再出现（GitHub 带 body 时忽略模板，语义要一致）', () => {
+    const url = githubNewIssueUrl('标题', '一段收敛后的正文')
+    expect(url).toContain(`body=${encodeURIComponent('一段收敛后的正文')}`)
+    expect(url).not.toContain('template=')
+    expect(url).toContain('labels=user-feedback')
+  })
+
+  it('无正文：回落 Bug Report 模板（与改动前完全一致）', () => {
+    const url = githubNewIssueUrl('标题')
+    expect(url).toContain('template=bug_report.md')
+    expect(url).not.toContain('body=')
+  })
+
+  it('超长正文按原文缩短并带截断提示，编码长度守在 6000 上限内', () => {
+    const url = githubNewIssueUrl('t', '诊断'.repeat(3000))
+    const body = decodeURIComponent(url.slice(url.indexOf('body=') + 5))
+    expect(url.slice(url.indexOf('body=') + 5).length).toBeLessThanOrEqual(6000)
+    expect(body).toContain('完整内容在剪贴板里')
+  })
+})

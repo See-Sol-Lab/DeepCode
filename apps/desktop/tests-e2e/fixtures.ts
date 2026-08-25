@@ -8,9 +8,9 @@
  * @module @see-sol-lab/deepcode/tests-e2e/fixtures
  */
 
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { _electron, type ElectronApplication } from 'playwright-core'
 import { parityEnv } from './parity-env.ts'
 import { waitForCompMount, waitForWindow } from './chrome-driver.ts'
@@ -66,10 +66,37 @@ export function launchArgs(temp: string): string[] {
  * @param options - 额外环境变量；`waitFor` 默认 `'mount'`。
  * @returns 应用（等待程度由 waitFor 决定）。
  */
+/**
+ * 预先按下官方的首启欢迎公告。
+ *
+ * 全新 home 首启时官方会弹一个 modal（compat view 里只有一个「继续」钮），
+ * 它是 `[role="dialog"][aria-modal="true"]`，会挡在设置面板前面，让驱动
+ * 无从打开分区——2026-08-24 六套件首次跑齐时 21 个用例集体超时，根因就是它。
+ *
+ * 这里写的是**官方自己的命名空间**，等价于「这台测试机上公告已读」，不碰
+ * 任何用户段（S5 的零暗改断言只看 permission/unrelated，正是为此窄化的）。
+ * 版本号跟官方走，将来官方发新公告时这里会失配——所以驱动侧另有一条按
+ * 结构识别并关闭的兜底，两条腿缺一不可：预写让常态干净，兜底保证不会因为
+ * 一个版本号而全套瘫痪。
+ * @param settingsFile - 目标 settings.yaml 的绝对路径。
+ */
+export function silenceWelcomeNotice(settingsFile: string): void {
+  mkdirSync(dirname(settingsFile), { recursive: true })
+  const existing = existsSync(settingsFile) ? readFileSync(settingsFile, 'utf8') : ''
+  if (existing.includes('welcomeNoticeVersion')) return
+  writeFileSync(settingsFile, `${existing}ui-onboarding:\n  welcomeNoticeVersion: ${WELCOME_NOTICE_VERSION}\n`)
+}
+
+/** 官方当前的欢迎公告版本（实测取自 rc.2 首启写入的 settings.yaml）。 */
+export const WELCOME_NOTICE_VERSION = '2026-08-13.1'
+
 export async function launchPackaged(
   temp: string,
   options: { env?: Record<string, string>; waitFor?: 'none' | 'window' | 'mount' } = {},
 ): Promise<ElectronApplication> {
+  // Managed home 的 settings 在 userData 下；Existing Home 的那份由
+  // writeLauncherState 一并处理（两条 home 路径都要按掉这个公告）。
+  silenceWelcomeNotice(join(userDataDir(temp), 'dsh', 'settings.yaml'))
   const app = await _electron.launch({
     executablePath: EXE,
     args: launchArgs(temp),
@@ -92,6 +119,11 @@ export async function launchPackaged(
 export function writeLauncherState(temp: string, home: string, profile: string): void {
   const userData = userDataDir(temp)
   mkdirSync(userData, { recursive: true })
+  // Existing Home 生效时官方读的是**这个 home** 的 settings.yaml，managed
+  // 那份不作数——欢迎公告也得在这里按掉，否则用 Existing Home 的用例照样
+  // 被那个 modal 挡住（见 silenceWelcomeNotice）。用例随后写自己的
+  // permission 段时是追加/覆盖自己的命名空间，两者互不干扰。
+  silenceWelcomeNotice(join(home, 'settings.yaml'))
   const active = { home: { kind: 'existing', path: home }, profile }
   writeFileSync(join(userData, 'launcher-state.json'), `${JSON.stringify({
     schemaVersion: 1,

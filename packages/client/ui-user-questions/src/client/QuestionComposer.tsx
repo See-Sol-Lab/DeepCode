@@ -1,8 +1,9 @@
-import { useMemo, useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import { useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import clsx from 'clsx'
 import {
-  Button, IconCheckOutline14, IconChevronLeftOutline14, IconChevronRightOutline14,
-  IconCloseOutline16, IconEditOutline16, MarkdownText,
+  Button, IconCheckOutline14, IconChevronDownOutline14, IconChevronLeftOutline14,
+  IconChevronRightOutline14, IconChevronUpOutline14, IconCloseOutline16,
+  IconEditOutline16, MarkdownText,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   PendingQuestion, planReviewOf,
@@ -38,10 +39,65 @@ export function parseRecommendedLabel(label: string): { label: string; recommend
 }
 
 /** Return whether a text-field key event belongs to an active IME composition. */
-function isComposing(event: KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>): boolean {
+function isComposing(event: KeyboardEvent<HTMLTextAreaElement>): boolean {
   // keyCode 229 is the legacy IME-composition signal engines emit without isComposing.
   // oxlint-disable-next-line typescript/no-deprecated
   return event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229
+}
+
+/** The free-text answer field shared by both question shapes. */
+interface AnswerFieldProps {
+  /** Which shape the field takes: the custom row's inline column, or the optionless question's own framed block. */
+  variant: 'inline' | 'block'
+  /** Current draft text. */
+  value: string
+  /** Empty-field prompt. */
+  placeholder: string
+  /** Whether a submission in flight has frozen the field. */
+  disabled: boolean
+  /** Whether this field takes focus on mount. */
+  autoFocus?: boolean
+  /** Called when the field takes focus. */
+  onFocus?: () => void
+  /** Called with each edit of the draft. */
+  onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void
+  /** Called with each key press, before the browser's own handling. */
+  onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void
+}
+
+/**
+ * Auto-growing free-text answer: a textarea, so a long answer soft-wraps and
+ * Shift+Enter breaks a line, over a hidden mirror that owns the height.
+ *
+ * The mirror renders the draft plus a trailing newline in normal flow and so
+ * sizes the grid row (counting rows by '\n' cannot see soft wraps); the
+ * textarea shares that one cell and stretches to it, and `rows={1}` keeps the
+ * control's own intrinsic height out of the row sizing so the mirror alone
+ * decides. Past the mirror's cap the textarea scrolls itself — it is the only
+ * scrollport in the stack, there being no second glyph layer to keep aligned.
+ * Mirror and textarea MUST share font, line-height, padding and wrapping rules
+ * or the two heights diverge.
+ *
+ * @param props - field shape, draft text, and the field's event handlers.
+ * @returns The mirrored auto-growing field.
+ */
+function AnswerField(props: AnswerFieldProps) {
+  return (
+    <div className={clsx(css.field, props.variant === 'inline' ? css.customInline : css.customBlock)}>
+      <div aria-hidden className={css.fieldMirror}>{`${props.value}\n`}</div>
+      <textarea
+        autoFocus={props.autoFocus}
+        className={css.fieldInput}
+        value={props.value}
+        disabled={props.disabled}
+        rows={1}
+        placeholder={props.placeholder}
+        onFocus={props.onFocus}
+        onChange={props.onChange}
+        onKeyDown={props.onKeyDown}
+      />
+    </div>
+  )
 }
 
 /**
@@ -75,6 +131,13 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
   })))
   const [busy, setBusy] = useState<'answer' | 'cancel' | null>(null)
   const [error, setError] = useState<Feedback | null>(null)
+  // Collapsed to the header strip so the conversation above stays readable
+  // while the user decides; the drafts survive because the state lives here.
+  const [minimized, setMinimized] = useState(false)
+  // The free-form textarea autofocuses on first presentation; re-expanding a
+  // collapsed question must not steal focus from the expand toggle back into
+  // the input, so focus is granted once per question index.
+  const focusedQuestions = useRef(new Set<number>())
   // index stays in bounds (every setIndex site clamps) and drafts mirrors questions 1:1.
   // oxlint-disable-next-line typescript/no-non-null-assertion
   const question = questions[index]!
@@ -156,11 +219,10 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
     submitDrafts(drafts)
   }
 
-  // Shared by the inline custom input and the optionless textarea: a
-  // multi-select draft retains checked labels, while a single-select custom
-  // answer replaces its selection. Enter continues the flow (Shift+Enter
-  // stays a newline in the textarea; on the single-line input it is inert).
-  const draftCustom = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
+  // Shared by the inline custom field and the optionless one: a multi-select
+  // draft retains checked labels, while a single-select custom answer replaces
+  // its selection. Enter continues the flow, Shift+Enter breaks a line.
+  const draftCustom = (event: ChangeEvent<HTMLTextAreaElement>): void => {
     const value = event.target.value
     updateDraft(current => ({
       ...current,
@@ -170,7 +232,7 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
     }))
   }
 
-  const continueFromCustom = (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
+  const continueFromCustom = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.key !== 'Enter' || event.shiftKey || isComposing(event)) return
     event.preventDefault()
     continueFlow()
@@ -191,7 +253,10 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
 
   return (
     <div className={css.frame} data-question-key={pending.key}>
-      <section className={css.card} aria-labelledby={`question-${pending.key}-${String(index)}`}>
+      <section
+        className={clsx(css.card, minimized && css.cardMinimized)}
+        aria-labelledby={`question-${pending.key}-${String(index)}`}
+      >
         <header className={css.header}>
           <div className={css.headingBlock}>
             {question.header !== undefined && <div className={css.eyebrow}>{question.header}</div>}
@@ -199,138 +264,153 @@ function QuestionFlow({ pending, t }: { pending: PendingQuestion } & Pick<Questi
               {question.question}
             </h2>
           </div>
-          <button
-            type="button" className={css.iconButton} aria-label={t('nav.cancel')}
-            title={t('nav.cancel')}
-            disabled={busy !== null} onClick={cancelFlow}
-          >
-            <IconCloseOutline16 />
-          </button>
+          <div className={css.headerActions}>
+            <button
+              type="button" className={css.iconButton}
+              aria-label={t(minimized ? 'nav.maximize' : 'nav.minimize')}
+              title={t(minimized ? 'nav.maximize' : 'nav.minimize')}
+              aria-expanded={!minimized}
+              disabled={busy !== null}
+              onClick={() => { setMinimized(current => !current) }}
+            >
+              {minimized ? <IconChevronUpOutline14 /> : <IconChevronDownOutline14 />}
+            </button>
+            <button
+              type="button" className={css.iconButton} aria-label={t('nav.cancel')}
+              title={t('nav.cancel')}
+              disabled={busy !== null} onClick={cancelFlow}
+            >
+              <IconCloseOutline16 />
+            </button>
+          </div>
         </header>
 
-        <div className={css.body} data-question-scroll>
-          {question.detail !== undefined && (
-            <div className={css.detail}><MarkdownText text={question.detail} /></div>
-          )}
-          <div className={css.options} role={question.multiSelect === true ? 'group' : 'radiogroup'}>
-            {(question.options ?? []).map((option, optionIndex) => {
-              const selected = draft.selected.includes(option.label)
-              const display = parseRecommendedLabel(option.label)
-              return (
-                <button
-                  type="button" key={`${option.label}-${String(optionIndex)}`}
-                  className={clsx(css.option, selected && question.multiSelect !== true && css.optionSelected)}
-                  role={question.multiSelect === true ? 'checkbox' : 'radio'}
-                  aria-checked={selected}
-                  aria-label={display.label}
-                  disabled={busy !== null}
-                  onClick={() => { choose(option.label) }}
-                  onKeyDown={(event) => {
-                    if (event.key !== 'Enter' || !drafts.every(completed)) return
-                    event.preventDefault()
-                    submitDrafts(drafts)
-                  }}
-                >
-                  {question.multiSelect === true
-                    ? (
-                      <span className={clsx(css.checkbox, selected && css.checkboxChecked)} aria-hidden="true">
-                        {selected && <IconCheckOutline14 size={12} />}
-                      </span>
-                    )
-                    : <span className={css.number}>{optionIndex + 1}</span>}
-                  <span className={css.optionCopy}>
-                    <span className={css.optionLine}>
-                      <span className={css.optionLabel}>{display.label}</span>
-                      {display.recommended && (
-                        <span className={css.badge}>{t('option.recommended')}</span>
-                      )}
-                      {option.description !== undefined && (
-                        <span className={css.description}>{option.description}</span>
-                      )}
-                    </span>
-                  </span>
-                </button>
-              )
-            })}
-
-            {hasOptions
-              ? (
-                <div className={clsx(css.customRow, draft.custom !== '' && css.customRowActive)}>
-                  {question.multiSelect === true
-                    ? (
-                      <span
-                        className={clsx(css.checkbox, draft.custom !== '' && css.checkboxChecked)}
-                        aria-hidden="true"
-                      >
-                        {draft.custom !== '' && <IconCheckOutline14 size={12} />}
-                      </span>
-                    )
-                    : (
-                      <span className={css.number} aria-hidden="true">
-                        <IconEditOutline16 size={12} />
-                      </span>
-                    )}
-                  <input
-                    type="text"
-                    className={css.customInput}
-                    value={draft.custom}
-                    disabled={busy !== null}
-                    placeholder={t('custom.placeholder')}
-                    onChange={draftCustom}
-                    onKeyDown={continueFromCustom}
-                  />
-                </div>
-              )
-              : (
-                <textarea
-                  autoFocus
-                  className={css.customTextarea}
-                  value={draft.custom}
-                  disabled={busy !== null}
-                  rows={2}
-                  placeholder={t('custom.placeholder')}
-                  onChange={draftCustom}
-                  onKeyDown={continueFromCustom}
-                />
+        {!minimized && (
+          <>
+            <div className={css.body} data-question-scroll>
+              {question.detail !== undefined && (
+                <div className={css.detail}><MarkdownText text={question.detail} /></div>
               )}
-          </div>
-        </div>
+              <div className={css.options} role={question.multiSelect === true ? 'group' : 'radiogroup'}>
+                {(question.options ?? []).map((option, optionIndex) => {
+                  const selected = draft.selected.includes(option.label)
+                  const display = parseRecommendedLabel(option.label)
+                  return (
+                    <button
+                      type="button" key={`${option.label}-${String(optionIndex)}`}
+                      className={clsx(css.option, selected && question.multiSelect !== true && css.optionSelected)}
+                      role={question.multiSelect === true ? 'checkbox' : 'radio'}
+                      aria-checked={selected}
+                      aria-label={display.label}
+                      disabled={busy !== null}
+                      onClick={() => { choose(option.label) }}
+                      onKeyDown={(event) => {
+                        if (event.key !== 'Enter' || !drafts.every(completed)) return
+                        event.preventDefault()
+                        submitDrafts(drafts)
+                      }}
+                    >
+                      {question.multiSelect === true
+                        ? (
+                          <span className={clsx(css.checkbox, selected && css.checkboxChecked)} aria-hidden="true">
+                            {selected && <IconCheckOutline14 size={12} />}
+                          </span>
+                        )
+                        : <span className={css.number}>{optionIndex + 1}</span>}
+                      <span className={css.optionCopy}>
+                        <span className={css.optionLine}>
+                          <span className={css.optionLabel}>{display.label}</span>
+                          {display.recommended && (
+                            <span className={css.badge}>{t('option.recommended')}</span>
+                          )}
+                          {option.description !== undefined && (
+                            <span className={css.description}>{option.description}</span>
+                          )}
+                        </span>
+                      </span>
+                    </button>
+                  )
+                })}
 
-        <footer className={css.footer}>
-          <div className={css.pager}>
-            <button
-              type="button" className={css.iconButton} aria-label={t('nav.prev')}
-              disabled={index === 0 || busy !== null}
-              onClick={() => { setIndex(index - 1); setError(null) }}
-            >
-              <IconChevronLeftOutline14 />
-            </button>
-            <span className={css.progress}>{index + 1} / {questions.length}</span>
-            <button
-              type="button" className={css.iconButton} aria-label={t('nav.next')}
-              disabled={index === questions.length - 1 || busy !== null}
-              onClick={() => { setIndex(index + 1); setError(null) }}
-            >
-              <IconChevronRightOutline14 />
-            </button>
-          </div>
-          <div className={css.feedback} role="status">
-            {error === null ? null : 'key' in error ? t(error.key) : error.text}
-          </div>
-          <div className={css.footerActions}>
-            <Button variant="outline" disabled={busy !== null} onClick={skipQuestion}>
-              {t('action.skip')}
-            </Button>
-            <Button
-              variant="primary"
-              disabled={busy !== null || !answered(draft)} onClick={continueFlow}
-            >
-              {busy === 'answer'
-                ? t('submitting')
-                : index === questions.length - 1 ? t('submit') : t('action.next')}
-            </Button>
-          </div>
-        </footer>
+                {hasOptions
+                  ? (
+                    <div className={clsx(css.customRow, draft.custom !== '' && css.customRowActive)}>
+                      {question.multiSelect === true
+                        ? (
+                          <span
+                            className={clsx(css.checkbox, draft.custom !== '' && css.checkboxChecked)}
+                            aria-hidden="true"
+                          >
+                            {draft.custom !== '' && <IconCheckOutline14 size={12} />}
+                          </span>
+                        )
+                        : (
+                          <span className={css.number} aria-hidden="true">
+                            <IconEditOutline16 size={12} />
+                          </span>
+                        )}
+                      <AnswerField
+                        variant="inline"
+                        value={draft.custom}
+                        disabled={busy !== null}
+                        placeholder={t('custom.placeholder')}
+                        onChange={draftCustom}
+                        onKeyDown={continueFromCustom}
+                      />
+                    </div>
+                  )
+                  : (
+                    <AnswerField
+                      autoFocus={!focusedQuestions.current.has(index)}
+                      variant="block"
+                      value={draft.custom}
+                      disabled={busy !== null}
+                      placeholder={t('custom.placeholder')}
+                      onFocus={() => { focusedQuestions.current.add(index) }}
+                      onChange={draftCustom}
+                      onKeyDown={continueFromCustom}
+                    />
+                  )}
+              </div>
+            </div>
+
+            <footer className={css.footer}>
+              <div className={css.pager}>
+                <button
+                  type="button" className={css.iconButton} aria-label={t('nav.prev')}
+                  disabled={index === 0 || busy !== null}
+                  onClick={() => { setIndex(index - 1); setError(null) }}
+                >
+                  <IconChevronLeftOutline14 />
+                </button>
+                <span className={css.progress}>{index + 1} / {questions.length}</span>
+                <button
+                  type="button" className={css.iconButton} aria-label={t('nav.next')}
+                  disabled={index === questions.length - 1 || busy !== null}
+                  onClick={() => { setIndex(index + 1); setError(null) }}
+                >
+                  <IconChevronRightOutline14 />
+                </button>
+              </div>
+              <div className={css.feedback} role="status">
+                {error === null ? null : 'key' in error ? t(error.key) : error.text}
+              </div>
+              <div className={css.footerActions}>
+                <Button variant="outline" disabled={busy !== null} onClick={skipQuestion}>
+                  {t('action.skip')}
+                </Button>
+                <Button
+                  variant="primary"
+                  disabled={busy !== null || !answered(draft)} onClick={continueFlow}
+                >
+                  {busy === 'answer'
+                    ? t('submitting')
+                    : index === questions.length - 1 ? t('submit') : t('action.next')}
+                </Button>
+              </div>
+            </footer>
+          </>
+        )}
       </section>
     </div>
   )

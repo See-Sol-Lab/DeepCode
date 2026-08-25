@@ -4,7 +4,8 @@
  * 用户数据的唯一选择来源），UI state 损坏永远回退安全默认值并让
  * Harness 正常启动——UI 偏好绝不能成为启动阻断。
  * 白名单字段：windowBounds / maximized / themePreference /
- * acknowledgedRecoveryHash / expertDetailsExpanded。session、model、
+ * acknowledgedRecoveryHash / expertDetailsExpanded /
+ * closeToTrayNoticeAcknowledged / terminalBounds。session、model、
  * credential、Profile、active selection、plugin、Memory、Compaction 或
  * Hook 事实一律禁存：严格解析拒绝一切未知字段，越界字段让文件整体
  * 失效回退默认，而不是部分采纳。
@@ -62,6 +63,12 @@ export interface DesktopUiStateV1 {
    * false 时下一次关窗显示一次非阻断说明，确认后不再提示。
    */
   readonly closeToTrayNoticeAcknowledged: boolean
+  /**
+   * DSH Terminal 侧窗最近一次的几何（P8-D28：主窗记得、侧窗不再裸奔）；
+   * 从未保存过为 null。侧窗不追踪 maximized——终端窗最大化属于临时状态，
+   * 存 normal bounds 就够。
+   */
+  readonly terminalBounds: WindowBoundsV1 | null
 }
 
 /** UI state 解析或写入失败时的明确错误。 */
@@ -86,6 +93,7 @@ export function defaultUiState(): DesktopUiStateV1 {
     acknowledgedRecoveryHash: null,
     expertDetailsExpanded: false,
     closeToTrayNoticeAcknowledged: false,
+    terminalBounds: null,
   }
 }
 
@@ -156,7 +164,7 @@ export function parseUiState(content: string): DesktopUiStateV1 {
   if (!isRecord(raw)) throw new UiStateError('顶层: 必须是对象')
   rejectUnknownKeys(
     raw,
-    ['schemaVersion', 'windowBounds', 'maximized', 'themePreference', 'acknowledgedRecoveryHash', 'expertDetailsExpanded', 'closeToTrayNoticeAcknowledged'],
+    ['schemaVersion', 'windowBounds', 'maximized', 'themePreference', 'acknowledgedRecoveryHash', 'expertDetailsExpanded', 'closeToTrayNoticeAcknowledged', 'terminalBounds'],
     '顶层',
   )
   if (raw.schemaVersion !== UI_STATE_VERSION) {
@@ -179,6 +187,12 @@ export function parseUiState(content: string): DesktopUiStateV1 {
     acknowledgedRecoveryHash: parseRecoveryHash(raw.acknowledgedRecoveryHash, 'acknowledgedRecoveryHash'),
     expertDetailsExpanded: raw.expertDetailsExpanded,
     closeToTrayNoticeAcknowledged: raw.closeToTrayNoticeAcknowledged,
+    // terminalBounds 是版本 2 存续期内后加的字段（P8-D28），对缺失宽容一次：
+    // 老的 V2 文件没有它，按「缺失即抛」会让升级用户的整份状态回退默认、
+    // 白丢主窗几何。未知字段仍然严格拒绝，schema 的边界没有放松。
+    terminalBounds: raw.terminalBounds === undefined || raw.terminalBounds === null
+      ? null
+      : parseWindowBounds(raw.terminalBounds, 'terminalBounds'),
   }
 }
 
@@ -202,6 +216,7 @@ export function serializeUiState(state: DesktopUiStateV1): string {
     acknowledgedRecoveryHash: state.acknowledgedRecoveryHash,
     expertDetailsExpanded: state.expertDetailsExpanded,
     closeToTrayNoticeAcknowledged: state.closeToTrayNoticeAcknowledged,
+    terminalBounds: state.terminalBounds === null ? null : boundsJson(state.terminalBounds),
   }, null, 2)}\n`
 }
 

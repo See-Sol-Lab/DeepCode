@@ -11,7 +11,7 @@
  */
 
 import { randomBytes } from 'node:crypto'
-import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 /**
@@ -63,46 +63,82 @@ export async function writeFileAtomic(filename: string, content: string, options
   }
 }
 
-/** Whether an exclusive create failed because the path already exists. */
-function isEEXIST(error: unknown): boolean {
-  return (error as NodeJS.ErrnoException | null)?.code === 'EEXIST'
+/** Whether an exclusive create found an existing lock. */
+async function isLockContention(error: unknown, lockPath: string): Promise<boolean> {
+  const code = (error as NodeJS.ErrnoException | null)?.code
+  if (code === 'EEXIST') return true
+  if (code !== 'EPERM') return false
+  try {
+    await lstat(lockPath)
+    return true
+  } catch {
+    // Keep the original EPERM authoritative when lock existence is unproven.
+    return false
+  }
 }
 
 /**
- * Writer-lock protocol constants. These are robustness invariants of the
- * cross-process write protocol, not deployment tunables: contention normally
- * resolves within the retry deadline, while expiry fails the contender without
- * guessing whether the existing lock still has an owner.
+ * Retry cadence for a contended lock. These stay robustness invariants of the
+ * cross-process write protocol rather than deployment tunables: they govern how
+ * often a contender asks, which no caller has a reason to vary.
  */
 const LOCK_RETRY_INITIAL_MS = 20
 const LOCK_RETRY_MAX_MS = 200
-const LOCK_TIMEOUT_MS = 2_000
+
+/**
+ * How long a contender waits when the caller states no limit — sized for the
+ * render-and-rename cycle every call site had when this package was written.
+ * Expiry fails the contender rather than guessing whether the existing lock
+ * still has an owner. How long is *worth* waiting is a property of the
+ * operation the lock holder runs, which is why {@link FileLockOptions.waitMs}
+ * exists; the value here is the floor for an operation that does file work
+ * alone.
+ */
+const DEFAULT_LOCK_WAIT_MS = 2_000
+
+/** Options for one {@link withFileLock} acquisition. */
+export interface FileLockOptions {
+  /**
+   * Maximum time to wait for the lock, in milliseconds. State one when the
+   * holder's operation legitimately runs longer than file work — a credential
+   * mutation that refreshes a token performs a network round trip while
+   * holding the lock, and leaving the default in place would fail every other
+   * writer of the same file for the duration. Waiting is productive: a
+   * contender that acquires the lock afterwards re-reads the committed state.
+   */
+  waitMs?: number
+}
 
 /**
  * Hold the cross-process writer lock for `filename` around one operation. The
  * lock is a `wx`-created sibling (`<filename>.lock`); paired with the
  * rename-based commit of {@link writeFileAtomic}, readers stay lock-free and
- * only writers contend. Contention backs off exponentially and fails with a
- * timed-out error after the deadline. The contender never removes an existing
- * lock because file age cannot prove that its owner stopped; orphan recovery
- * is an operator action. The parent directory must exist.
+ * only writers contend. `EEXIST` is contention directly; an `EPERM` is
+ * contention only when a fresh `lstat` confirms the lock path exists, covering
+ * Windows exclusive-create behavior without hiding an unrelated permission
+ * failure. Contention backs off exponentially and fails with a timed-out error
+ * after the deadline. The contender never removes an existing lock because
+ * file age cannot prove that its owner stopped; orphan recovery is an operator
+ * action. The parent directory must exist.
  * @param filename - the file whose writers this lock serializes.
  * @param operation - the read-render-commit cycle to run while holding the lock.
+ * @param options - acquisition options; omitted waits {@link DEFAULT_LOCK_WAIT_MS}.
  * @returns the operation's result; the lock releases on both outcomes.
  */
 export async function withFileLock<T>(
   filename: string,
   operation: () => Promise<T>,
+  options?: FileLockOptions,
 ): Promise<T> {
   const lockPath = `${filename}.lock`
-  const deadline = Date.now() + LOCK_TIMEOUT_MS
+  const deadline = Date.now() + (options?.waitMs ?? DEFAULT_LOCK_WAIT_MS)
   let delay = LOCK_RETRY_INITIAL_MS
   for (;;) {
     try {
       await writeFile(lockPath, `${process.pid}\n`, { mode: 0o600, flag: 'wx' })
       break
     } catch (error) {
-      if (!isEEXIST(error)) throw error
+      if (!await isLockContention(error, lockPath)) throw error
     }
     if (Date.now() >= deadline) {
       throw new Error(`atomic-write: timed out waiting for the writer lock at ${lockPath}`)

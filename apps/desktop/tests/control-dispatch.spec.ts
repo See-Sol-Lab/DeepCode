@@ -49,13 +49,10 @@ function makeDeps(overrides: Partial<ControlDispatchDeps> = {}) {
     // 末尾的专门用例覆盖。
     confirmDisruptive: vi.fn(async () => true),
     showRecoveryDialog: vi.fn(),
-    setTheme: vi.fn(),
     acknowledgeRecovery: vi.fn(),
     copyFullPath: vi.fn(),
-    toggleExpertDetails: vi.fn(),
     showAbout: vi.fn(),
     showTerminal: vi.fn(),
-    refreshPluginInventory: vi.fn(),
     requestPluginOperation: vi.fn(),
     cancelPluginOperation: vi.fn(),
     restartForPluginHandoff: vi.fn(),
@@ -68,15 +65,15 @@ function makeDeps(overrides: Partial<ControlDispatchDeps> = {}) {
     updateDownload: vi.fn(),
     updateCancelDownload: vi.fn(),
     updateInstall: vi.fn(),
-    updateCancelInstall: vi.fn(),
     openLogFolder: vi.fn(),
-    copyBuildInfo: vi.fn(),
     exportDiagnostics: vi.fn(),
     setPermissionMode: vi.fn(),
     openFeedback: vi.fn(),
     closeFeedback: vi.fn(),
     sendFeedback: vi.fn(),
     feedbackCopyOpen: vi.fn(),
+    feedbackSubmitGateway: vi.fn(),
+    browserPaneToggle: vi.fn(),
     quit: vi.fn(),
     holder,
     broadcast: vi.fn(),
@@ -140,13 +137,6 @@ describe('命令 → 唯一路径', () => {
     expect(switchTo).not.toHaveBeenCalled()
   })
 
-  it('set-theme 只调用注入的 setTheme（偏好落盘属 main）', async () => {
-    const { deps, dispatch, switchTo } = makeDeps()
-    await dispatch({ type: 'set-theme', theme: 'light' })
-    expect(deps.setTheme).toHaveBeenCalledWith('light')
-    expect(switchTo).not.toHaveBeenCalled()
-  })
-
   it('acknowledge-recovery 只调用注入的 acknowledgeRecovery（不碰 controller）', async () => {
     const { deps, dispatch, switchTo } = makeDeps()
     await dispatch({ type: 'acknowledge-recovery' })
@@ -158,13 +148,6 @@ describe('命令 → 唯一路径', () => {
     const { deps, dispatch, switchTo } = makeDeps()
     await dispatch({ type: 'copy-full-path' })
     expect(deps.copyFullPath).toHaveBeenCalled()
-    expect(switchTo).not.toHaveBeenCalled()
-  })
-
-  it('toggle-expert-details 只调用注入的 toggleExpertDetails', async () => {
-    const { deps, dispatch, switchTo } = makeDeps()
-    await dispatch({ type: 'toggle-expert-details' })
-    expect(deps.toggleExpertDetails).toHaveBeenCalled()
     expect(switchTo).not.toHaveBeenCalled()
   })
 
@@ -184,8 +167,6 @@ describe('命令 → 唯一路径', () => {
 
   it('plugin 命令族：只调用对应出口，调度器自身绝不直接 restart', async () => {
     const { deps, dispatch, restart } = makeDeps()
-    await dispatch({ type: 'refresh-plugin-inventory' })
-    expect(deps.refreshPluginInventory).toHaveBeenCalledOnce()
     await dispatch({ type: 'plugin-op-request', action: 'remove', profile: 'web', spec: 'p' })
     expect(deps.requestPluginOperation).toHaveBeenCalledWith({ action: 'remove', profile: 'web', spec: 'p' })
     await dispatch({ type: 'plugin-op-cancel' })
@@ -210,12 +191,8 @@ describe('命令 → 唯一路径', () => {
     expect(deps.updateCancelDownload).toHaveBeenCalledOnce()
     await dispatch({ type: 'update-install' })
     expect(deps.updateInstall).toHaveBeenCalledOnce()
-    await dispatch({ type: 'update-cancel-install' })
-    expect(deps.updateCancelInstall).toHaveBeenCalledOnce()
     await dispatch({ type: 'open-log-folder' })
     expect(deps.openLogFolder).toHaveBeenCalledOnce()
-    await dispatch({ type: 'copy-build-info' })
-    expect(deps.copyBuildInfo).toHaveBeenCalledOnce()
     await dispatch({ type: 'export-diagnostics' })
     expect(deps.exportDiagnostics).toHaveBeenCalledOnce()
     await dispatch({ type: 'set-permission-mode', mode: 'sandbox' })
@@ -424,9 +401,11 @@ describe('Feedback 命令 → 唯一出口', () => {
     await dispatch({ type: 'open-feedback' })
     await dispatch({ type: 'close-feedback' })
     await dispatch({ type: 'feedback-copy-open' })
+    await dispatch({ type: 'feedback-submit-gateway' })
     expect(deps.openFeedback).toHaveBeenCalledTimes(1)
     expect(deps.closeFeedback).toHaveBeenCalledTimes(1)
     expect(deps.feedbackCopyOpen).toHaveBeenCalledTimes(1)
+    expect(deps.feedbackSubmitGateway).toHaveBeenCalledTimes(1)
   })
 
   it('feedback-send 把 text 与 diagnostics（编辑稿）原样交给出口', async () => {

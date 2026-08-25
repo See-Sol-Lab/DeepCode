@@ -31,6 +31,7 @@ Groups hold `packages/<group>/<pkg>/`; names stay `@deepseek-ai/dsh-<pkg>`. **Gr
 | [`context/`](context/README.md) | Model-visible request context, including workspace instructions and time context | Product — stable API |
 | [`subagent/`](subagent/README.md) | Subagent capability family: the provider-registry contract and the model-facing delegation tool | Product — stable API |
 | [`jobs/`](jobs/README.md) | Generic background-job runtime and model-facing `job_*` control tools | Product — stable API |
+| [`experimental/`](experimental/README.md) | Private prototypes and internal-only plugins | Unreleased |
 | [`workflow/`](workflow/README.md) | Workflow seam, worker-thread engine, and model-facing `workflow`/`ralph` tools | Product — stable API |
 | [`web/`](web/README.md) | Web capability family: seam, search/fetch provider impls, and the model-facing web tools | Product — stable API |
 | [`attachment/`](attachment/README.md) | Durable attachment identity, validation, local content-addressed storage | Product — stable API |
@@ -45,7 +46,7 @@ Groups hold `packages/<group>/<pkg>/`; names stay `@deepseek-ai/dsh-<pkg>`. **Gr
 | [`session/`](session/README.md) | Durable session data plane: persistence seam + JSONL/SQLite backends, projection seam, log-backed titles, session reporting | Product — stable API |
 | [`session-query/`](session-query/README.md) | Session retrieval family: logical corpus, bounded reads, lineage, event relationships, semantic filtering, and SQLite full-text search | Product — stable API |
 | [`settings/`](settings/README.md) | User-settings seam + file-backed provider | Product — stable API |
-| [`credentials/`](credentials/README.md) | Credential-reference seam + env-over-`.env` provider | Product — stable API |
+| [`credentials/`](credentials/README.md) | Credential reference/record seam + env-over-`.env` provider + authorization flows | Product — stable API |
 | [`storage/`](storage/README.md) | Non-session storage hub + backends + domain form | Product — stable API |
 | [`workspace/`](workspace/README.md) | Workspace entity | Product — stable API |
 | [`sdk/`](sdk/README.md) | Out-of-process runtime SDK: JSON-RPC protocol, TypeScript client, and server plugin | Product — stable API |

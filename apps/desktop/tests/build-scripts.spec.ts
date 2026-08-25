@@ -18,7 +18,10 @@ describe('build:desktop-dist freshness 链', () => {
   it('公开入口按序重建当前源码的全部输入后才 assemble', () => {
     const command = scripts['build:desktop-dist']
     expect(command).toBeDefined()
-    const stages = ['build:lib:host', 'build:web', 'build:desktop', 'build:desktop-dist:assemble']
+    // build:lib（host+client 全编——只编 host 曾让 D25 的 client CSS 改动
+    // 从未进包，2026-08-23 实机灾难）→ 品牌化 web 构建（P8-D34：
+    // DSH_CLIENT_BRAND_* 经 build-web-branded.ts 注入）→ desktop → assemble。
+    const stages = ['build:lib', 'build-web-branded.ts', 'build:desktop', 'build:desktop-dist:assemble']
     const positions = stages.map(stage => (command ?? '').indexOf(stage))
     for (const [index, position] of positions.entries()) {
       expect(position, `缺少阶段 ${stages[index] ?? ''}`).toBeGreaterThanOrEqual(0)
@@ -26,6 +29,8 @@ describe('build:desktop-dist freshness 链', () => {
     expect([...positions].sort((a, b) => a - b)).toEqual(positions)
     // 公开入口不得绕过重建直接调用 assemble 脚本文件。
     expect(command).not.toContain('scripts/build-desktop-dist.ts')
+    // 只编 host 的旧前置绝不允许回归。
+    expect(command).not.toContain('build:lib:host')
   })
 
   it('内部 assemble 步骤才直接运行 build-desktop-dist 脚本', () => {

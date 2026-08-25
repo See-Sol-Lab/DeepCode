@@ -4,22 +4,31 @@
  * @module @see-sol-lab/deepcode/tests/dsh-service
  */
 
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
+import { EventEmitter } from 'node:events'
 import { createServer, type Server } from 'node:http'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   DEFAULT_HOST,
   DEFAULT_PORT,
   PROBE_FAST_INTERVAL_MS,
+  ProcessStopError,
+  PROBE_TIMEOUT_MS,
+  READY_TIMEOUT_MS,
   PROBE_INTERVAL_MS,
+  MANAGED_HOME_BLOCKED_ENV,
   childStdio,
   classifyLinkOpen,
   createServiceLogWriter,
+  BROWSER_PLUGIN_PACKAGE,
+  ensurePluginResolvable,
+  inheritedEnv,
   portInUse,
+  profileBundlesInclude,
   repoRoot,
   resolveDshLaunch,
   resolveThemePatchFile,
@@ -63,6 +72,7 @@ describe('resolveDshLaunch', () => {
       '--profile', 'web',
       '--host', '127.0.0.1',
       '--port', '3080',
+      '--no-open',
     ])
     expect(cwd).toBe('R:\\repo')
     expect(env.ELECTRON_RUN_AS_NODE).toBeUndefined()
@@ -130,6 +140,7 @@ describe('resolveDshLaunch', () => {
       '--profile', 'web',
       '--host', '127.0.0.1',
       '--port', '3080',
+      '--no-open',
     ])
     expect(cwd).toBe('C:\\Users\\alice')
     expect(env.ELECTRON_RUN_AS_NODE).toBe('1')
@@ -350,10 +361,15 @@ describe('waitForServer', () => {
   })
 
   it('前段用快间隔探测：服务在稳态间隔之内就绪时不必多等一整个周期', async () => {
-    // 服务在 ~120ms 后才起来。稳态间隔（250ms）下第一次探测失败后要固定
-    // 等满一个周期才会再探，最快也要 250ms 才发现；前段快间隔应当在
-    // 就绪后一个快周期内发现。断言留足余量，只区分"一个稳态周期"与
-    // "一个快周期"这两个量级，不对具体调度时间较真。
+    // 服务在 ~40ms 后起来。稳态间隔（250ms）下第一次探测失败后要固定等满
+    // 一个周期才会再探，最快也要 250ms 才发现；前段快间隔（50ms）应当在
+    // 就绪后一个快周期内发现，约 50ms。断言只区分"一个稳态周期"与"一个快
+    // 周期"这两个量级，不对具体调度时间较真。
+    //
+    // 启动延迟刻意压得比快间隔还短：原先设成 120ms 时，正常路径要 ~150ms，
+    // 距离 250ms 的断言只剩 80ms 余量，全量并发跑起来光调度抖动就能吃掉它
+    // （2026-08-25 实测偶发变红，单独跑必过）。40ms 让正常路径落在 ~50ms，
+    // 余量翻到 200ms，而要区分的那两个量级一点没变。
     const server = createServer((_req, res) => {
       res.writeHead(200, { 'content-type': 'text/html' })
       res.end('ok')
@@ -367,7 +383,7 @@ describe('waitForServer', () => {
     })
     const startedAt = Date.now()
     const ready = waitForServer(DEFAULT_HOST, port, 3_000)
-    setTimeout(() => { servers.push(server); server.listen(port, '127.0.0.1') }, 120)
+    setTimeout(() => { servers.push(server); server.listen(port, '127.0.0.1') }, 40)
     await ready
     const elapsed = Date.now() - startedAt
     expect(elapsed).toBeLessThan(PROBE_INTERVAL_MS)
@@ -433,6 +449,81 @@ describe('stopProcess', () => {
 describe('DEFAULT_PORT', () => {
   it('与官方 Web UI 的默认端口一致', () => {
     expect(DEFAULT_PORT).toBe(3080)
+  })
+})
+
+describe('内置浏览器 overlay 与 profile bundles 互斥', () => {
+  /**
+   * 浏览器插件是唯一有两条进入 composition 的路的自带插件：随包内置走
+   * launcher 的 `--patch`，用户手动安装走 profile 的 bundles 层（插件的
+   * package.json 声明了 `dsh.bundle.patch`）。两条同时生效会插入同一个
+   * loader id，官方 loader 抛 `duplicate loader entry id: deepcode-browser`
+   * 硬退出——用户看到的只是"DSH 服务启动失败"，没有任何线索指向这里。
+   * 住户 2026-08-24 实机撞上：她在 B3-10 用插件管理装过一次。
+   */
+  /** 开发态仓库骨架：browser 插件目录 + 它自带的 overlay。 */
+  function stageBrowserRepo(): string {
+    const root = mkdtempSync(join(tmpdir(), 'deepcode-browser-root-'))
+    const dir = join(root, 'apps', 'desktop', 'browser-plugin')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'cordis.patch.yml'), '- insert:\n    - id: deepcode-browser\n')
+    return root
+  }
+
+  /** profile 清单：bundles 里带不带 browser 包。 */
+  function stageProfile(home: string, profile: string, bundles: string[]): void {
+    const dir = join(home, 'profiles', profile)
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'package.json'), `${JSON.stringify({
+      name: `dsh-profile-${profile}`,
+      private: true,
+      dsh: { profile: { bundles } },
+    }, undefined, 2)}\n`)
+  }
+
+  /** args 里所有 --patch 的值。 */
+  function patchValues(args: string[]): string[] {
+    return args.flatMap((arg, index) => arg === '--patch' ? [args[index + 1] ?? ''] : [])
+  }
+
+  it('profile 没列这个包时照常带 overlay（全新安装：内置那条路）', () => {
+    const root = stageBrowserRepo()
+    const home = mkdtempSync(join(tmpdir(), 'deepcode-browser-home-'))
+    stageProfile(home, 'web', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
+
+    const { args } = resolveDshLaunch({
+      packaged: false, root, nodeExecutable: 'node', profile: 'web', dshHome: home,
+    })
+    expect(patchValues(args).some(value => value.endsWith('cordis.patch.yml'))).toBe(true)
+
+    rmSync(root, { recursive: true, force: true })
+    rmSync(home, { recursive: true, force: true })
+  })
+
+  it('profile 已把这个包列进 bundles 时不带 overlay：重复 id 会让 Harness 起不来', () => {
+    const root = stageBrowserRepo()
+    const home = mkdtempSync(join(tmpdir(), 'deepcode-browser-home-'))
+    stageProfile(home, 'web', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', BROWSER_PLUGIN_PACKAGE])
+
+    const { args } = resolveDshLaunch({
+      packaged: false, root, nodeExecutable: 'node', profile: 'web', dshHome: home,
+    })
+    expect(patchValues(args).some(value => value.endsWith('cordis.patch.yml'))).toBe(false)
+
+    rmSync(root, { recursive: true, force: true })
+    rmSync(home, { recursive: true, force: true })
+  })
+
+  it('清单缺失或读不动时按"没列"处理：与全新安装同形，不因读文件失败丢掉浏览器', () => {
+    const home = mkdtempSync(join(tmpdir(), 'deepcode-browser-home-'))
+    expect(profileBundlesInclude(home, 'web', BROWSER_PLUGIN_PACKAGE)).toBe(false)
+    const dir = join(home, 'profiles', 'web')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'package.json'), '{ not json')
+    expect(profileBundlesInclude(home, 'web', BROWSER_PLUGIN_PACKAGE)).toBe(false)
+    writeFileSync(join(dir, 'package.json'), '{"dsh":{"profile":{}}}')
+    expect(profileBundlesInclude(home, 'web', BROWSER_PLUGIN_PACKAGE)).toBe(false)
+    rmSync(home, { recursive: true, force: true })
   })
 })
 
@@ -506,5 +597,218 @@ describe('皮肤 overlay（--patch）与模块 fallback', () => {
 
     rmSync(root, { recursive: true, force: true })
     rmSync(home, { recursive: true, force: true })
+  })
+
+  it('链接指向已消失的旧安装路径时重建到新路径（卸载重装的必经之路）', () => {
+    // P8-D22：`existsSync` 跟随链接，指向已删除目标的坏 junction 会被它报成
+    // "不存在"，代码于是直奔 symlinkSync——而那条路径上正有坏链接占位，创建
+    // 必然失败，插件从此永远解析不了：皮肤 overlay 不传、client 标记不置位、
+    // Harness 每次启动都以 page-load 超时收场，错误文案还完全不指向这里。
+    // 住户 2026-08-22 实机撞上：卸载 Program Files 版之后改用 win-unpacked。
+    const root = mkdtempSync(join(tmpdir(), 'deepcode-root-'))
+    const home = mkdtempSync(join(tmpdir(), 'deepcode-home-'))
+    const gone = join(root, 'old-install', 'theme-plugin')
+    mkdirSync(gone, { recursive: true })
+    const link = join(home, 'profiles', 'node_modules', '@see-sol-lab', 'deepcode-theme')
+    mkdirSync(dirname(link), { recursive: true })
+    symlinkSync(gone, link, 'junction')
+    // 模拟卸载：链接的目标整个消失，链接本身留在原地。
+    rmSync(join(root, 'old-install'), { recursive: true, force: true })
+    // 这一行就是 bug 的机理本身：链接明明占着位置，existsSync 却说"不存在"。
+    expect(existsSync(link)).toBe(false)
+
+    const pluginDir = join(root, 'apps', 'desktop', 'theme-plugin')
+    mkdirSync(pluginDir, { recursive: true })
+    writeFileSync(join(pluginDir, THEME_PATCH_FILENAME), '- insert: []\n')
+
+    const { args } = resolveDshLaunch({
+      packaged: false, root, nodeExecutable: 'node', profile: 'web', dshHome: home,
+    })
+    // overlay 必须照常带上，链接必须重建到新路径。
+    expect(args).toContain('--patch')
+    expect(realpathSync(link)).toBe(realpathSync(pluginDir))
+
+    rmSync(root, { recursive: true, force: true })
+    rmSync(home, { recursive: true, force: true })
+  })
+})
+
+describe('inheritedEnv：Managed Home 不把宿主的模型密钥透传给 DSH（P8-D23）', () => {
+  it('Managed Home 下拦掉 DEEPSEEK_API_KEY，其余变量原样保留', () => {
+    // 官方凭据模型里「继承的环境优先」：宿主留着这个变量，官方设置里的密钥输入框
+    // 就会被锁成只读，用户在 GUI 里永远换不了 key（住户 2026-08-22 实机撞上）。
+    const env = inheritedEnv(true, { DEEPSEEK_API_KEY: 'sk-host', EXA_API_KEY: 'exa', PATH: 'p' })
+    expect(env[MANAGED_HOME_BLOCKED_ENV]).toBeUndefined()
+    // 只拦这一个：搜索类密钥不锁任何输入框，拦掉只会悄悄弄坏用户既有配置。
+    expect(env.EXA_API_KEY).toBe('exa')
+    expect(env.PATH).toBe('p')
+  })
+
+  it('Existing Home 下原样透传：那是用户自己的 Home，行为要与 `dsh web` 一致', () => {
+    const env = inheritedEnv(false, { DEEPSEEK_API_KEY: 'sk-host' })
+    expect(env[MANAGED_HOME_BLOCKED_ENV]).toBe('sk-host')
+  })
+
+  it('绝不改动调用方传入的环境对象', () => {
+    const base: NodeJS.ProcessEnv = { DEEPSEEK_API_KEY: 'sk-host' }
+    inheritedEnv(true, base)
+    expect(base[MANAGED_HOME_BLOCKED_ENV]).toBe('sk-host')
+  })
+})
+
+describe('ensurePluginResolvable 重建链接时不碰旧目标（2026-08-23 实机灾难回归）', () => {
+  it('换安装位置重建 junction：旧目标目录的内容必须原封不动', () => {
+    // 灾难原型：rmSync({recursive:true}) 摘旧链接时跟进 junction，把旧安装
+    // （当时是桌面 win-unpacked）里的插件真身掏空——此后打出的每个安装包
+    // 都带着空插件，用户启动必崩 page-load，现场毫无线索指向这里。
+    const root = mkdtempSync(join(tmpdir(), 'dsh-link-'))
+    try {
+      const oldTarget = join(root, 'old-install', 'plugin')
+      const newTarget = join(root, 'new-install', 'plugin')
+      mkdirSync(oldTarget, { recursive: true })
+      mkdirSync(newTarget, { recursive: true })
+      writeFileSync(join(oldTarget, 'index.js'), 'old body')
+      writeFileSync(join(newTarget, 'index.js'), 'new body')
+      const home = join(root, 'home')
+      const link = join(home, 'profiles', 'node_modules', '@scope', 'plugin')
+      mkdirSync(dirname(link), { recursive: true })
+      symlinkSync(oldTarget, link, 'junction')
+
+      expect(ensurePluginResolvable(home, newTarget, '@scope/plugin')).toBe(true)
+
+      // 链接指向新目标
+      expect(realpathSync(link)).toBe(realpathSync(newTarget))
+      // 旧目标毫发无损——这行就是整个回归的靶心
+      expect(readFileSync(join(oldTarget, 'index.js'), 'utf8')).toBe('old body')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('占位是真实非空目录（不是链接）：放弃而不是删别人的目录', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-link-'))
+    try {
+      const target = join(root, 'install', 'plugin')
+      mkdirSync(target, { recursive: true })
+      const home = join(root, 'home')
+      const occupied = join(home, 'profiles', 'node_modules', '@scope', 'plugin')
+      mkdirSync(occupied, { recursive: true })
+      writeFileSync(join(occupied, 'user-file.txt'), 'not ours')
+
+      expect(ensurePluginResolvable(home, target, '@scope/plugin')).toBe(false)
+      expect(readFileSync(join(occupied, 'user-file.txt'), 'utf8')).toBe('not ours')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+
+describe('waitForServer 的总超时必须真的生效', () => {
+  const openSockets: import('node:net').Socket[] = []
+  let silent: import('node:net').Server | undefined
+
+  afterEach(async () => {
+    for (const socket of openSockets.splice(0)) socket.destroy()
+    if (silent !== undefined) {
+      await new Promise<void>((done) => { silent?.close(() => { done() }) })
+      silent = undefined
+    }
+  })
+
+  it('端口能连上但服务永不写响应：仍在总超时内失败', async () => {
+    // 这是原先那个洞的复现：fetch 没有 signal，服务端接了连接却不回，
+    // 于是 promise 永远 pending，deadline 检查永远轮不到。改之前这个
+    // 用例会一直挂到测试框架超时。
+    const net = await import('node:net')
+    silent = net.createServer((socket) => { openSockets.push(socket) })
+    await new Promise<void>((done) => { silent?.listen(0, '127.0.0.1', () => { done() }) })
+    const port = (silent.address() as AddressInfo).port
+
+    const startedAt = Date.now()
+    await expect(waitForServer('127.0.0.1', port, 600)).rejects.toThrow(/未就绪/)
+    const elapsed = Date.now() - startedAt
+    // 允许调度抖动，但必须是"按时失败"而不是"挂死"。
+    expect(elapsed).toBeLessThan(4_000)
+  })
+
+  it('连接被拒绝：按重试节奏走，到点失败', async () => {
+    // 没有任何东西监听的端口：每次 probe 立即 ECONNREFUSED，重试到总超时。
+    const startedAt = Date.now()
+    await expect(waitForServer('127.0.0.1', 1, 400)).rejects.toThrow(/未就绪/)
+    expect(Date.now() - startedAt).toBeLessThan(4_000)
+  })
+
+  it('迟到的响应不能突破总超时', async () => {
+    const http = await import('node:http')
+    const late = http.createServer((_request, response) => {
+      // 远晚于总超时才回应。
+      setTimeout(() => { response.end('ok') }, 5_000).unref()
+    })
+    await new Promise<void>((done) => { late.listen(0, '127.0.0.1', () => { done() }) })
+    const port = (late.address() as AddressInfo).port
+    try {
+      const startedAt = Date.now()
+      await expect(waitForServer('127.0.0.1', port, 500)).rejects.toThrow(/未就绪/)
+      expect(Date.now() - startedAt).toBeLessThan(4_000)
+    } finally {
+      late.closeAllConnections()
+      await new Promise<void>((done) => { late.close(() => { done() }) })
+    }
+  })
+
+  it('服务正常：立刻就绪', async () => {
+    const http = await import('node:http')
+    const ok = http.createServer((_request, response) => { response.end('ok') })
+    await new Promise<void>((done) => { ok.listen(0, '127.0.0.1', () => { done() }) })
+    const port = (ok.address() as AddressInfo).port
+    try {
+      await expect(waitForServer('127.0.0.1', port, 5_000)).resolves.toBeUndefined()
+    } finally {
+      ok.closeAllConnections()
+      await new Promise<void>((done) => { ok.close(() => { done() }) })
+    }
+  })
+
+  it('单次探测上限是个正数，且不长于默认总超时', () => {
+    expect(PROBE_TIMEOUT_MS).toBeGreaterThan(0)
+    expect(PROBE_TIMEOUT_MS).toBeLessThan(READY_TIMEOUT_MS)
+  })
+})
+
+describe('停不下来的子进程必须明确失败，而不是永远等下去', () => {
+  /** 一个装死的子进程：永远不发 exit，kill 也毫无作用。 */
+  const stubbornChild = (): ChildProcess => {
+    const emitter = new EventEmitter()
+    return Object.assign(emitter, {
+      exitCode: null,
+      signalCode: null,
+      pid: 999_999,
+      kill: () => true,
+    }) as unknown as ChildProcess
+  }
+
+  /** taskkill 报告成功，但目标其实纹丝不动。 */
+  const uselessTreeKill = (): ChildProcess => {
+    const emitter = new EventEmitter()
+    setTimeout(() => { emitter.emit('exit', 0) }, 5).unref()
+    return emitter as unknown as ChildProcess
+  }
+
+  it('到最终期限还没退出 → 抛 ProcessStopError（旧实现会一直挂着）', async () => {
+    const startedAt = Date.now()
+    await expect(stopProcess(stubbornChild(), 20, uselessTreeKill, 300))
+      .rejects.toThrow(ProcessStopError)
+    expect(Date.now() - startedAt).toBeLessThan(3_000)
+  })
+
+  it('错误里带得上 pid，诊断时能对上号', async () => {
+    await expect(stopProcess(stubbornChild(), 20, uselessTreeKill, 200))
+      .rejects.toThrow(/999999|999_999/)
+  })
+
+  it('正常退出的进程不受影响（最终期限只是兜底）', async () => {
+    const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'])
+    await expect(stopProcess(child, 2_000)).resolves.toBeUndefined()
   })
 })

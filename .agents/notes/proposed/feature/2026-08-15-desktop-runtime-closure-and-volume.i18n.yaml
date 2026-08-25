@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-08-15-desktop-runtime-closure-and-volume.md
 2026-08-15-desktop-runtime-closure-and-volume.md: a4c0eba0eda72c72165897b081bbd658681b3b8d
-2026-08-15-desktop-runtime-closure-and-volume.zh.md: 3d95efe1827584aca415d2d449d52affac6dbba0
+2026-08-15-desktop-runtime-closure-and-volume.zh.md: f5a5f939c0c5e633014c315e64282882b73a0c45

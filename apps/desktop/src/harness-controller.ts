@@ -22,6 +22,16 @@ import { redactSecrets } from './redact.ts'
 export interface ResolvedSelection {
   profile: string
   dshHome: string
+  /**
+   * 这次启动用的是不是托管 Home。
+   *
+   * 只影响宿主凭据的透传：Managed Home 是「DeepCode 自己管的干净目录」，
+   * 宿主环境里的 `DEEPSEEK_API_KEY` 不该漏进去（漏进去官方 UI 会把密钥输入框
+   * 锁成只读，用户在界面上永远改不了 key）。Existing Home 是接管用户自己的
+   * DSH Home，行为要和他自己跑 `dsh web` 一致，照旧透传。
+   * 省略等同 false：宁可多透传一个变量，也不要因为漏填而悄悄改变既有行为。
+   */
+  managedHome?: boolean
 }
 
 /** controller 协调的外部世界；进程与窗口都由 main 注入。 */
@@ -101,7 +111,11 @@ function toBootFailure(stage: BootFailure['stage'], error: unknown, selection?: 
 
 /** 解析一条 selection（home 引用 → 绝对 DSH_HOME）。 */
 function resolve(selection: HarnessSelection, resolveHome: (selection: HarnessSelection) => string): ResolvedSelection {
-  return { profile: selection.profile, dshHome: resolveHome(selection) }
+  return {
+    profile: selection.profile,
+    dshHome: resolveHome(selection),
+    managedHome: selection.home.kind === 'managed',
+  }
 }
 
 /**
@@ -358,7 +372,11 @@ export class HarnessController {
     } catch (error) {
       // spawn 失败没有产生存活进程；shutdown 在途时直接让位。
       if (this.shutdownRequested) throw new ShutdownAbort()
-      await this.options.runtime.stopProcess()
+      // 这里是在处理另一个错误的路上做尽力清理：停不下来要记下来，但绝不
+      // 能用它替换掉真正该报给用户的那个失败原因。
+      await this.options.runtime.stopProcess().catch((stopError: unknown) => {
+        console.error(`[deepcode] 清理子进程失败: ${String(stopError instanceof Error ? stopError.message : stopError)}`)
+      })
       throw new BootAttemptError(toBootFailure('spawn', error, target))
     }
     // 孤儿进程窗口：stop() 同步段发起 terminate 时 spawn 还没 settle，
@@ -373,7 +391,11 @@ export class HarnessController {
       await this.options.runtime.waitReady()
     } catch (error) {
       if (this.isShuttingDown()) throw new ShutdownAbort()
-      await this.options.runtime.stopProcess()
+      // 这里是在处理另一个错误的路上做尽力清理：停不下来要记下来，但绝不
+      // 能用它替换掉真正该报给用户的那个失败原因。
+      await this.options.runtime.stopProcess().catch((stopError: unknown) => {
+        console.error(`[deepcode] 清理子进程失败: ${String(stopError instanceof Error ? stopError.message : stopError)}`)
+      })
       throw new BootAttemptError(toBootFailure('readiness', error, target))
     }
     this.assertNotShuttingDown()
@@ -381,7 +403,11 @@ export class HarnessController {
       await this.options.runtime.loadPage()
     } catch (error) {
       if (this.isShuttingDown()) throw new ShutdownAbort()
-      await this.options.runtime.stopProcess()
+      // 这里是在处理另一个错误的路上做尽力清理：停不下来要记下来，但绝不
+      // 能用它替换掉真正该报给用户的那个失败原因。
+      await this.options.runtime.stopProcess().catch((stopError: unknown) => {
+        console.error(`[deepcode] 清理子进程失败: ${String(stopError instanceof Error ? stopError.message : stopError)}`)
+      })
       throw new BootAttemptError(toBootFailure('page-load', error, target))
     }
   }

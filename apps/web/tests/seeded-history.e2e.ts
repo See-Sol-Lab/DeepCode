@@ -14,7 +14,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
-import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, Message } from '@deepseek-ai/dsh-llm'
 import { deriveEventMessage, SessionId } from '@deepseek-ai/dsh-session'
@@ -23,7 +23,8 @@ import type { TokenMeter } from '@deepseek-ai/dsh-token-meter'
 import { join } from 'node:path'
 import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
-  launchWebScaffold, realizeSeedFixture, recordFixture, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
+  launchWebScaffold, parseSeedFixture, realizeSeedFixture, recordFixture, renderSeedFixture, seedSession, watchConsole,
+  webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
 
@@ -33,6 +34,7 @@ const UI_EXPECTED = fileURLToPath(new URL('./snapshots/seeded-history/ui.expecte
 // Command-row goldens over the same conversation after direct host commands.
 const COMMAND_ROW_EXPECTED = fileURLToPath(new URL('./snapshots/seeded-history/command-row.expected.md', import.meta.url))
 const FEEDBACK_ROW_EXPECTED = fileURLToPath(new URL('./snapshots/seeded-history/feedback-row.expected.md', import.meta.url))
+const FILE_OPEN_FAILURE_EXPECTED = fileURLToPath(new URL('./snapshots/seeded-history/file-open-failure.expected.md', import.meta.url))
 const MODE = webSnapshotMode()
 const SEED_ID = 'seeded-history-web-e2e'
 
@@ -53,14 +55,14 @@ const PROMPT = 'Use the read tool twice in one assistant message: read a.txt and
  * @returns the fixture with a manual compaction lifecycle appended.
  */
 function withCompaction(raw: string, meter: TokenMeter): string {
-  const lines = raw.trimEnd().split('\n')
-  const events = lines.slice(1).map(line => JSON.parse(line) as {
+  const decoded = parseSeedFixture(raw)
+  const events = decoded.events as unknown as Array<{
     type: string
     seq: number
     time: number
     surfaceOp?: unknown
     data?: { turn?: unknown; message?: unknown; content?: unknown; callId?: unknown; isError?: unknown }
-  })
+  }>
   const surfaceSeqs = events
     .filter(event => event.surfaceOp === 'append'
       && (event.type === 'user/message'
@@ -84,9 +86,9 @@ function withCompaction(raw: string, meter: TokenMeter): string {
    * @param event - the event body, without seq/time.
    * @returns the assigned seq, so later `sourceEventSeqs` cite the pushed event directly.
    */
-  const at = (event: Record<string, unknown>): number => {
+  const at = (event: { type: string } & Record<string, unknown>): number => {
     const taken = seq++
-    lines.push(JSON.stringify({ ...event, seq: taken, time: time++ }))
+    events.push({ ...event, seq: taken, time: time++ })
     return taken
   }
   const commandId = 'cmd-seeded-manual-compact'
@@ -172,7 +174,7 @@ function withCompaction(raw: string, meter: TokenMeter): string {
   const closureTurn = lastTurn + 1
   at({ type: 'turn/start', data: { turn: closureTurn } })
   at({ type: 'turn/end', data: { turn: closureTurn, reason: { kind: 'completed' } } })
-  return `${lines.join('\n')}\n`
+  return renderSeedFixture(decoded.headerLine, events)
 }
 
 describe('web e2e: seeded history renders through cold resume', () => {
@@ -396,10 +398,55 @@ describe('web e2e: seeded history renders through cold resume', () => {
     await fileLink.waitFor({ timeout: 10_000 })
     const frame = page.locator('[style*="grid-template-columns"]').first()
     expect(await frame.getAttribute('data-details-collapsed')).toBe('true')
-    await fileLink.click()
-    await expect.poll(() => frame.getAttribute('data-details-collapsed'), { timeout: 5_000 }).toBe('true')
+    const openPath = vi.spyOn(scaffold.ctx.apiProxy.host, 'openPath')
+      .mockImplementation(async (request, _signal) => ({
+        rpcId: request.rpcId,
+        result: { ok: true, value: { opened: true as const } },
+      }))
+    try {
+      await fileLink.click()
+      await expect.poll(() => frame.getAttribute('data-details-collapsed'), { timeout: 5_000 }).toBe('true')
+    } finally {
+      openPath.mockRestore()
+    }
     // Path label survives from the recorded args (a.txt).
     await expect.poll(() => page.getByText('a.txt', { exact: false }).count(), { timeout: 5_000 }).toBeGreaterThan(0)
+  })
+
+  it.skipIf(MODE === 'record')('a Host open refusal keeps the reason and retries the same path', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-seeded-file-open-failure'))
+    const fileLink = page.locator('[data-variant="read"] button').first()
+    await fileLink.waitFor({ timeout: 10_000 })
+    const openPath = vi.spyOn(scaffold.ctx.apiProxy.host, 'openPath')
+      .mockImplementation(async (request, _signal) => ({
+        rpcId: request.rpcId,
+        result: {
+          ok: false as const,
+          error: { code: 'internal', message: 'xdg-open is not available', details: {} },
+        },
+      }))
+    try {
+      await fileLink.click()
+      const dialog = page.getByRole('dialog', { name: 'Couldn’t open file' })
+      await dialog.waitFor({ timeout: 5_000 })
+      const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+      await compareOrRefreshGolden(FILE_OPEN_FAILURE_EXPECTED, snapshot, MODE)
+      await expect.poll(() => dialog.innerText(), { timeout: 5_000 })
+        .toContain('path open failed: xdg-open is not available')
+      await page.getByRole('button', { name: 'Retry' }).click()
+      await expect.poll(() => openPath.mock.calls.length, { timeout: 5_000 }).toBe(2)
+      expect(openPath.mock.calls[0]![0].payload).toEqual(openPath.mock.calls[1]![0].payload)
+      await page.getByRole('button', { name: 'Cancel' }).click()
+      await expect.poll(() => page.getByRole('dialog', { name: 'Couldn’t open file' }).count(), {
+        timeout: 5_000,
+      }).toBe(0)
+    } finally {
+      // Shared page: a leftover mask blocks later cases even when this one fails.
+      if (await page.getByRole('dialog', { name: 'Couldn’t open file' }).count() > 0) {
+        await page.keyboard.press('Escape')
+      }
+      openPath.mockRestore()
+    }
   })
 
   it.skipIf(MODE === 'record')('expands the cold-resumed compact summary', async () => {
@@ -505,6 +552,6 @@ describe('web e2e: seeded history renders through cold resume', () => {
     // stream would have failed the turn loudly. Cleanliness pins the wire.
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
-    await assertFixtureInventory(SNAPSHOT_DIR, ['command-row.expected.md', 'feedback-row.expected.md', 'seed.jsonl', 'ui.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['command-row.expected.md', 'feedback-row.expected.md', 'file-open-failure.expected.md', 'seed.jsonl', 'ui.expected.md'])
   })
 })

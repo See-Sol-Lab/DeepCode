@@ -17,6 +17,9 @@ declare module '*.mjs' {
   }
   export class Terminal {
     constructor(options?: TerminalOptions)
+    /** fit 后的实际列/行数（P8-D47：上报 pty.resize 对齐重绘定位）。 */
+    readonly cols: number
+    readonly rows: number
     open(parent: HTMLElement): void
     write(data: string): void
     loadAddon(addon: FitAddon): void

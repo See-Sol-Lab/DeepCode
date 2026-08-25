@@ -6,22 +6,25 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 28px;
+  /* Host hooks (DeepCode P8-D45): the footer row may scale down with a
+     smaller transcript body. Defaults keep upstream 28px targets / 14px
+     labels / 16px glyphs exactly. */
+  height: var(--dsh-iconaction-size, 28px);
 }
 
 /* Clock before icons (user figma 388:20051) / after (assistant 43:32997). */
 .timeStart {
   padding-right: 12px;
-  font-size: 14px;
-  line-height: 24px;
+  font-size: var(--dsh-meta-font-size, 14px);
+  line-height: var(--dsh-meta-line-height, 24px);
   color: var(--dsw-alias-label-tertiary);
   white-space: nowrap;
 }
 
 .timeEnd {
   padding-left: 12px;
-  font-size: 14px;
-  line-height: 24px;
+  font-size: var(--dsh-meta-font-size, 14px);
+  line-height: var(--dsh-meta-line-height, 24px);
   color: var(--dsw-alias-label-tertiary);
   white-space: nowrap;
 }
@@ -50,14 +53,22 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 6px;
+  width: var(--dsh-iconaction-size, 28px);
+  height: var(--dsh-iconaction-size, 28px);
+  padding: var(--dsh-iconaction-pad, 6px);
   border: none;
-  border-radius: 28px;
+  border-radius: var(--dsh-iconaction-size, 28px);
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
+}
+
+/* Host hook (DeepCode P8-D45): the fixed 16px glyphs shrink with the row;
+   the 16px default is each icon's intrinsic size, so unset hosts render
+   pixel-identically. */
+.action svg {
+  width: var(--dsh-iconaction-glyph, 16px);
+  height: var(--dsh-iconaction-glyph, 16px);
 }
 
 .action:hover {

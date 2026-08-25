@@ -74,3 +74,28 @@
 .chevronOpen {
   transform: rotate(180deg);
 }
+
+/* Two-line dropdown option: localized label over a smaller risk description.
+   Colors inherit from the Menu row (danger rows tint the label red); the
+   description dims itself except on the danger row, where a softer red keeps
+   the warning readable without shouting. */
+.optionText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+  text-align: left;
+}
+
+.optionDesc {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--dsw-alias-label-caption);
+  white-space: normal;
+}
+
+.optionDescDanger {
+  color: var(--dsw-alias-state-error-primary);
+  opacity: 0.75;
+}

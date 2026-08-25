@@ -118,6 +118,85 @@ describe('BlockAssembler', () => {
   })
 })
 
+describe('BlockAssembler replay metadata', () => {
+  const response = { responseId: 'resp-1' }
+
+  it('prunes per-block replay entries with the tool calls a max-tokens finish drops', () => {
+    const assembler = new BlockAssembler()
+    assembler.push({ type: 'block-end', index: 0, block: { type: 'text', text: 'lead' } })
+    assembler.push({
+      type: 'block-end',
+      index: 1,
+      block: { type: 'tool-call', id: CallId('c1'), name: 'echo', arguments: '{"text":' },
+    })
+    assembler.push({ type: 'block-end', index: 2, block: { type: 'reasoning', text: 'tail' } })
+    assembler.push({
+      type: 'finish',
+      reason: { kind: 'max-tokens' },
+      replayState: { response, blocks: ['meta-0', 'meta-1', 'meta-2'] },
+    })
+
+    expect(assembler.blocks()).toEqual([
+      { type: 'text', text: 'lead' },
+      { type: 'reasoning', text: 'tail' },
+    ])
+    expect(assembler.replayState).toEqual({ response, blocks: ['meta-0', 'meta-2'] })
+  })
+
+  it('omits replay metadata whose per-block entries misalign with the emitted blocks', () => {
+    const assembler = new BlockAssembler()
+    assembler.push({ type: 'block-end', index: 0, block: { type: 'text', text: 'one' } })
+    assembler.push({ type: 'block-end', index: 1, block: { type: 'text', text: 'two' } })
+    assembler.push({
+      type: 'finish',
+      reason: { kind: 'stop' },
+      replayState: { response, blocks: ['meta-0'] },
+    })
+
+    expect(assembler.blocks()).toHaveLength(2)
+    expect(assembler.replayState).toBeUndefined()
+  })
+
+  it('passes replay metadata through unchanged when assembly drops nothing', () => {
+    const replayState = { response, blocks: ['meta-0', 'meta-1'] }
+    const assembler = new BlockAssembler()
+    assembler.push({ type: 'block-end', index: 0, block: { type: 'text', text: 'partial' } })
+    assembler.push({
+      type: 'block-end',
+      index: 1,
+      block: { type: 'tool-call', id: CallId('c1'), name: 'echo', arguments: '{}' },
+    })
+    assembler.push({ type: 'finish', reason: { kind: 'tool-calls' }, replayState })
+
+    expect(assembler.replayState).toBe(replayState)
+  })
+
+  it('keeps a max-tokens replay state with no per-block entries across a tool-call drop', () => {
+    const replayState = { response }
+    const assembler = new BlockAssembler()
+    assembler.push({ type: 'block-end', index: 0, block: { type: 'text', text: 'partial' } })
+    assembler.push({
+      type: 'block-end',
+      index: 1,
+      block: { type: 'tool-call', id: CallId('c1'), name: 'echo', arguments: '{"text":' },
+    })
+    assembler.push({ type: 'finish', reason: { kind: 'max-tokens' }, replayState })
+
+    expect(assembler.blocks()).toEqual([{ type: 'text', text: 'partial' }])
+    expect(assembler.replayState).toBe(replayState)
+  })
+
+  it('keeps a text-only max-tokens response and its replay metadata intact', () => {
+    const replayState = { response, blocks: ['meta-0'] }
+    const assembler = new BlockAssembler()
+    assembler.push({ type: 'block-end', index: 0, block: { type: 'text', text: 'partial' } })
+    assembler.push({ type: 'finish', reason: { kind: 'max-tokens' }, replayState })
+
+    expect(assembler.blocks()).toEqual([{ type: 'text', text: 'partial' }])
+    expect(assembler.replayState).toBe(replayState)
+  })
+})
+
 describe('assertNever', () => {
   it('throws with diagnostics when a value escapes a closed union at runtime', async () => {
     const { assertNever } = await import('@deepseek-ai/dsh-llm')
@@ -143,5 +222,43 @@ describe('BlockAssembler duplicate-close contract', () => {
     const assembler = new BlockAssembler()
     for (const chunk of chunks) assembler.push(chunk)
     expect(assembler.blocks()).toEqual([{ type: 'reasoning', text: 'first' }])
+  })
+})
+
+describe('BlockAssembler.interruptedBlocks', () => {
+  it('keeps closed and open text/reasoning blocks with streamed content, in order', () => {
+    const assembler = new BlockAssembler()
+    assembler.push({ type: 'block-start', index: 0, blockType: 'reasoning' })
+    assembler.push({ type: 'reasoning-delta', index: 0, text: 'planning' })
+    assembler.push({ type: 'block-end', index: 0, block: { type: 'reasoning', text: 'planning' } })
+    assembler.push({ type: 'block-start', index: 1, blockType: 'text' })
+    assembler.push({ type: 'text-delta', index: 1, text: 'half an ans' })
+    expect(assembler.interruptedBlocks()).toEqual([
+      { type: 'reasoning', text: 'planning' },
+      { type: 'text', text: 'half an ans' },
+    ])
+  })
+
+  it('drops tool calls whether open or closed — interruption precedes dispatch', () => {
+    const assembler = new BlockAssembler()
+    assembler.push({ type: 'block-start', index: 0, blockType: 'text' })
+    assembler.push({ type: 'text-delta', index: 0, text: 'calling' })
+    assembler.push({ type: 'block-end', index: 0, block: { type: 'text', text: 'calling' } })
+    assembler.push({ type: 'block-start', index: 1, blockType: 'tool-call' })
+    assembler.push({ type: 'tool-call-delta', index: 1, id: CallId('c1'), name: 'read', argumentsDelta: '{"a":1}' })
+    assembler.push({ type: 'block-end', index: 1, block: { type: 'tool-call', id: CallId('c1'), name: 'read', arguments: '{"a":1}' } })
+    assembler.push({ type: 'block-start', index: 2, blockType: 'tool-call' })
+    assembler.push({ type: 'tool-call-delta', index: 2, id: CallId('c2'), name: 'read', argumentsDelta: '{"pa' })
+    expect(assembler.interruptedBlocks()).toEqual([{ type: 'text', text: 'calling' }])
+  })
+
+  it('drops empty and whitespace-only text/reasoning blocks and unknown open block types', () => {
+    const assembler = new BlockAssembler()
+    assembler.push({ type: 'block-start', index: 0, blockType: 'text' })
+    assembler.push({ type: 'text-delta', index: 0, text: '  \n' })
+    // A merge-extended block kind this build does not know how to assemble.
+    assembler.push({ type: 'block-start', index: 1, blockType: 'mystery' } as unknown as StreamChunk)
+    assembler.push({ type: 'block-start', index: 2, blockType: 'reasoning' })
+    expect(assembler.interruptedBlocks()).toEqual([])
   })
 })

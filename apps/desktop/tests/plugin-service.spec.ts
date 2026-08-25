@@ -18,6 +18,7 @@ import {
   parseManifestDependencies,
   pluginConfirmText,
   shouldShowHandoff,
+  specHasCredentials,
   validateLocalSpecTarget,
   validatePluginRequest,
   validatePluginTarget,
@@ -489,6 +490,22 @@ describe('main 接线形态（plugin argv 经 resolveDshCommand 组装）', () =
     expect(launch.env.DSH_HOME).toBe('C:\\dsh home')
   })
 
+  it('packaged：把内嵌 pnpm 的入口交给官方 CLI，好让它不必经 shell 调 pnpm', () => {
+    const launch = resolveDshCommand({
+      packaged: true,
+      resourcesPath: 'E:\\res',
+      packagedCwd: 'C:\\home',
+      packagedExecutable: 'E:\\DeepCode.exe',
+      dshHome: 'C:\\dsh home',
+      args: buildPluginOperationArgs({ action: 'remove', profile: 'web', spec: 'some-plugin', anchorDir: null }),
+    })
+    // 没有这一条，官方 CLI 会在 Windows 上用 shell 去找 PATH 里的 pnpm.cmd；
+    // shell 就是 cmd.exe，而 broker 起的进程带 windowsHide、没有控制台可继承，
+    // Windows 于是另开一个终端窗口——用户看得见它，管道却回不到宿主：没有
+    // 输出、没有退出码，操作永远等下去，pnpm 却在那个窗口里把活干完了。
+    expect(launch.env.DSH_PNPM_ENTRY).toBe('E:\\res\\dsh\\node_modules\\pnpm\\bin\\pnpm.cjs')
+  })
+
   it('dev：同样形态（tsx 入口 + plugin argv），无父级启动参数', () => {
     const launch = resolveDshCommand({
       packaged: false,
@@ -540,5 +557,24 @@ describe('pluginConfirmText（目标透明度：Managed/Existing 明确区分）
     expect(text.detail).toContain('Existing')
     expect(text.detail).toContain('Install / repair dependencies')
     expect(text.detail).not.toContain('Package：')
+  })
+})
+
+describe('插件 spec 不接受嵌在 URL 里的凭据', () => {
+  it.each([
+    'https://user:token@example.com/pkg.tgz',
+    'git+https://user:token@git.example.com/x.git',
+    'https://user@example.com/pkg.tgz',
+  ])('%s → 拒绝（原始 spec 会写进 recovery journal）', (spec) => {
+    expect(specHasCredentials(spec)).toBe(true)
+    expect(validatePluginRequest({ profile: 'web', action: 'add', spec, anchorDir: null })).toContain('账号密码')
+  })
+
+  it.each([
+    'lodash',
+    '@scope/pkg@1.2.3',
+    'https://example.com/pkg.tgz',
+  ])('%s → 放行（普通包名与干净 URL 不受影响）', (spec) => {
+    expect(specHasCredentials(spec)).toBe(false)
   })
 })

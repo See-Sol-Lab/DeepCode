@@ -160,6 +160,20 @@ describe('built-in conversation node Definitions', () => {
     expect(interrupted?.data).toMatchObject({ status: 'interrupted' })
     expect((interrupted?.data as AssistantChatData).finalNode?.interrupted).toBe(true)
 
+    const markedValue = assembler([
+      at(20, 'turn/start', { turn: 3 }),
+      at(21, 'step/start', { turn: 3, step: 1 }),
+      at(22, 'assistant/message', {
+        turn: 3,
+        step: 1,
+        message: assistantMessage('assistant-3', 'cut short'),
+        interrupted: true,
+      }, { surfaceOp: 'append' }),
+    ])
+    const marked = node(snapshot(markedValue), 'assistant-step')
+    expect(marked?.data).toMatchObject({ status: 'interrupted', blocks: [{ kind: 'text', text: 'cut short' }] })
+    expect((marked?.data as AssistantChatData).finalNode?.interrupted).toBe(true)
+
     const hiddenValue = assembler([
       at(20, 'turn/start', { turn: 3 }),
       at(21, 'step/start', { turn: 3, step: 1 }),
@@ -514,6 +528,100 @@ describe('built-in conversation node Definitions', () => {
     })
   })
 
+  it('associates each direct message with its immediately following session recall', () => {
+    const value = assembler([
+      at(1, 'user/message', textMessage('citing-research', '@Research notes what changed?'), { surfaceOp: 'append' }),
+      at(2, 'user/message', {
+        ...textMessage('research-context', 'snapshot'),
+        source: {
+          kind: 'session-reference',
+          form: 'recall',
+          version: 1,
+          references: [{ sessionId: 'source-a', label: 'Research notes' }],
+        },
+      }, { surfaceOp: 'append' }),
+      at(3, 'user/message', textMessage('citing-review', '@Review next'), { surfaceOp: 'append' }),
+      at(4, 'user/message', {
+        ...textMessage('review-context', 'snapshot'),
+        source: {
+          kind: 'session-reference',
+          form: 'recall',
+          version: 1,
+          references: [{ sessionId: 'source-b', label: 'Review' }],
+        },
+      }, { surfaceOp: 'append' }),
+      at(6, 'user/message', textMessage('later-user', 'unrelated'), { surfaceOp: 'append' }),
+    ])
+
+    const current = snapshot(value)
+    const messages = [...current.nodes.values()]
+      .filter(candidate => candidate.kind === 'user' || candidate.kind === 'context')
+    const users = [...current.nodes.values()].filter(candidate => candidate.kind === 'user')
+    expect(messages.map(candidate => candidate.kind)).toEqual(['user', 'context', 'user', 'context', 'user'])
+    expect(users[0]?.data).toMatchObject({ referenceLabels: ['Research notes'] })
+    expect(users[1]?.data).toMatchObject({ referenceLabels: ['Review'] })
+    expect(users[2]?.data).not.toHaveProperty('referenceLabels')
+  })
+
+  it('updates an already published direct node when its following recall arrives', () => {
+    const value = assembler([
+      at(1, 'user/message', textMessage('citing-user', '@Research notes what changed?'), { surfaceOp: 'append' }),
+    ])
+    const before = node(snapshot(value), 'user')
+    expect(before?.data).not.toHaveProperty('referenceLabels')
+
+    value.append(at(2, 'user/message', {
+      ...textMessage('reference-context', 'snapshot'),
+      source: {
+        kind: 'session-reference',
+        form: 'recall',
+        version: 1,
+        references: [{ sessionId: 'source-a', label: 'Research notes' }],
+      },
+    }, { surfaceOp: 'append' }))
+    value.flush()
+
+    const current = snapshot(value)
+    const nodes = [...current.nodes.values()]
+      .filter(candidate => candidate.kind === 'user' || candidate.kind === 'context')
+    expect(nodes.map(candidate => candidate.kind)).toEqual(['user', 'context'])
+    expect(nodes[0]?.key).toBe(before?.key)
+    expect(nodes[0]?.data).toMatchObject({ referenceLabels: ['Research notes'] })
+    expect(current.legacy.nodes[0]).toMatchObject({ referenceLabels: ['Research notes'] })
+  })
+
+  it('associates a claimed steering message with its following recall', () => {
+    const steering = textMessage('steering-reference', '@Research notes continue')
+    const value = assembler([
+      at(1, 'agent/inbox/spliced', {
+        target: 'next-step',
+        start: 0,
+        inserted: [steering],
+      }),
+      at(2, 'agent/inbox/spliced', {
+        target: 'next-step',
+        start: 0,
+        removedCount: 1,
+        inserted: [],
+      }),
+      at(3, 'user/message', steering, { surfaceOp: 'append' }),
+      at(4, 'user/message', {
+        ...textMessage('steering-reference-context', 'snapshot'),
+        source: {
+          kind: 'session-reference',
+          form: 'recall',
+          version: 1,
+          references: [{ sessionId: 'source-a', label: 'Research notes' }],
+        },
+      }, { surfaceOp: 'append' }),
+    ])
+
+    expect(node(snapshot(value), 'steering')?.data).toMatchObject({
+      messageId: 'steering-reference',
+      referenceLabels: ['Research notes'],
+    })
+  })
+
   it('keeps replacement copies out of Chat business nodes', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),
@@ -580,7 +688,12 @@ describe('built-in conversation node Definitions', () => {
     const retryNode = node(snapshot(retry), 'model-retry')
     const retryData = retryNode?.data as RetryChatData
     expect(retryData.attempts.map(attempt => attempt.retryState)).toEqual(['started', 'cancelled'])
-    expect(node(snapshot(retry), 'turn-error')).toBeUndefined()
+    expect(node(snapshot(retry), 'turn-error')?.data).toMatchObject({
+      kind: 'turn-error',
+      turn: 1,
+      message: 'failed',
+      code: 'TRANSPORT',
+    })
 
     const compactions = assembler([
       at(10, 'command/run', {
@@ -764,7 +877,7 @@ describe('built-in conversation node Definitions', () => {
     expect(node(snapshot(value), 'tool-call')).toBeUndefined()
   })
 
-  it('suppresses a turn error when the loaded tail contains only a later retry attempt', () => {
+  it('renders the exhausted-retry turn error in a partial tail window and after prepending the chain', () => {
     const value = assembler([
       at(5, 'llm/retry', {
         retryId: 'retry-paged',
@@ -786,7 +899,13 @@ describe('built-in conversation node Definitions', () => {
     ], true)
 
     expect(node(snapshot(value), 'model-retry')).toBeUndefined()
-    expect(node(snapshot(value), 'turn-error')).toBeUndefined()
+    expect(node(snapshot(value), 'turn-error')?.data).toMatchObject({
+      kind: 'turn-error',
+      seq: 7,
+      turn: 1,
+      message: 'failed',
+      code: 'TRANSPORT',
+    })
 
     value.prepend([
       at(1, 'turn/start', { turn: 1 }),
@@ -811,7 +930,13 @@ describe('built-in conversation node Definitions', () => {
 
     const retry = node(snapshot(value), 'model-retry')
     expect((retry?.data as RetryChatData).attempts).toHaveLength(2)
-    expect(node(snapshot(value), 'turn-error')).toBeUndefined()
+    expect(node(snapshot(value), 'turn-error')?.data).toMatchObject({
+      kind: 'turn-error',
+      seq: 7,
+      turn: 1,
+      message: 'failed',
+      code: 'TRANSPORT',
+    })
   })
 
   it('materializes a max-tokens notice and keeps completed and error turns clean', () => {

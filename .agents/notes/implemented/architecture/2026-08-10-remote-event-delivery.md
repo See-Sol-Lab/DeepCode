@@ -8,7 +8,7 @@ English | [中文](2026-08-10-remote-event-delivery.zh.md)
 
 [Typert Gateway targeted method calls](../../implemented/architecture/2026-08-02-typert-remote-method-calls.md) cover only the request/response shape and deliberately leave Session event streams and stateful interactions to separate designs. Every **one-way Host-to-consumer push** therefore still rides the legacy API Proxy.
 
-The Host owns a family of one-way events whose payloads are already JSON and whose emission never binds an AgentScope: `agent-preset/selected`, `commands/change`, `credentials/updated`, `llm/adapters-updated`, and `settings/document-updated`. Reaching one UI subscriber took four hops: the Host cordis event, a hand-written `HostFrame` variant plus its zod branch in apiproxy, a hand-written bridge in client/runtime that re-emitted it as a Client cordis event, and finally the consumer's `ctx.on(...)`. Adding one such event edited five places (frame union, zod union, host-stream listener, client bridge, a duplicated Client-side `Events` declaration), and not one of them stated a new fact: the name, the payload type, and the emission point were all declared by the owner package's cordis `Events` merge.
+The Host owns a family of one-way events whose payloads are already JSON and whose emission never binds an AgentScope: `agent-preset/selected`, `commands/change`, `credentials/reference-updated`, `llm/adapters-updated`, and `settings/document-updated`. Reaching one UI subscriber took four hops: the Host cordis event, a hand-written `HostFrame` variant plus its zod branch in apiproxy, a hand-written bridge in client/runtime that re-emitted it as a Client cordis event, and finally the consumer's `ctx.on(...)`. Adding one such event edited five places (frame union, zod union, host-stream listener, client bridge, a duplicated Client-side `Events` declaration), and not one of them stated a new fact: the name, the payload type, and the emission point were all declared by the owner package's cordis `Events` merge.
 
 That duplicated declaration is also **lossy**: the Client side restates it as `settings/changed(ns: string)`, flattening a branded type into bare `string` — the opposite of the Remote method contract, where a consumer type points at the business package's one canonical symbol.
 
@@ -56,7 +56,7 @@ $on<Event extends TypertRemoteEvent>(event: Event, listener: Events[Event]): () 
 
 `Events` resolves per program: the full Host vocabulary in the Host program, whatever the Client face can see in the Client program. The same predicate therefore holds on both sides without dragging Host declarations into the Client.
 
-**The surface separates the consumer verb from the carrier handoff**: consumers subscribe with `$on`, and whoever owns the Host frame sink hands each decoded frame over with `$dispatch`. It cannot be a module-level function reaching across Client plugins — the client bundle purity gate (`packages/client/tsdown.client.ts`) admits value imports only from `CLIENT_EXTERNALS`, the `INLINE_SAFE` wire layer, and generated `/remote` contributions, and inlining around it would copy `ClientRemoteService` into the runtime bundle, making `instanceof` permanently false. A cordis service method is the collaboration shape that gate prescribes:
+**The surface separates the consumer verb from the carrier handoff**: consumers subscribe with `$on`, and whoever owns the Host frame sink hands each decoded frame over with `$dispatch`. It cannot be a module-level function reaching across Client plugins — the client bundle purity gate (`packages/client/tsdown.client.ts`) admits value imports only from the implicit `PLATFORM_MODULES` plus `PRELOADED_CLIENT_EXTERNALS` baseline, the package's `dsh.client.external` requests, the `INLINE_SAFE` wire layer, and generated `/remote` contributions. Inlining around it would copy `ClientRemoteService` into the runtime bundle, making `instanceof` permanently false. A cordis service method is the collaboration shape that gate prescribes:
 
 ```ts ignore-check
 $dispatch(event: string, args: readonly unknown[]): void
@@ -75,7 +75,7 @@ Delivery shares no implementation with the cordis event system: one-way only, no
 export const API_REMOTE_FORWARDED_EVENTS = [
   'agent-preset/selected',
   'commands/change',
-  'credentials/updated',
+  'credentials/reference-updated',
   'llm/adapters-updated',
   'settings/document-updated',
 ] as const

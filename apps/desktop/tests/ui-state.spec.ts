@@ -44,6 +44,7 @@ function sampleState(): DesktopUiStateV1 {
     acknowledgedRecoveryHash: 'a'.repeat(64),
     expertDetailsExpanded: true,
     closeToTrayNoticeAcknowledged: true,
+    terminalBounds: { x: 40, y: 60, width: 900, height: 560 },
   }
 }
 
@@ -57,6 +58,7 @@ describe('defaultUiState', () => {
       acknowledgedRecoveryHash: null,
       expertDetailsExpanded: false,
       closeToTrayNoticeAcknowledged: false,
+      terminalBounds: null,
     })
   })
 })
@@ -81,8 +83,17 @@ describe('parseUiState 严格校验', () => {
     ['maximized 非布尔', `{${base.replace('"maximized":false', '"maximized":"yes"')}}`],
     ['托盘确认非布尔', `{${base.replace('"closeToTrayNoticeAcknowledged":false', '"closeToTrayNoticeAcknowledged":"yes"')}}`],
     ['缺少托盘确认字段', `{${base.replace(',"closeToTrayNoticeAcknowledged":false', '')}}`],
+    ['终端几何负数宽', `{${base},"terminalBounds":{"x":0,"y":0,"width":-1,"height":10}}`],
+    ['终端几何含未知字段', `{${base},"terminalBounds":{"x":0,"y":0,"width":10,"height":10,"scale":2}}`],
   ])('拒绝 %s', (_name, content) => {
     expect(() => parseUiState(content)).toThrow()
+  })
+
+  it('terminalBounds 缺失宽容为 null（版本 2 存续期内后加的字段，老文件不能整份回退默认）', () => {
+    const parsed = parseUiState(`{${base}}`)
+    expect(parsed.terminalBounds).toBeNull()
+    // 宽容仅限缺失：其余老字段的解析结果一个不变。
+    expect(parsed).toEqual({ ...defaultUiState() })
   })
 })
 

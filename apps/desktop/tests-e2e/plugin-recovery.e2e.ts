@@ -30,15 +30,15 @@ import {
   writeLauncherState,
 } from './fixtures.ts'
 import {
-  CHROME_URL_PREFIX,
-  clickChromeButton,
-  dumpChromeButtons,
+  clickDeepCodeButton,
+  deepCodeAnchors,
   ensureCleanStage,
-  evalInView,
+  fillDeepCodeInput,
+  openDeepCodeSection,
   openHarnessPanel,
   shutdownApp,
-  waitForChromeElement,
   waitForCompMount,
+  waitForDeepCodeElement,
 } from './chrome-driver.ts'
 import { launchPackaged } from './fixtures.ts'
 
@@ -67,41 +67,35 @@ const managedProfileDir = (temp: string): string => join(userDataDir(temp), 'dsh
 /** 等 Plugin Manager 子视图可见。 */
 async function openPluginManager(app: ElectronApplication): Promise<void> {
   await openHarnessPanel(app)
-  await clickChromeButton(app, 'harness-plugin-manager')
-  await waitForChromeElement(app, 'plugin-help')
+  // Existing Home 的 profiles 要经一次 discovery 才进插件分区的 inventory；
+  // 没有它目标为空，plugin-run 的 canRun 恒假、执行钮一直禁用（2026-08-24
+  // S10c 现场：disabled=true，同屏锚点里一个 profile 都没有；而 managed
+  // home 启动时已经发现过，所以 S10a 一直是好的）。对 managed 这步幂等。
+  await clickDeepCodeButton(app, 'harness-refresh')
+  await openDeepCodeSection(app, 'plugins')
+  await waitForDeepCodeElement(app, 'plugin-verify-note')
 }
 
-/** 在 spec 输入框里输入值（input 事件同步按钮状态，与真实输入一致）。 */
-async function setPluginSpec(app: ElectronApplication, spec: string): Promise<void> {
-  await evalInView(
-    app,
-    CHROME_URL_PREFIX,
-    `(() => {
-      const input = document.getElementById('plugin-spec')
-      if (input === null) return false
-      input.value = ${JSON.stringify(spec)}
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-      return true
-    })()`,
-  )
-}
-
-/** 通过 UI 发起 add 并等 handoff（Restart Now / Later 可见）。 */
+/**
+ * 通过 UI 发起 add 并等 handoff（Restart Now / Later 可见）。
+ *
+ * 两处 D39 遗留在这里被一起修掉（2026-08-24 六套件跑齐时才暴露——此前这个
+ * 套件从没跑到过这一步）：
+ * - spec 输入原本自己写「设 input.value ＋ 派发 input 事件」。settings-plugin
+ *   是 React 受控组件，这样写**不会**更新它的 state，于是 spec 一直是空、
+ *   plugin-run 的 disabled:!canRun 永远为真，报出来就是「按钮不存在、已禁用
+ *   或不可见」。驱动的 fillDeepCodeInput 走的是原生 setter，正是为此存在。
+ * - handoff 按钮原本从 chrome 侧按 id 找，而它现在是设置页里的
+ *   data-deepcode 锚点。
+ * @param app - 打包应用。
+ * @param spec - 插件 spec（本地路径或包名）。
+ * @param timeoutMs - 等 handoff 的上限。
+ */
 async function addPluginAndWaitHandoff(app: ElectronApplication, spec: string, timeoutMs = 180_000): Promise<void> {
   await openPluginManager(app)
-  await setPluginSpec(app, spec)
-  await clickChromeButton(app, 'plugin-run')
-  await expect.poll(async () => {
-    try {
-      return await evalInView<boolean>(
-        app,
-        CHROME_URL_PREFIX,
-        "document.getElementById('plugin-handoff-restart') !== null",
-      )
-    } catch {
-      return false
-    }
-  }, { timeout: timeoutMs, message: 'add 后 restart handoff 未出现' }).toBe(true)
+  await fillDeepCodeInput(app, 'plugin-spec', spec)
+  await clickDeepCodeButton(app, 'plugin-run')
+  await waitForDeepCodeElement(app, 'plugin-handoff-restart', timeoutMs)
 }
 
 describe.runIf(packagedExists)('S10 — Plugin transaction recovery（打包态）', () => {
@@ -141,7 +135,7 @@ describe.runIf(packagedExists)('S10 — Plugin transaction recovery（打包态�
     // Restart Now → 坏插件 apply 抛错 + 硬退出 → boot 失败 → 自动恢复 →
     // 自动重启一次 → 健康。等待信号必须是 journal 的真实相位（recovered）：
     // status-text 在旧代 Harness 被停掉之前也显示"运行中"，等它会提前放行。
-    await clickChromeButton(instance, 'plugin-handoff-restart')
+    await clickDeepCodeButton(instance, 'plugin-handoff-restart')
     await expect.poll(async () => readJournal(temp)?.state ?? null, {
       timeout: 240_000,
       message: '自动恢复链未在时限内完成（journal 未到 recovered）',
@@ -170,7 +164,7 @@ describe.runIf(packagedExists)('S10 — Plugin transaction recovery（打包态�
     await stubDialogs(first)
     await addPluginAndWaitHandoff(first, BAD_PLUGIN_DIR)
     // Restart Later：本次操作完成，journal 保留 pending-verification。
-    await clickChromeButton(first, 'plugin-handoff-later')
+    await clickDeepCodeButton(first, 'plugin-handoff-later')
     expect(readJournal(temp)?.state).toBe('pending-verification')
 
     // 外部修改：模拟"事务后用户/其它程序改过白名单文件"。
@@ -181,21 +175,14 @@ describe.runIf(packagedExists)('S10 — Plugin transaction recovery（打包态�
 
     // 面板 Restart Harness（单实例内验证 drift；第二次 playwright launch 在
     // "同 userData + boot 失败"场景会被 CDP 初始化基建卡住，避开它）。
-    // 插件子视图接管面板内容区时 harness-restart 不在 DOM：经汉堡菜单把
-    // harnessView 重置回主面板（production 控制入口不动）。
-    const resetPanel = await evalInView<boolean>(first, CHROME_URL_PREFIX, `(() => {
-      const ham = document.getElementById('hamburger')
-      if (ham === null) return false
-      ham.click()
-      ham.click()
-      const entry = Array.from(document.querySelectorAll('[data-open="harness"]')).at(-1)
-      if (entry === undefined) return false
-      entry.click()
-      return true
-    })()`)
-    expect(resetPanel, '无法从汉堡菜单重置 Harness 面板').toBe(true)
-    await waitForChromeElement(first, 'harness-restart')
-    await clickChromeButton(first, 'harness-restart')
+    //
+    // 原来这里要"经汉堡菜单把 harnessView 重置回主面板"，因为旧 chrome 面板
+    // 里插件子视图会**接管内容区**、把 harness-restart 挤出 DOM。P8-D39 之后
+    // 这件事不存在了：Harness 与插件管理是官方设置页里**并列**的两个分区，
+    // 切过去就有。chrome 侧的 [data-open="harness"] 连同那个子视图一起没了。
+    await openHarnessPanel(first)
+    await waitForDeepCodeElement(first, 'harness-restart')
+    await clickDeepCodeButton(first, 'harness-restart')
 
     // 坏插件第一次进 composition → boot 失败；drift 检出后 journal → drift。
     await expect.poll(async () => readJournal(temp)?.state ?? null, {
@@ -208,13 +195,15 @@ describe.runIf(packagedExists)('S10 — Plugin transaction recovery（打包态�
     expect(readFileSync(join(managedProfileDir(temp), 'package.json'), 'utf8')).toBe(driftedBytes)
     // 应用因"需要人工恢复"保持存活，恢复区块可见。
     await openHarnessPanel(first)
-    await clickChromeButton(first, 'harness-plugin-manager')
-    await waitForChromeElement(first, 'plugin-recovery-block')
-    // drift 状态不提供 Restore（只有人工入口 + 放弃）。
-    const buttons = await dumpChromeButtons(first)
-    expect(buttons).not.toContain('plugin-recovery-restore')
-    expect(buttons).toContain('plugin-recovery-open-profile')
-    expect(buttons).toContain('plugin-recovery-abandon')
+    await openDeepCodeSection(first, 'plugins')
+    await waitForDeepCodeElement(first, 'plugin-recovery-block')
+    // drift 状态不提供 Restore（只有人工入口 + 放弃）。恢复区块住在官方
+    // 设置页的 DeepCode 分区里，锚点要从 compat 侧取——chrome 侧的按钮
+    // 清单里没有它们，拿 dumpChromeButtons 去找必然落空。
+    const anchors = await deepCodeAnchors(first)
+    expect(anchors).not.toContain('plugin-recovery-restore')
+    expect(anchors).toContain('plugin-recovery-open-profile')
+    expect(anchors).toContain('plugin-recovery-abandon')
   }, 420_000)
 
   it('S10c：Existing Home 坏插件 → boot 失败不自动恢复 → 面板 Restore 经确认后恢复并重启健康', async () => {
@@ -237,7 +226,7 @@ describe.runIf(packagedExists)('S10 — Plugin transaction recovery（打包态�
     await stubDialogs(instance)
     await addPluginAndWaitHandoff(instance, BAD_PLUGIN_DIR)
     // Restart Now → boot 失败 → Existing Home：绝不自动恢复。
-    await clickChromeButton(instance, 'plugin-handoff-restart')
+    await clickDeepCodeButton(instance, 'plugin-handoff-restart')
     await expect.poll(async () => {
       return readJournal(temp)?.state ?? null
     }, { timeout: 240_000, message: 'journal 未进入 recovery-needed' }).toBe('recovery-needed')
@@ -252,9 +241,9 @@ describe.runIf(packagedExists)('S10 — Plugin transaction recovery（打包态�
     // openHarnessPanel 点的是 status-pill——那是个 toggle，对已打开的面板
     // 只会把它关掉，随后等 harness-refresh 必然超时（实测：90s 空等）。
     // 恢复区块就渲染在插件子视图的操作区里，直接等它即可。
-    await waitForChromeElement(instance, 'plugin-recovery-restore')
+    await waitForDeepCodeElement(instance, 'plugin-recovery-restore')
     // 确认对话框（stub 默认 0 = Restore）。
-    await clickChromeButton(instance, 'plugin-recovery-restore')
+    await clickDeepCodeButton(instance, 'plugin-recovery-restore')
     await expect.poll(async () => readJournal(temp)?.state ?? null, {
       timeout: 240_000,
       message: '恢复后 journal 未到 recovered',

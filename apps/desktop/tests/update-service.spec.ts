@@ -17,6 +17,8 @@ import {
   sanitizeAssetFilename,
   sha256Stream,
   shouldReuseVerifiedInstaller,
+  MAX_UPDATE_REDIRECTS,
+  resolveRedirectTarget,
   streamDownload,
   verifyDigest,
   UPDATE_SIZE_LIMIT,
@@ -349,5 +351,174 @@ describe('sha256Stream（安装前校验的流式摘要）', () => {
       },
     }
     await expect(sha256Stream(failing)).rejects.toThrow(/read failed/)
+  })
+})
+
+
+describe('streamDownload 跟随重定向（GitHub latest/download 的正常链路）', () => {
+  /**
+   * 按 URL 路由的 fake：每个地址要么给一个跳转，要么给一段内容。
+   * 真实 GitHub 的 releases/latest/download 就是先 302 到打了签名的
+   * 对象存储地址，所以"跟不跟跳转"直接决定默认更新通道能不能用。
+   */
+  const routedGet = (routes: Record<string, { status: number; location?: string; body?: number[] }>): HttpGet => {
+    const fn: HttpGet = (url, callback) => {
+      const route = routes[url]
+      if (route === undefined) throw new Error(`fake 未定义的地址：${url}`)
+      const handlers = new Map<string, ((arg: unknown) => void)[]>()
+      callback({
+        statusCode: route.status,
+        headers: route.location === undefined ? {} : { location: route.location },
+        on: (event: string, handler: (arg: unknown) => void): void => {
+          const list = handlers.get(event) ?? []
+          list.push(handler)
+          handlers.set(event, list)
+        },
+      })
+      setTimeout(() => {
+        const emit = (event: string, arg?: unknown): void => {
+          for (const handler of handlers.get(event) ?? []) handler(arg)
+        }
+        if (route.body !== undefined) {
+          emit('data', new Uint8Array(route.body))
+          emit('end')
+        }
+      }, 0)
+      return { on: () => {}, destroy: () => {} }
+    }
+    return fn
+  }
+
+  const run = async (routes: Parameters<typeof routedGet>[0], start = 'https://github.com/o/r/releases/latest/download/a.exe'): Promise<{ bytes: number; written: number[] }> => {
+    const written: number[] = []
+    const result = await streamDownload(
+      start,
+      (chunk) => { written.push(...chunk) },
+      1024,
+      new AbortController().signal,
+      () => {},
+      routedGet(routes),
+    )
+    return { bytes: result.bytes, written }
+  }
+
+  it('相对 Location：GitHub 的 302 就是相对形式', async () => {
+    const outcome = await run({
+      'https://github.com/o/r/releases/latest/download/a.exe': { status: 302, location: '/o/r/releases/download/v1.0.1/a.exe' },
+      'https://github.com/o/r/releases/download/v1.0.1/a.exe': { status: 200, body: [1, 2, 3] },
+    })
+    expect(outcome.bytes).toBe(3)
+    expect(outcome.written).toEqual([1, 2, 3])
+  })
+
+  it('绝对 Location：跳到对象存储域名', async () => {
+    const outcome = await run({
+      'https://github.com/o/r/releases/latest/download/a.exe': { status: 302, location: 'https://objects.example.com/signed/a.exe' },
+      'https://objects.example.com/signed/a.exe': { status: 200, body: [7, 7] },
+    })
+    expect(outcome.bytes).toBe(2)
+  })
+
+  it('多跳但在上限内：正常下完', async () => {
+    const routes: Record<string, { status: number; location?: string; body?: number[] }> = {}
+    for (let i = 0; i < MAX_UPDATE_REDIRECTS; i++) {
+      routes[`https://h/${String(i)}`] = { status: 302, location: `https://h/${String(i + 1)}` }
+    }
+    routes[`https://h/${String(MAX_UPDATE_REDIRECTS)}`] = { status: 200, body: [9] }
+    const outcome = await run(routes, 'https://h/0')
+    expect(outcome.bytes).toBe(1)
+  })
+
+  it('超过跳数上限：明确停止，不无限跟下去', async () => {
+    const routes: Record<string, { status: number; location?: string; body?: number[] }> = {}
+    for (let i = 0; i <= MAX_UPDATE_REDIRECTS + 2; i++) {
+      routes[`https://h/${String(i)}`] = { status: 302, location: `https://h/${String(i + 1)}` }
+    }
+    await expect(run(routes, 'https://h/0')).rejects.toThrow(/跳转超过/)
+  })
+
+  it('跳转成环：绕回走过的地址就停', async () => {
+    await expect(run({
+      'https://h/a': { status: 302, location: 'https://h/b' },
+      'https://h/b': { status: 302, location: 'https://h/a' },
+    }, 'https://h/a')).rejects.toThrow(/绕回/)
+  })
+
+  it('降级到 HTTP：拒绝（中间人可以换掉安装包）', async () => {
+    await expect(run({
+      'https://h/a': { status: 302, location: 'http://h/a' },
+    }, 'https://h/a')).rejects.toThrow(/非 HTTPS/)
+  })
+
+  it('跳转到带账号密码的地址：拒绝', async () => {
+    await expect(run({
+      'https://h/a': { status: 302, location: 'https://user:secret@h/b' },
+    }, 'https://h/a')).rejects.toThrow(/账号密码/)
+  })
+
+  it('3xx 但没有 Location：明确报错，不当成下载失败', async () => {
+    await expect(run({
+      'https://h/a': { status: 302 },
+    }, 'https://h/a')).rejects.toThrow(/没有给出目标地址/)
+  })
+
+  it('Location 是解析不了的绝对地址：明确报错', async () => {
+    // 注意畸形 Location 的常态：'ht!tp://x' 这类会被当成相对路径吃掉，
+    // 解析成 https://h/ht!tp://x 而不报错——那条路仍受 https 与凭据检查
+    // 约束，所以安全。真正解析失败的是非法的绝对地址，比如残缺的 IPv6。
+    await expect(run({
+      'https://h/a': { status: 302, location: 'https://[' },
+    }, 'https://h/a')).rejects.toThrow(/无法解析/)
+  })
+
+  it('301 / 307 / 308 一视同仁（我们只做 GET）', async () => {
+    for (const status of [301, 307, 308]) {
+      const outcome = await run({
+        'https://h/a': { status, location: 'https://h/b' },
+        'https://h/b': { status: 200, body: [5] },
+      }, 'https://h/a')
+      expect(outcome.bytes).toBe(1)
+    }
+  })
+})
+
+describe('resolveRedirectTarget（跳转地址的卫生）', () => {
+  it('相对路径按当前地址解析', () => {
+    expect(resolveRedirectTarget('https://h/x/y', '/z')).toBe('https://h/z')
+    expect(resolveRedirectTarget('https://h/x/y', 'z')).toBe('https://h/x/z')
+  })
+
+  it('Location 缺失 / 空串 / 非字符串都拒绝', () => {
+    expect(() => resolveRedirectTarget('https://h/a', undefined)).toThrow(/没有给出目标地址/)
+    expect(() => resolveRedirectTarget('https://h/a', '   ')).toThrow(/没有给出目标地址/)
+    expect(() => resolveRedirectTarget('https://h/a', 42)).toThrow(/没有给出目标地址/)
+  })
+
+  it('非 HTTPS 一律拒绝（含 file: 与 data:）', () => {
+    expect(() => resolveRedirectTarget('https://h/a', 'http://h/a')).toThrow(/非 HTTPS/)
+    expect(() => resolveRedirectTarget('https://h/a', 'file:///C:/x.exe')).toThrow(/非 HTTPS/)
+    expect(() => resolveRedirectTarget('https://h/a', 'data:text/plain,x')).toThrow(/非 HTTPS/)
+  })
+
+  it('带凭据的地址拒绝（会漏进日志与诊断包）', () => {
+    expect(() => resolveRedirectTarget('https://h/a', 'https://u:p@h/b')).toThrow(/账号密码/)
+    expect(() => resolveRedirectTarget('https://h/a', 'https://u@h/b')).toThrow(/账号密码/)
+  })
+})
+
+describe('更新地址不接受嵌在 URL 里的凭据', () => {
+  it('feed 配置带账号密码 → 视为未配置', () => {
+    expect(resolveUpdateFeed(JSON.stringify({ feedUrl: 'https://u:p@example.com/m.json' }))).toBeNull()
+    expect(resolveUpdateFeed(JSON.stringify({ feedUrl: 'https://u@example.com/m.json' }))).toBeNull()
+  })
+
+  it('干净的 https feed 仍然接受', () => {
+    const url = 'https://example.com/m.json'
+    expect(resolveUpdateFeed(JSON.stringify({ feedUrl: url }))).toBe(url)
+  })
+
+  it('资产 URL 带凭据 → 拒绝', () => {
+    expect(isSafeAssetUrl('https://u:p@example.com/a.exe')).toBe(false)
+    expect(isSafeAssetUrl('https://example.com/a.exe')).toBe(true)
   })
 })

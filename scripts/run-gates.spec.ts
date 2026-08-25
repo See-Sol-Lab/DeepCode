@@ -31,9 +31,9 @@ function resultFor(subject: Gate, status: GateResult['status'] = 'passed'): Gate
   }
 }
 
-function withPnpmEntrypoint<T>(action: () => T): T {
+function withPnpmEntrypoint<T>(action: () => T, entrypoint = '/private/pnpm.cjs'): T {
   const previous = process.env.npm_execpath
-  process.env.npm_execpath = '/private/pnpm.cjs'
+  process.env.npm_execpath = entrypoint
   try {
     return action()
   } finally {
@@ -69,6 +69,7 @@ describe('gate graph validation', () => {
     'ci-windows-observational',
     'node-compat',
     'check-all',
+    'hygiene',
     'doc-sync',
   ] as const)('constructs and executes preflight for a valid non-empty %s graph', async (mode) => {
     const subject = withPnpmEntrypoint(() => gatesForMode(mode))
@@ -83,6 +84,40 @@ describe('gate graph validation', () => {
     expect(ids).toContain('public-repository-links')
   })
 
+  it('keeps the hygiene aggregate aligned with the package script checks', () => {
+    const ids = withPnpmEntrypoint(() => gatesForMode('hygiene').map(subject => subject.id))
+
+    expect(ids).toEqual([
+      'rescope-vendor', 'knip', 'publint', 'constraints', 'dsh-package-licenses',
+      'package-invariants', 'built-package-invariants', 'node-next-types',
+      'optional-dependency-imports', 'client-packages', 'cordis-config',
+      'runtime-closure', 'vendored-links',
+    ])
+    expect(defaultConcurrency('hygiene', ids.length, 8)).toEqual({
+      workers: 4,
+      source: '8 available CPU(s), hygiene cap 4',
+    })
+  })
+
+  it('schedules the longest documentation leaves before short checks', () => {
+    const ids = withPnpmEntrypoint(() => gatesForMode('doc-sync').map(subject => subject.id))
+
+    expect(ids.slice(0, 10)).toEqual([
+      'doc-typecheck', 'docs-site-build', 'doc-graphs', 'markdown-links', 'type-equivalence',
+      'cordis-catalog', 'mermaid', 'scoped-events', 'translation-pairing', 'markdown-wrap',
+    ])
+  })
+
+  it('launches a native pnpm entrypoint directly', () => {
+    const entrypoint = String.raw`C:\Program Files\pnpm\pnpm.exe`
+    const subject = withPnpmEntrypoint(() => gatesForMode('ci-windows-blocking')[0], entrypoint)
+
+    expect(subject).toMatchObject({
+      command: entrypoint,
+      args: ['run', 'build'],
+    })
+  })
+
   it.each(['ci-primary', 'ci-static', 'check-all'] as const)(
     'keeps the DSH package license policy in %s',
     (mode) => {
@@ -92,20 +127,89 @@ describe('gate graph validation', () => {
     },
   )
 
-  it('keeps native Windows coverage blocking while portability inventory remains observational', () => {
-    const gates = withPnpmEntrypoint(() => gatesForMode('ci-windows-complete'))
-    const byId = new Map(gates.map(subject => [subject.id, subject]))
+  it.each(['ci-primary', 'ci-static', 'check-all'] as const)(
+    'keeps the client dependency policy in %s',
+    (mode) => {
+      const ids = withPnpmEntrypoint(() => gatesForMode(mode).map(subject => subject.id))
+
+      expect(ids).toContain('client-packages')
+    },
+  )
+
+  it('keeps native Windows coverage blocking while retaining the observational inventory', () => {
+    const complete = withPnpmEntrypoint(() => gatesForMode('ci-windows-complete'))
+    const observational = withPnpmEntrypoint(() => gatesForMode('ci-windows-observational'))
+      .filter(gate => gate.id !== 'build' && gate.id !== 'docs-site-build')
+    const byId = new Map(complete.map(subject => [subject.id, subject]))
 
     expect(byId.get('coverage')?.allowFailure).not.toBe(true)
     expect(byId.get('coverage-exempt-heavy')?.allowFailure).not.toBe(true)
-    expect(byId.get('duplication')?.allowFailure).toBe(true)
+    expect(byId.get('coverage-exempt-heavy')?.needs).toContain('build')
+    expect(observational).not.toHaveLength(0)
+    for (const gate of observational) {
+      const completeGate = byId.get(gate.id)
+      expect(completeGate?.allowFailure).toBe(true)
+      expect(completeGate?.after).toEqual(expect.arrayContaining([
+        'coverage',
+        'coverage-exempt-heavy',
+      ]))
+      expect(completeGate?.needs).toEqual(gate.needs)
+    }
+  })
+
+  it('applies one configured test and polling timeout to both coverage gates', () => {
+    const gates = withEnv('DSH_COVERAGE_TEST_TIMEOUT_MS', '15000', () =>
+      withPnpmEntrypoint(() => gatesForMode('ci-windows-complete')))
+
+    for (const id of ['coverage', 'coverage-exempt-heavy']) {
+      expect(gates.find(subject => subject.id === id)?.args).toEqual(expect.arrayContaining([
+        '--testTimeout=15000',
+        '--expect.poll.timeout=15000',
+      ]))
+    }
+  })
+
+  it('keeps Vitest timeout defaults when the coverage override is absent', () => {
+    const gates = withEnv('DSH_COVERAGE_TEST_TIMEOUT_MS', undefined, () =>
+      withPnpmEntrypoint(() => gatesForMode('ci-windows-complete')))
+
+    for (const id of ['coverage', 'coverage-exempt-heavy']) {
+      expect(gates.find(subject => subject.id === id)?.args).not.toEqual(expect.arrayContaining([
+        expect.stringMatching(/^--(?:testTimeout|expect\.poll\.timeout)=/),
+      ]))
+    }
+  })
+
+  it('rejects an invalid coverage timeout before starting a gate', () => {
+    expect(() => withEnv('DSH_COVERAGE_TEST_TIMEOUT_MS', '0', () =>
+      withPnpmEntrypoint(() => gatesForMode('ci-windows-complete'))))
+      .toThrow('DSH_COVERAGE_TEST_TIMEOUT_MS must be a positive integer')
+  })
+
+  it('selects partitioned coverage only when explicitly configured', () => {
+    const coverage = withEnv('DSH_COVERAGE_PARTITIONS', '3', () =>
+      withPnpmEntrypoint(() => gatesForMode('ci-windows-complete').find(subject => subject.id === 'coverage')))
+
+    expect(coverage).toMatchObject({
+      displayCommand: 'DSH_COVERAGE_PARTITIONS=3 pnpm run test:coverage:partitioned',
+      args: ['/private/pnpm.cjs', 'run', 'test:coverage:partitioned'],
+      streamOutput: true,
+    })
+  })
+
+  it('rejects an invalid coverage partition count before starting a gate', () => {
+    expect(() => withEnv('DSH_COVERAGE_PARTITIONS', '1', () =>
+      withPnpmEntrypoint(() => gatesForMode('ci-windows-complete'))))
+      .toThrow('DSH_COVERAGE_PARTITIONS must be an integer greater than 1')
   })
 
   it.each([
     ['empty', [], /gate graph has no gates/],
     ['duplicate ids', [gate('same'), gate('same')], /duplicate gate id "same"/],
     ['unknown dependencies', [gate('subject', { needs: ['missing'] })], /depends on unknown gate "missing"/],
+    ['unknown ordering predecessors', [gate('subject', { after: ['missing'] })], /waits for unknown gate "missing"/],
     ['cycles', [gate('first', { needs: ['second'] }), gate('second', { needs: ['first'] })], /dependency cycle: first -> second -> first/],
+    ['mixed cycles', [gate('first', { after: ['second'] }), gate('second', { needs: ['first'] })], /dependency cycle: first -> second -> first/],
   ] as const)('rejects %s before starting a child', async (_label, invalid, message) => {
     const execute = vi.fn(async (subject: Gate) => resultFor(subject))
 
@@ -130,6 +234,29 @@ describe('gate graph validation', () => {
     expect(execute).toHaveBeenCalledOnce()
     expect(execute).toHaveBeenCalledWith(root)
     expect(results[0]).toMatchObject({ gate: dependent, status: 'skipped', error: 'dependency failed or skipped: root' })
+  })
+
+  it('runs an ordered follower after its predecessor fails', async () => {
+    const follower = gate('follower', { after: ['root'] })
+    const root = gate('root')
+    const execute = vi.fn(async (subject: Gate) => resultFor(subject, subject === root ? 'failed' : 'passed'))
+
+    const results = await runGates([follower, root], 2, execute)
+
+    expect(execute.mock.calls.map(([subject]) => subject.id)).toEqual(['root', 'follower'])
+    expect(results.map(result => result.status)).toEqual(['passed', 'failed'])
+  })
+
+  it('runs an ordered follower after its predecessor is skipped', async () => {
+    const follower = gate('follower', { after: ['dependent'] })
+    const dependent = gate('dependent', { needs: ['root'] })
+    const root = gate('root')
+    const execute = vi.fn(async (subject: Gate) => resultFor(subject, subject === root ? 'failed' : 'passed'))
+
+    const results = await runGates([follower, dependent, root], 2, execute)
+
+    expect(execute.mock.calls.map(([subject]) => subject.id)).toEqual(['root', 'follower'])
+    expect(results.map(result => result.status)).toEqual(['passed', 'skipped', 'failed'])
   })
 })
 
@@ -252,7 +379,13 @@ describe('Node 24 lane ownership', () => {
       'built-bin-smoke',
     ])
     expect(subject.find(item => item.id === 'publint')?.needs).toEqual(['build'])
-    expect(subject.find(item => item.id === 'built-package-invariants')?.needs).toEqual(['publint'])
+    expect(subject.find(item => item.id === 'build')?.env).toEqual({
+      DSH_BUILD_CLIENT_PROFILE: 'official',
+    })
+    expect(subject.find(item => item.id === 'node-compat')?.env).toEqual({
+      DSH_BUILD_CLIENT_PROFILE: 'official',
+    })
+    expect(subject.find(item => item.id === 'built-package-invariants')?.needs).toEqual(['build'])
     expect(subject.find(item => item.id === 'lint-and-duplication')?.needs).toEqual(['built-package-invariants'])
     for (const id of [
       'snapshot',
@@ -294,6 +427,22 @@ describe('Linux primary graph', () => {
 })
 
 describe('gate process outcomes', () => {
+  it('streams selected gate output without retaining it', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+    try {
+      const result = await runGate(gate('streamed', {
+        args: ['-e', "process.stdout.write('live output')"],
+        streamOutput: true,
+      }))
+
+      expect(result.status).toBe('passed')
+      expect(result.output).toEqual([])
+      expect(write).toHaveBeenCalledWith('live output')
+    } finally {
+      write.mockRestore()
+    }
+  })
+
   it.skipIf(process.platform === 'win32')('reports signal termination independently from exit status', async () => {
     const result = await runGate(gate('terminated', {
       args: ['-e', "process.kill(process.pid, 'SIGTERM')"],

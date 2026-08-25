@@ -204,6 +204,43 @@ describe('QuestionComposer', () => {
     expect(respond).not.toHaveBeenCalled()
   })
 
+  it('answers over multiple lines: both fields grow with the draft and keep Shift+Enter a newline', () => {
+    const { carrier, respond } = wait()
+    render(<QuestionComposer matched={carrier} interactions={[carrier]} {...kit} />)
+
+    // Both question shapes answer into a textarea, so the engine soft-wraps a
+    // long answer and Shift+Enter breaks the line natively.
+    const inline = screen.getByPlaceholderText('输入你的答案')
+    expect(inline.tagName).toBe('TEXTAREA')
+
+    const multiline = '第一行\n第二行'
+    fireEvent.change(inline, { target: { value: multiline } })
+    // The hidden height ruler carries the draft plus the trailing newline the
+    // textarea's own last line needs, so the box is as tall as the answer.
+    expect(inline.previousElementSibling?.textContent).toBe(`${multiline}\n`)
+    // Shift+Enter belongs to the field, never to the flow.
+    fireEvent.keyDown(inline, { key: 'Enter', shiftKey: true })
+    expect(screen.getByText('1 / 3')).toBeTruthy()
+
+    fireEvent.keyDown(inline, { key: 'Enter' })
+    const optionless = screen.getByPlaceholderText('输入你的答案')
+    expect(optionless.tagName).toBe('TEXTAREA')
+    fireEvent.change(optionless, { target: { value: multiline } })
+    expect(optionless.previousElementSibling?.textContent).toBe(`${multiline}\n`)
+    fireEvent.keyDown(optionless, { key: 'Enter', shiftKey: true })
+    expect(screen.getByText('2 / 3')).toBeTruthy()
+
+    fireEvent.keyDown(optionless, { key: 'Enter' })
+    fireEvent.click(screen.getByRole('checkbox', { name: '系统设计' }))
+    fireEvent.click(screen.getByRole('button', { name: '提交' }))
+    // Line breaks reach the model verbatim: nothing along the way flattens them.
+    expect(respond).toHaveBeenCalledWith(answeredEnvelope('question-1', [
+      { id: 'profile', selected: [], custom: multiline },
+      { id: 'detail', selected: [], custom: multiline },
+      { id: 'signals', selected: ['系统设计'] },
+    ]))
+  })
+
   it('surfaces cancellation failures: rejected receipt text and raw transport reasons', async () => {
     const respond = vi.fn()
       .mockResolvedValueOnce({ accepted: false, reason: 'bad-response' })
@@ -305,6 +342,45 @@ describe('PendingQuestion domain face', () => {
     const question = new PendingQuestion(wait('rk').carrier)
     expect(question.key).toBe('q:rk')
     expect(question.questions).toBe(wait('rk').carrier.payload.questions)
+  })
+
+  it('collapses the card to the header strip and expands it back', () => {
+    const { carrier } = wait()
+    render(<QuestionComposer matched={carrier} interactions={[carrier]} {...kit} />)
+    // Expanded: the option list is visible.
+    expect(screen.getByRole('radiogroup')).toBeTruthy()
+    // Collapse: options leave the tree; the title and minimize toggle stay.
+    fireEvent.click(screen.getByLabelText(zh['nav.minimize']))
+    expect(screen.queryByRole('radiogroup')).toBeNull()
+    expect(screen.getByText('选择候选人类型')).toBeTruthy()
+    // Expand: the options return (the toggle label flips while collapsed).
+    fireEvent.click(screen.getByLabelText(zh['nav.maximize']))
+    expect(screen.getByRole('radiogroup')).toBeTruthy()
+    // Expanded again: the toggle reports expanded and the option list is back.
+    expect(screen.getByLabelText(zh['nav.minimize']).getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('keeps the collapse toggle out of the cancel path and preserves drafts across collapse', () => {
+    const { carrier, respond } = wait()
+    render(<QuestionComposer matched={carrier} interactions={[carrier]} {...kit} />)
+    fireEvent.click(screen.getByRole('radio', { name: /工程落地型/ }))
+    // Single-select auto-advances to the second question; collapse and expand
+    // must not lose either the picked option or the current position.
+    fireEvent.click(screen.getByLabelText(zh['nav.minimize']))
+    fireEvent.click(screen.getByLabelText(zh['nav.maximize']))
+    const custom = screen.getByPlaceholderText(zh['custom.placeholder'])
+    fireEvent.change(custom, { target: { value: '要能独立排查线上问题' } })
+    // Re-expanding must not steal focus back into the textarea: it was
+    // autofocused on first presentation, so focus stays on the expand toggle.
+    expect(document.activeElement).not.toBe(custom)
+    fireEvent.click(screen.getByLabelText('下一题'))
+    fireEvent.click(screen.getByRole('checkbox', { name: '系统设计' }))
+    fireEvent.click(screen.getByRole('button', { name: '提交' }))
+    expect(respond).toHaveBeenCalledWith(answeredEnvelope('question-1', [
+      { id: 'profile', selected: ['工程落地型 (Recommended)'] },
+      { id: 'detail', custom: '要能独立排查线上问题', selected: [] },
+      { id: 'signals', selected: ['系统设计'] },
+    ]))
   })
 })
 

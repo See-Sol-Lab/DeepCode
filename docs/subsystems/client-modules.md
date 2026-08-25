@@ -2,13 +2,13 @@
 
 English | [中文](client-modules.zh.md)
 
-The web plugin table: the Node half of the client module system in [dsh-client-modules](../../packages/client/modules), provided as `ctx.clientModules` (`ClientModuleRegistry`). It scans the host Loader's entries for packages declaring `dsh.client`, composes the `window.__DSH_BOOT__` entry graph, serves each bundle at `/plugins/<id>/client.js`, and taps the index render to inject the boot manifest — the four faces of one service. It is an optional capability of the web GUI stack, not part of the agent-loop spine, and it is a consumer of [dsh-host-webserver](../../packages/host/webserver): the carrier described in [web-server.md](web-server.md) supplies the prefix route and index tap this service registers. The same package's browser half (`ctx.modules`, the lazy-CJS module table that fetches and materializes these bundles) is kernel machinery documented in the [package README](../../packages/client/modules/README.md), not here.
+The web plugin table: the Node half of the client module system in [dsh-client-modules](../../packages/client/modules), provided as `ctx.clientModules` (`ClientModuleRegistry`). It scans the host Loader's entries for packages declaring `dsh.client`, composes the `window.__DSH_BOOT__` entry graph, serves each bundle at `/plugins/<id>/client.js`, and answers every index-injection collection with the boot manifest rows — the four faces of one service. It is an optional capability of the web GUI stack, not part of the agent-loop spine, and it is a consumer of [dsh-host-webserver](../../packages/host/webserver): the carrier described in [web-server.md](web-server.md) supplies the prefix route and the `webserver/index-inject` event this service answers. The same package's browser half (`ctx.modules`, the lazy-CJS module table that fetches and materializes these bundles) is kernel machinery documented in the [package README](../../packages/client/modules/README.md), not here.
 
 Source: [`packages/client/modules/src/client/manifest.ts`](../../packages/client/modules/src/client/manifest.ts)
 
 ## The wire
 
-The graph is the wire single source between the Node and browser halves: the host composes `WebBootEntry` rows from scanned packages, injects the graph as the first script in `<head>` (`window.__DSH_BOOT__`, with `<` escaped so plugin-controlled strings cannot break out of the script element), and the shell parses it before booting anything. A page without a valid manifest cannot boot — the browser-side parser throws loud on a missing or malformed graph.
+The graph is the wire single source between the Node and browser halves: the host composes `WebBootEntry` rows from scanned packages, publishes the graph as a `global` injection row rendered ahead of later script rows (`globalThis["__DSH_BOOT__"]`, with `<` escaped so plugin-controlled strings cannot break out of the script element), and the shell parses it before booting anything. A page without a valid manifest cannot boot — the browser-side parser throws loud on a missing or malformed graph.
 
 ```ts type-equiv
 /**
@@ -16,7 +16,9 @@ The graph is the wire single source between the Node and browser halves: the hos
  * single source: the host node half (package root) produces this same shape.
  * `immediately` marks stage-one prefetch; `inject` is informational graph
  * metadata (the authoritative edges live in each package's `dsh.client`
- * declaration and reach fibers through entry creation).
+ * declaration and reach fibers through entry creation). `external` carries
+ * module-graph edges: unlike `inject`, they constrain code arrival because
+ * `require` is synchronous (see {@link WebBootGraph.entries}).
  */
 interface WebBootEntry {
   /** Entry name == package name. */
@@ -29,6 +31,8 @@ interface WebBootEntry {
   inject?: string[]
   /** Stage-one prefetch mark: load the script for factory registration during module-face boot. */
   immediately?: boolean
+  /** Non-baseline module specifiers this row requests; omitted when it requests none. */
+  external?: string[]
 }
 ```
 
@@ -37,7 +41,11 @@ interface WebBootEntry {
 interface WebBootGraph {
   /** Consistency anchor over the whole graph (content + bundle hashes). */
   rev: string
-  /** Composed entries; order carries no semantics (activation order is fiber inject waiting). */
+  /**
+   * Composed entries in module-graph order — a dynamic package row precedes
+   * rows whose `external` requests that package. Cordis activation order is
+   * unrelated and remains owned by fiber service waiting.
+   */
   entries: WebBootEntry[]
 }
 ```
@@ -52,9 +60,9 @@ Scanning is incremental per package; there is no full-rescan code path. Every co
 
 Package metadata — including the negative "not a client package" verdict — is cached per name and never expires: plugin-set changes take effect on restart. A fiber restart reuses its row and rev untouched; bundle content changes reach the graph only through `rebuilt()`.
 
-## The bundle route and index tap
+## The bundle route and index injection
 
-`GET`/`HEAD /plugins/<id>/client.js` serves the registered bundle from disk with `no-cache` (the rev query, not HTTP caching, anchors consistency); other methods are 405. An unknown id — or a registered row whose bundle is unreadable because it has not been built yet — answers a loud 404 rather than letting the carrier's SPA fallback ship HTML as JavaScript. The index tap injects the current graph on every index render, so a reload always boots against the live composition.
+`GET`/`HEAD /plugins/<id>/client.js` serves the registered bundle from disk with `no-cache` (the rev query, not HTTP caching, anchors consistency); other methods are 405. An unknown id — or a registered row whose bundle is unreadable because it has not been built yet — answers a loud 404, so no unreadable bundle appears as a successful JavaScript response. The injection rows carry the current graph on every index render, so a reload always boots against the live composition.
 
 ## The service
 
@@ -68,13 +76,13 @@ In development, [dsh-client-hmr](../../packages/client/hmr/README.md) is the reg
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxclientmodules--clientmoduleregistry"></a>
 
 ### `ctx.clientModules` — `ClientModuleRegistry`
 
-The web plugin table service: incremental `dsh.client` scan + wire composition + bundle route + index tap. Construction runs the activation scan synchronously — a malformed declaration or missing bundle among the already-loaded entries aggregates into one loud throw (FAILED fiber; the boot activation audit reports it).
+The web plugin table service: incremental `dsh.client` scan + wire composition + bundle route + index injection rows. Construction runs the activation scan synchronously — a malformed declaration or missing bundle among the already-loaded entries aggregates into one loud throw (FAILED fiber; the boot activation audit reports it).
 
 ```ts cordis-catalog
 /**
@@ -114,5 +122,5 @@ onRebuilt(listener: (id: string, rev: string) => void): () => void
 onGraphChanged(listener: () => void): () => void
 ```
 
-Source: [`packages/client/modules/src/index.ts:184`](../../packages/client/modules/src/index.ts)
+Source: [`packages/client/modules/src/index.ts`](../../packages/client/modules/src/index.ts)
 <!-- END GENERATED cordis-surface -->

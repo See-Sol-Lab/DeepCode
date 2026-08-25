@@ -22,6 +22,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const IPC_MS = 5
 
 const commands: DesktopControlCommand[] = []
+/** main 转发的"打开反馈面板"通知；入口按钮住在另一层，这里只收通知。 */
 let pushModel: (model: DesktopControlModel) => void
 
 const model = (): DesktopControlModel => buildControlModel({
@@ -40,11 +41,8 @@ const model = (): DesktopControlModel => buildControlModel({
   discoveryError: null,
   logPath: 'C:/ud/logs/deepcode.log',
   existingHomeCandidate: null,
-  viewTitle: 'DeepSeek Harness',
-  themePreference: 'system',
   effectiveTheme: 'dark',
   highContrast: false,
-  expertDetailsExpanded: false,
   recoveryNotice: null,
   pluginManager: { profiles: [], error: null, operation: null, handoffPending: false, recovery: null },
   update: {
@@ -53,17 +51,19 @@ const model = (): DesktopControlModel => buildControlModel({
   },
   diagnostics: {
     buildInfo: [
-      { label: 'Version', value: 'DeepCode 1.0.0' },
-      { label: 'Home', value: 'managed' },
-      { label: 'Profile', value: 'web' },
+      { key: 'diag.build.app', label: 'Version', value: 'DeepCode 1.0.0' },
+      { key: 'diag.build.home', label: 'Home', value: 'managed' },
+      { key: 'diag.build.profile', label: 'Profile', value: 'web' },
     ],
+    homeDisplay: '<USER_HOME>/ud/dsh',
     logPath: 'C:/ud/logs/deepcode.log',
     lastExport: null,
     uncleanExit: null,
   },
-  feedback: { open: false, diagnostics: '', phase: 'idle', reply: null, issueTitle: '', degradedReason: null, notice: null },
+  feedback: { open: false, diagnostics: '', phase: 'idle', reply: null, issueTitle: '', degradedReason: null, notice: null, gatewayConfigured: false },
   permissions: { mode: 'sandbox', preset: 'workspace-write', detail: null },
   powerShell7Available: true,
+  browserPane: { present: false, open: false },
 })
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => { setTimeout(resolve, ms) })
@@ -90,8 +90,7 @@ beforeAll(async () => {
       return () => {}
     },
     setChromeExpanded: async () => { await sleep(IPC_MS) },
-    onOpenHarnessPanel: () => () => {},
-    onOpenDiagnosticsPanel: () => () => {},
+    onOpenUpdatePanel: () => () => {},
   }
   await import('../src/chrome/renderer.ts')
   pushModel(model())
@@ -104,7 +103,7 @@ beforeEach(async () => {
 })
 
 describe('openMenu 的面板意图（最后一次意图获胜）', () => {
-  it('扩 bounds 往返期间点"检查更新"：诊断面板可见，不被陈旧意图盖回去', async () => {
+  it('扩 bounds 往返期间点"检查更新"：更新面板可见，不被陈旧意图盖回去', async () => {
     click(byId('hamburger'))
     // 不等 IPC 落地就点——自动化必然撞上，人手一般撞不上。
     const checkUpdates = document.querySelector('[data-command="check-updates"]')
@@ -112,18 +111,19 @@ describe('openMenu 的面板意图（最后一次意图获胜）', () => {
     click(checkUpdates as Element)
     await sleep(IPC_MS * 4)
 
-    expect(byId('diagnostics-panel').hidden).toBe(false)
+    // P8-D35①：检查更新有自己的面板（诊断面板已随 D39 移居设置页）。
+    expect(byId('update-panel').hidden).toBe(false)
     expect(byId('main-menu').hidden).toBe(true)
     expect(commands).toContainEqual({ type: 'check-for-updates' })
   })
 
-  it('往返落地后点"检查更新"：诊断面板同样可见（正常路径不受影响）', async () => {
+  it('往返落地后点"检查更新"：更新面板同样可见（正常路径不受影响）', async () => {
     click(byId('hamburger'))
     await sleep(IPC_MS * 4)
     click(document.querySelector('[data-command="check-updates"]') as Element)
     await sleep(IPC_MS * 2)
 
-    expect(byId('diagnostics-panel').hidden).toBe(false)
+    expect(byId('update-panel').hidden).toBe(false)
     expect(byId('main-menu').hidden).toBe(true)
   })
 
@@ -133,7 +133,6 @@ describe('openMenu 的面板意图（最后一次意图获胜）', () => {
     await sleep(IPC_MS * 4)
 
     expect(byId('main-menu').hidden).toBe(true)
-    expect(byId('diagnostics-panel').hidden).toBe(true)
     expect(byId('overlay').hidden).toBe(true)
   })
 
@@ -165,66 +164,5 @@ describe('openMenu 的面板意图（最后一次意图获胜）', () => {
   })
 })
 
-describe('Feedback 面板（P7-A~E）', () => {
-  const feedbackModel = (overrides: Partial<DesktopControlModel['feedback']>): DesktopControlModel => ({
-    ...model(),
-    feedback: {
-      open: false,
-      diagnostics: 'DeepCode: 1.0.0',
-      phase: 'idle',
-      reply: null,
-      issueTitle: '',
-      degradedReason: null,
-      notice: null,
-      ...overrides,
-    },
-  })
-
-  it('左下角入口点击：发 open-feedback 并展开面板', async () => {
-    pushModel(feedbackModel({}))
-    click(byId('feedback-entry'))
-    await sleep(IPC_MS * 4)
-    expect(commands).toContainEqual({ type: 'open-feedback' })
-    expect(byId('feedback-panel').hidden).toBe(false)
-  })
-
-  it('发送：载荷带用户文本与（可能被编辑过的）诊断包编辑稿', async () => {
-    pushModel(feedbackModel({}))
-    click(byId('feedback-entry'))
-    await sleep(IPC_MS * 4)
-    const textarea = byId('feedback-text') as HTMLTextAreaElement
-    textarea.value = '保存没反应'
-    textarea.dispatchEvent(new window.Event('input', { bubbles: true }))
-    const diag = byId('feedback-diag') as HTMLTextAreaElement
-    diag.value = '编辑后的诊断包'
-    diag.dispatchEvent(new window.Event('input', { bubbles: true }))
-    click(byId('feedback-send'))
-    expect(commands).toContainEqual({ type: 'feedback-send', text: '保存没反应', diagnostics: '编辑后的诊断包' })
-  })
-
-  it('degraded：显示降级说明与 issue 标题，复制按钮可用', async () => {
-    pushModel(feedbackModel({ phase: 'degraded', issueTitle: '保存无响应' }))
-    click(byId('feedback-entry'))
-    await sleep(IPC_MS * 4)
-    expect(byId('feedback-issue-title').textContent).toBe('保存无响应')
-    click(byId('feedback-copy-open'))
-    expect(commands).toContainEqual({ type: 'feedback-copy-open' })
-  })
-
-  it('sending：发送按钮禁用（防重复提交），其余元素不消失', async () => {
-    pushModel(feedbackModel({ phase: 'sending' }))
-    click(byId('feedback-entry'))
-    await sleep(IPC_MS * 4)
-    expect((byId('feedback-send') as HTMLButtonElement).disabled).toBe(true)
-    expect(byId('feedback-entry')).not.toBeNull()
-  })
-
-  it('关闭按钮：发 close-feedback 并关菜单', async () => {
-    pushModel(feedbackModel({}))
-    click(byId('feedback-entry'))
-    await sleep(IPC_MS * 4)
-    click(byId('feedback-close'))
-    expect(commands).toContainEqual({ type: 'close-feedback' })
-    expect(byId('overlay').hidden).toBe(true)
-  })
-})
+// Feedback 面板用例已随 P8-D39 移除：反馈整体移居官方设置页的
+// DeepCode 分区（settings-plugin），Chrome 不再有对应容器与入口。

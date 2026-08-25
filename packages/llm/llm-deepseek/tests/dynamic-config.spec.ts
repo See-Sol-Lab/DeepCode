@@ -3,7 +3,16 @@ import { Context } from '@deepseek-ai/cordis'
 import { access, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import LlmRuntime, { INVALID_CREDENTIAL_CODE } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { createUserMessage, INVALID_CREDENTIAL_CODE } from '@deepseek-ai/dsh-llm'
+import AttachmentStore, { AttachmentId, ImageVariantId } from '@deepseek-ai/dsh-attachment'
+import type {
+  ImageAttachmentLimits,
+  ImageAttachmentRef,
+  ImageRequestPolicy,
+  RequestImageAttachment,
+  SaveImageAttachment,
+  StoredImageAttachment,
+} from '@deepseek-ai/dsh-attachment'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { LocalCredentialProvider } from '@deepseek-ai/dsh-credentials-local'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
@@ -14,6 +23,55 @@ import { closeMockServers, mockServer, textEvents } from './mock-server.ts'
 
 const NS = settingsNamespace('llm-deepseek')
 const KEY_REF = credentialRef('DEEPSEEK_API_KEY')
+const IMAGE_REF: ImageAttachmentRef = {
+  attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`),
+  mediaType: 'image/png',
+  bytes: 3,
+  width: 1,
+  height: 1,
+}
+
+class StaticAttachmentStore extends AttachmentStore {
+  readonly imageLimits: ImageAttachmentLimits = {
+    maxImageBytes: 16,
+    maxImagesPerMessage: 4,
+    maxMessageImageBytes: 64,
+    maxImagePixels: 4,
+    maxImageDimension: 4,
+    mediaTypes: ['image/png'],
+  }
+
+  validateImage(_input: SaveImageAttachment): Promise<void> {
+    return Promise.resolve()
+  }
+
+  saveImage(_input: SaveImageAttachment): Promise<ImageAttachmentRef> {
+    return Promise.resolve(IMAGE_REF)
+  }
+
+  readImage(ref: ImageAttachmentRef, _signal?: AbortSignal): Promise<StoredImageAttachment> {
+    return Promise.resolve({ ref, data: Uint8Array.of(1, 2, 3) })
+  }
+
+  override readImageRequest(
+    ref: ImageAttachmentRef,
+    _policy: ImageRequestPolicy,
+    _signal?: AbortSignal,
+  ): Promise<RequestImageAttachment> {
+    return Promise.resolve({
+      variantId: ImageVariantId(`sha256:${'b'.repeat(64)}`),
+      attachment: ref,
+      data: Uint8Array.of(1, 2, 3),
+      mediaType: ref.mediaType,
+      bytes: 3,
+      width: ref.width,
+      height: ref.height,
+      depth: 'uchar',
+      space: 'srgb',
+      hasAlpha: true,
+    })
+  }
+}
 
 const cleanups: Array<() => Promise<void>> = []
 
@@ -47,6 +105,7 @@ async function boot(dir: string, config: object): Promise<Harness> {
     await ctx.fiber.dispose()
   })
   await ctx.plugin(LlmRuntime)
+  await ctx.plugin(StaticAttachmentStore)
   const settingsFiber = ctx.plugin(FileSettingsProvider, { path: join(dir, 'settings.yaml'), watch: false })
   await settingsFiber
   await ctx.plugin(LocalCredentialProvider, { path: join(dir, '.credentials.yaml'), watch: false })
@@ -62,7 +121,7 @@ describe('request-level dynamic configuration', () => {
   it('routes the next request with the freshly resolved base URL and credential', async () => {
     vi.stubEnv('DEEPSEEK_API_KEY', '')
     const dir = await home()
-    await writeFile(join(dir, '.credentials.yaml'), 'DEEPSEEK_API_KEY: first-key\n', { mode: 0o600 })
+    await writeFile(join(dir, '.credentials.yaml'), 'version: 1\nrefs:\n  DEEPSEEK_API_KEY: first-key\n', { mode: 0o600 })
     const serverA = await mockServer([{ kind: 'sse', events: textEvents }])
     const serverB = await mockServer([{ kind: 'sse', events: textEvents }])
     const { ctx } = await boot(dir, { baseURL: serverA.url })
@@ -117,11 +176,40 @@ describe('request-level dynamic configuration', () => {
     const dir = await home()
     const { ctx } = await boot(dir, { baseURL: 'http://127.0.0.1:1' })
 
-    await expect(ctx.llm.listModels('deepseek-official')).resolves.toHaveLength(2)
-    await ctx.settings.update(NS, { models: [{ id: 'settings-model', name: 'From Settings' }] })
+    await expect(ctx.llm.listModels('deepseek-official')).resolves.toHaveLength(3)
+    await ctx.settings.update(NS, {
+      models: [{ id: 'settings-model', name: 'From Settings', inputModalities: ['text', 'image'] }],
+    })
     await expect(ctx.llm.listModels('deepseek-official')).resolves.toEqual([
-      { provider: 'deepseek-official', id: 'settings-model', name: 'From Settings', inputModalities: ['text'] },
+      { provider: 'deepseek-official', id: 'settings-model', name: 'From Settings', inputModalities: ['text', 'image'] },
     ])
+  })
+
+  it('applies changed request file limits to the next request', async () => {
+    vi.stubEnv('DEEPSEEK_API_KEY', 'test-key')
+    const dir = await home()
+    const server = await mockServer([
+      { kind: 'sse', events: textEvents },
+      { kind: 'sse', events: textEvents },
+    ])
+    const { ctx } = await boot(dir, { baseURL: server.url })
+    const messages = [createUserMessage({
+      content: [
+        { type: 'image', attachment: IMAGE_REF },
+        { type: 'image', attachment: IMAGE_REF },
+      ],
+      source: { kind: 'plugin', plugin: 'test' },
+    })]
+
+    await assemble(ctx, { model: 'deepseek-v4-flash-vision-exp', messages })
+    await ctx.settings.update(NS, { maxRequestFilesBytes: 4, imageOffloadByteQuantum: 2 })
+    await assemble(ctx, { model: 'deepseek-v4-flash-vision-exp', messages })
+
+    const first = (server.requests[0] as { messages: Array<{ content: unknown }> }).messages[0]?.content
+    const second = (server.requests[1] as { messages: Array<{ content: unknown }> }).messages[0]?.content
+    expect(JSON.stringify(first).match(/"type":"file"/g)).toHaveLength(2)
+    expect(JSON.stringify(second)).toContain('[image omitted to keep the request within its image limit')
+    expect(JSON.stringify(second).match(/"type":"file"/g)).toHaveLength(1)
   })
 
   it('re-registers the route in place when the captured retry policy changes, without an empty-registry window', async () => {
@@ -156,7 +244,7 @@ describe('request-level dynamic configuration', () => {
     // Schema-valid but resolver-invalid: duplicate catalog ids pass the array
     // schema and fail the explicit resolve step.
     await ctx.settings.update(NS, { models: [{ id: 'dup' }, { id: 'dup' }] })
-    await expect(ctx.llm.listModels('deepseek-official')).resolves.toHaveLength(2)
+    await expect(ctx.llm.listModels('deepseek-official')).resolves.toHaveLength(3)
     await ctx.settings.update(NS, { models: [{ id: 'recovered' }] })
     await expect(ctx.llm.listModels('deepseek-official')).resolves.toEqual([
       { provider: 'deepseek-official', id: 'recovered', name: 'recovered', inputModalities: ['text'] },
@@ -188,7 +276,7 @@ describe('request-level dynamic configuration', () => {
   it('falls back to the composition entry when settings detach', async () => {
     vi.stubEnv('DEEPSEEK_API_KEY', '')
     const dir = await home()
-    await writeFile(join(dir, '.credentials.yaml'), 'DEEPSEEK_API_KEY: steady-key\n', { mode: 0o600 })
+    await writeFile(join(dir, '.credentials.yaml'), 'version: 1\nrefs:\n  DEEPSEEK_API_KEY: steady-key\n', { mode: 0o600 })
     const serverA = await mockServer([{ kind: 'sse', events: textEvents }])
     const serverB = await mockServer([{ kind: 'sse', events: textEvents }])
     const { ctx, settingsFiber } = await boot(dir, { baseURL: serverA.url })

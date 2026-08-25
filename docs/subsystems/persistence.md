@@ -4,7 +4,7 @@ English | [中文](persistence.zh.md)
 
 The **durability seam** for the event log. [session.md](session.md) describes the in-memory `Session` — the append-only `SessionEvent` log that is the source of truth. This page describes how that log is made durable: the abstract `SessionPersistence` service, its backends, the flush checkpoint, crash recovery, and the metadata header that travels alongside the log. The event vocabulary the log carries is enumerated, member by member, in the generated [persistence log event catalog](../persistence-catalog.md).
 
-The seam is a [capability seam](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md): one abstract service ([dsh-session-persistence](../../packages/session/session-persistence), `ctx.sessionPersistence`) defining locate/create/append, reusable Session preparation, logical load/inspect, physical suffix reads, and lightweight list/snapshot observation over the existing `SessionEvent` — **no parallel persisted event type** — and two interchangeable backends implementing the same contract. See the [session-persistence Agent Note](../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.md).
+The seam is a [capability seam](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md): one abstract service ([dsh-session-persistence](../../packages/session/session-persistence), `ctx.sessionPersistence`) defining locate/create/append, reusable Session preparation, logical load/inspect, physical suffix reads, and lightweight list/snapshot observation over the existing `SessionEvent` — **no parallel persisted event type** — and three interchangeable providers implementing the same contract. See the [session-persistence Agent Note](../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.md).
 
 ## The flush checkpoint
 
@@ -230,10 +230,10 @@ interface SessionPersistenceSnapshot {
 
 ## The backends
 
-Both implement the same abstract `SessionPersistence` (locate/create/append/prepare/load/inspect/readFrom/list/listSnapshots over `SessionEvent`, with optional cancellation on observation methods) and pass the shared `runPersistenceContract` suite:
+All implement the same abstract `SessionPersistence` (locate/create/append/prepare/load/inspect/readFrom/list/listSnapshots over `SessionEvent`, with optional cancellation on observation methods) and pass the shared `runPersistenceContract` suite:
 
 - **[dsh-session-persistence-jsonl](../../packages/session/session-persistence-jsonl)** — an append-only logical JSONL log per session, stored as checksummed concatenated Zstandard frames by default or raw lines by configuration, with crash-safe atomic writes, interrupted-turn recovery, and a read/replay path.
-- **[dsh-session-persistence-sqlite](../../packages/session/session-persistence-sqlite)** — `node:sqlite`, one row per `SessionEvent`. The row fields `(session_id, seq, type, time, data, source_event_seqs, surface_op)` map 1:1 onto the event, including optional surface metadata, so there is no parallel persisted schema to keep in sync.
+- **[dsh-session-persistence-sqlite](../../packages/session/session-persistence-sqlite)** — an opt-in `node:sqlite` backend using schema 17 to store exact same-block delta runs in bounded physical `text-chunks`, `reasoning-chunks`, and `tool-call-chunks` rows. It reconstructs the complete logical event stream before returning it, packs only newly durable batches, and rejects older schemas rather than migrating them.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -241,7 +241,7 @@ Both implement the same abstract `SessionPersistence` (locate/create/append/prep
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxsessionpersistence--sessionpersistence-abstract-seam"></a>
 
@@ -381,5 +381,5 @@ abstract listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot
 
 Types: [SessionEvent](session.md) · [SessionId](core.md)
 
-Source: [`packages/session/session-persistence/src/index.ts:84`](../../packages/session/session-persistence/src/index.ts)
+Source: [`packages/session/session-persistence/src/index.ts`](../../packages/session/session-persistence/src/index.ts)
 <!-- END GENERATED cordis-surface -->

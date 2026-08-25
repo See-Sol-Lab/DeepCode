@@ -265,6 +265,23 @@ export function unsafeForWindowsShellForward(value: string): boolean {
  * @param request - 待校验请求。
  * @returns null = 合法；否则拒绝原因。
  */
+/**
+ * spec 里是否嵌了账号密码。
+ *
+ * 只对能解析成 URL 的 spec 生效；普通包名（`lodash`、`@scope/pkg@1.2.3`）
+ * 解析不成 URL，直接放行。`git+https://` 这类前缀也能被 URL 解析。
+ * @param spec - 用户给的 package spec。
+ * @returns 是否带凭据。
+ */
+export function specHasCredentials(spec: string): boolean {
+  try {
+    const parsed = new URL(spec)
+    return parsed.username !== '' || parsed.password !== ''
+  } catch {
+    return false
+  }
+}
+
 export function validatePluginRequest(request: PluginOperationRequest): string | null {
   if (request.profile === '' || request.profile.includes('/') || request.profile.includes('\\')
     || request.profile === '.' || request.profile === '..' || request.profile === 'node_modules') {
@@ -276,6 +293,12 @@ export function validatePluginRequest(request: PluginOperationRequest): string |
   }
   if (request.spec === null || request.spec.trim() === '') {
     return `${request.action} 需要一个包名或 spec`
+  }
+  // 带账号密码的 spec（https://user:token@host/pkg.tgz、git+https://…）：
+  // 原始 spec 会写进 recovery journal，也会出现在操作提示与日志里，凭据
+  // 就这么落了盘。上面的字符白名单挡不住它——@ 和 : 是合法包名的一部分。
+  if (specHasCredentials(request.spec)) {
+    return 'spec 不能包含账号密码（形如 https://user:secret@host/…）；请改用 registry 认证配置'
   }
   // 空白字符一律拒绝：pnpm 的合法 spec（包名/URL）本就不含空白，而官方
   // CLI 在 Windows 上以 shell:true 转发 pnpm，含空格的本地路径会被 cmd

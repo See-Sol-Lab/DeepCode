@@ -1,5 +1,5 @@
 /**
- * DSH Terminal 的窄 preload：只暴露 deepCodeTerminal 四个具名 API，
+ * DSH Terminal 的窄 preload：只暴露 deepCodeTerminal 的具名 API，
  * 不暴露通用 send/任意 IPC。sandbox: true 下必须是 CommonJS（.cts →
  * .cjs）。所有载荷只做类型无关的透传，业务判断在 main。
  * @module @see-sol-lab/deepcode/terminal/preload
@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('deepCodeTerminal', {
   locale,
   /** 向 pty 发送用户输入（原样透传，main 只接受 string）。 */
   send: (data: string): Promise<void> => ipcRenderer.invoke('deepcode-terminal:send', data),
+  /** 上报 xterm 的真实尺寸（P8-D47）：main 组帧转给 host 调 pty.resize。 */
+  resize: (cols: number, rows: number): void => { ipcRenderer.send('deepcode-terminal:resize', cols, rows) },
+  /** 终端调试取证（P8-D36）：单向、只收短字符串，落 userData 下的日志文件。 */
   /** 订阅 pty 输出（已脱敏的文本）。终端窗口只注册一次，监听器随窗口销毁。 */
   onData: (listener: (text: string) => void): void => {
     ipcRenderer.on('deepcode-terminal:data', (_event, text: unknown) => {

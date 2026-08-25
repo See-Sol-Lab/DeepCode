@@ -15,7 +15,6 @@ export type TrayAction =
   | { kind: 'show-window' }
   | { kind: 'switch-profile'; profile: string }
   | { kind: 'restart' }
-  | { kind: 'open-panel' }
   | { kind: 'open-terminal' }
   | { kind: 'check-updates' }
   | { kind: 'about' }
@@ -39,7 +38,6 @@ const ZH = {
   'tray.status': 'Harness 状态',
   'tray.profiles': 'Profiles',
   'tray.restart': '重启 Harness',
-  'tray.panel': '打开 Harness 面板',
   'tray.terminal': '打开 DSH Terminal',
   'tray.updates': '检查更新',
   'tray.updates.available': '检查更新（有新版本 {version}）',
@@ -53,7 +51,6 @@ const EN = {
   'tray.status': 'Harness Status',
   'tray.profiles': 'Profiles',
   'tray.restart': 'Restart Harness',
-  'tray.panel': 'Open Harness Panel',
   'tray.terminal': 'Open DSH Terminal',
   'tray.updates': 'Check for Updates',
   'tray.updates.available': 'Check for Updates ({version} available)',
@@ -117,7 +114,6 @@ export function trayMenuTemplate(input: TrayMenuInput): TrayMenuItem[] {
     { type: 'separator' },
     { label: dict['tray.profiles'], submenu: profiles },
     { label: dict['tray.restart'], action: { kind: 'restart' } },
-    { label: dict['tray.panel'], action: { kind: 'open-panel' } },
     { label: dict['tray.terminal'], action: { kind: 'open-terminal' } },
     // 更新状态：available/verified 时提示新版本；否则普通入口。
     { label: updateLabel, action: { kind: 'check-updates' } },

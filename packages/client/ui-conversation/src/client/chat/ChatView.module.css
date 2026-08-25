@@ -18,6 +18,11 @@
   /* Sides = composer clearance + 16px: on narrow viewports the transcript
      stays exactly 32px narrower than the input card (the shared width rule). */
   padding: 16px calc(var(--dsh-composer-side-clearance) + 16px);
+  /* Inline-size query container: wide markdown tables size their breakout
+     against this box's content width (100cqw in AssistantMarkdown's
+     md-table-wide rule) — the CSS stand-in for deepsuite chat's JS-measured
+     --dsl-virtual-list-width. */
+  container-type: inline-size;
 }
 
 :global([data-conversation-scroll]) .root {
@@ -41,7 +46,12 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  /* Host hook (DeepCode D45 续，2026-08-24): the figma 16px gap between
+     transcript blocks is sized for the 16px body. A host that shrinks the body
+     font leaves this gap at full size, so think/tool rows drift apart while
+     their own text got smaller — the dominant source of "too airy" after D45.
+     Default keeps upstream exactly. */
+  gap: var(--dsh-chat-block-gap, 16px);
 }
 
 /* Settled-flow identity boundary. It is neutral today and becomes the natural
@@ -189,4 +199,9 @@
 
 .toBottom:hover {
   background: var(--dsw-alias-button-floating-hover);
+}
+
+/* Host open-path refusal: same dialog family as the workspace folder error. */
+.modalAction {
+  min-width: 72px;
 }

@@ -85,7 +85,11 @@ describe('dsh-tool-subagent', () => {
 
   it('registers a `subagent` tool that delegates to the configured provider and returns its output', async () => {
     const ctx = await setup({ provider: 'mock' }, { reply: 'child says hi' })
-    const result = await callSubagent(ctx, { description: 'do a thing', prompt: 'go research X' })
+    const result = await callSubagent(ctx, {
+      description: 'do a thing',
+      prompt: 'go research X',
+      run_in_background: false,
+    })
     expect(result.isError).toBe(false)
     if (result.isError) throw new Error('expected subagent success')
     expect(result.value).toEqual({
@@ -179,6 +183,22 @@ describe('dsh-tool-subagent', () => {
     // The failure is not partial success, but the child's preserved partial
     // answer still reaches the parent model inside the error result.
     expect(text(result)).toContain('scripted subagent reply')
+  })
+
+  it('renders provider diagnostics before preserved partial assistant output', async () => {
+    const ctx = await setup({ provider: 'mock' }, {
+      reply: 'partial assistant text',
+      diagnostic: 'Claude Code denied a tool request',
+      stopReason: 'error',
+    })
+
+    const result = await callSubagent(ctx, { description: 'd', prompt: 'p' })
+    expect(result.isError).toBe(true)
+    expect(text(result)).toBe(
+      'Error: subagent run failed\n'
+      + 'Diagnostic: Claude Code denied a tool request\n'
+      + 'Partial output before the run ended:\npartial assistant text',
+    )
   })
 
   it('registers under a configurable toolName so multiple providers can coexist', async () => {
@@ -814,7 +834,7 @@ describe('dsh-tool-subagent background mode', () => {
       agent: parent,
     })
 
-    expect(text(started)).toBe('started background subagent task subagent-1')
+    expect(text(started)).toBe('started background subagent job subagent-1')
     expect(prepareCalls).toBe(0)
   })
 
@@ -826,7 +846,7 @@ describe('dsh-tool-subagent background mode', () => {
     expect(start.isError).toBe(false)
     if (start.isError) throw new Error('expected background subagent success')
     expect(start.value).toEqual({ kind: 'background', jobId: 'subagent-1' })
-    expect(text(start)).toBe('started background subagent task subagent-1')
+    expect(text(start)).toBe('started background subagent job subagent-1')
 
     const collected = await ctx.tools.execute({
       signal: testToolSignal,
@@ -846,6 +866,36 @@ describe('dsh-tool-subagent background mode', () => {
       agent: parent,
     })
     expect(text(again)).toBe('background answer\n[status: completed]')
+  })
+
+  it('preserves provider diagnostics in one-shot background failure detail', async () => {
+    const ctx = await backgroundSetup({ provider: 'mock' }, {
+      reply: 'not background output',
+      diagnostic: 'Claude Code cancelled an unattended dialog',
+      stopReason: 'error',
+    })
+    const parent = ownerAgent(ctx, 'sess-parent')
+
+    const started = await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: CallId('diagnostic-background-start'),
+      name: 'subagent',
+      arguments: { description: 'd', prompt: 'p', run_in_background: true },
+      agent: parent,
+    })
+    expect(text(started)).toBe('started background subagent job subagent-1')
+
+    const output = await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: CallId('diagnostic-background-output'),
+      name: 'job_output',
+      arguments: { job_id: 'subagent-1', wait: true },
+      agent: parent,
+    })
+    expect(text(output)).toBe(
+      '(no new output)\n'
+      + '[status: failed, error; diagnostic: Claude Code cancelled an unattended dialog]',
+    )
   })
 
   it('fails loud when the tasks runtime is not loaded', async () => {
@@ -887,7 +937,7 @@ describe('dsh-tool-subagent background mode', () => {
       arguments: { description: 'broken', prompt: 'p', run_in_background: true },
       agent: parent,
     })
-    expect(text(started)).toBe('started background subagent task subagent-1')
+    expect(text(started)).toBe('started background subagent job subagent-1')
     const output = await ctx.tools.execute({
       signal: testToolSignal,
       callId: CallId('broken-output'),
@@ -935,6 +985,48 @@ describe('dsh-tool-subagent background mode', () => {
     expect(text(output)).toBe('(no new output)\n[status: killed]')
   })
 
+  it('reports startup rollback failure after cancellation as a failed job', async () => {
+    const ctx = await backgroundSetup({ provider: 'mock' })
+    const parent = ownerAgent(ctx, 'sess-parent')
+    ctx.subagents.registerProvider({
+      name: 'broken-start-rollback',
+      capabilities: { outputSchema: false, depthLimit: false, toolFilter: false, persona: false },
+      inheritsParentContext: false,
+      start: request => new Promise((_resolve, reject) => {
+        request.signal.addEventListener('abort', () => {
+          reject(new AggregateError(
+            [new Error('startup aborted'), new Error('cleanup failed')],
+            'startup failed and cleanup also failed',
+          ))
+        }, { once: true })
+      }),
+    })
+    tool.apply(ctx, { provider: 'broken-start-rollback', toolName: 'subagent_broken_rollback' })
+
+    await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: CallId('broken-rollback-start'),
+      name: 'subagent_broken_rollback',
+      arguments: { description: 'broken rollback', prompt: 'p', run_in_background: true },
+      agent: parent,
+    })
+    await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: CallId('broken-rollback-kill'),
+      name: 'job_kill',
+      arguments: { job_id: 'subagent-1' },
+      agent: parent,
+    })
+    const output = await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: CallId('broken-rollback-output'),
+      name: 'job_output',
+      arguments: { job_id: 'subagent-1', wait: true },
+      agent: parent,
+    })
+    expect(text(output)).toContain('[status: failed, AggregateError: startup failed and cleanup also failed]')
+  })
+
   it('forwards job_kill reasons through the run signal (and defaults one when absent)', async () => {
     // Use a provider that remains live until its signal is aborted.
     const ctx = await backgroundSetup({ provider: 'mock', agentOptions: { model: 'child-model' } })
@@ -966,8 +1058,8 @@ describe('dsh-tool-subagent background mode', () => {
 
     const startOne = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('h1'), name: 'subagent_hang', arguments: { description: 'one', prompt: 'p', run_in_background: true }, agent: parent })
     const startTwo = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('h2'), name: 'subagent_hang', arguments: { description: 'two', prompt: 'p', run_in_background: true }, agent: parent })
-    expect(text(startOne)).toBe('started background subagent task subagent-1')
-    expect(text(startTwo)).toBe('started background subagent task subagent-2')
+    expect(text(startOne)).toBe('started background subagent job subagent-1')
+    expect(text(startTwo)).toBe('started background subagent job subagent-2')
 
     const withReason = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('k1'), name: 'job_kill', arguments: { job_id: 'subagent-1', reason: 'superseded' }, agent: parent })
     const withoutReason = await ctx.tools.execute({ signal: testToolSignal, callId: CallId('k2'), name: 'job_kill', arguments: { job_id: 'subagent-2' }, agent: parent })

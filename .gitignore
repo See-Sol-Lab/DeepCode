@@ -33,6 +33,7 @@ python/**/.pytest_cache/
 apps/web/dist/
 dist/
 .artifacts/
+.dsh-build/
 .playwright-mcp/
 .orig
 .worktrees/
@@ -53,3 +54,16 @@ worktrees/
 # 没有对应的 TS 源码可以重新生成——被忽略掉就等于插件整个丢失。
 !/apps/desktop/theme-plugin/lib/
 !/apps/desktop/theme-plugin/lib/*.js
+
+# 同理：目录选择器插件的 lib/ 也是手写产物（P8-D11）。它由 DSH 那个 Node 进程
+# 加载，不经 tsdown、也不进 asar；被忽略掉的话，仓库里就只剩一条会 disable 官方
+# picker 的 overlay 而没有替代实现——克隆下来构建即失败（shipPickerPlugin 的
+# entry 断言会当场拦住，但那已经是浪费了一次构建）。
+!/apps/desktop/picker-plugin/lib/
+!/apps/desktop/picker-plugin/lib/*.js
+
+# 同理：设置页插件的 lib/ 也是手写产物（P8-D39）。经 --patch overlay 注入官方
+# settings.section 槽位，同样没有 TS 源码可重新生成；D29 施工时曾被上面的
+# lib/ 规则误伤（当时靠 git add -f 才进的仓库），此例外让后续改动正常入库。
+!/apps/desktop/settings-plugin/lib/
+!/apps/desktop/settings-plugin/lib/*.js

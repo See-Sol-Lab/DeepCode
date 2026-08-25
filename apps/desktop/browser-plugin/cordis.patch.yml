@@ -1,0 +1,12 @@
+# DeepCode browser capability launcher overlay (B2 spike).
+#
+# Profile-installed via `dsh plugin add` (the plugin declares dsh.bundle.patch,
+# so reconcilePlugins appends it to the profile's bundle layer stack). The
+# patch inserts the browser plugin into this round's composition, like the
+# official web-app bundle does for its own layer. Runtime dependency
+# (playwright-core) resolves from the profile's node_modules — never from the
+# DeepCode private runtime (菲博 §7.1.2).
+
+- insert:
+    - id: deepcode-browser
+      name: '@see-sol-lab/deepcode-browser'

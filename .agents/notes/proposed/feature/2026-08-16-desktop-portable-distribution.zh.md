@@ -6,14 +6,14 @@ Status: proposed
 
 ## Problem
 
-[Electron 桌面壳](2026-08-15-desktop-electron-shell.md)目前只能从源码检出运行：启动它需要 Node.js、pnpm 与仓库的构建产物。本里程碑的下一步是"可双击的 Windows 发行"：一条构建命令产出一个非程序员无需任何开发工具即可运行的目录，同时壳保持单一 DSH 运行时、固定 `127.0.0.1:3080` 端口与全部安全设置。
+[Electron 桌面壳](2026-08-15-desktop-electron-shell.zh.md)目前只能从源码检出运行：启动它需要 Node.js、pnpm 与仓库的构建产物。本里程碑的下一步是"可双击的 Windows 发行"：一条构建命令产出一个非程序员无需任何开发工具即可运行的目录，同时壳保持单一 DSH 运行时、固定 `127.0.0.1:3080` 端口与全部安全设置。
 
 ## Proposal
 
 新增 `pnpm run build:desktop-dist`（`scripts/build-desktop-dist.ts`），产出 `dist/desktop/win-unpacked/`，内含 `DeepCode.exe`：
 
 - **打包**：两个 release family（`dsh`、`vendor`）走与 `release/pack.ts` 相同的逐成员检查（pnpm pack + payload 校验），输出到 `dist/npm-dsh` 与 `dist/npm-vendor`。
-- **安装**：写一份 staging consumer manifest，把[运行闭包](2026-08-15-desktop-runtime-closure-and-volume.md)内的 tarball 声明为相对 `file:` 依赖，然后 `npm install`——与 `release/verify-packed-install.ts` 证明过的机制一致，但不带它的 `--omit=optional`：Windows ACL 沙箱的 `koffi` 与 Landlock 平台包以 optionalDependencies 发布预编译二进制，跳过它们会迫使源码构建。registry 流量仅限于外部依赖（commander、js-yaml、koffi、opentelemetry 等），由提交在仓库的 `apps/desktop/runtime.package-lock.json` 钉住（种子进 staging 安装并回写，外部漂移会以 git diff 的形式显形；锁文件含任何机器绝对路径都会使构建失败）。
+- **安装**：写一份 staging consumer manifest，把[运行闭包](2026-08-15-desktop-runtime-closure-and-volume.zh.md)内的 tarball 声明为相对 `file:` 依赖，然后 `npm install`——与 `release/verify-packed-install.ts` 证明过的机制一致，但不带它的 `--omit=optional`：Windows ACL 沙箱的 `koffi` 与 Landlock 平台包以 optionalDependencies 发布预编译二进制，跳过它们会迫使源码构建。registry 流量仅限于外部依赖（commander、js-yaml、koffi、opentelemetry 等），由提交在仓库的 `apps/desktop/runtime.package-lock.json` 钉住（种子进 staging 安装并回写，外部漂移会以 git diff 的形式显形；锁文件含任何机器绝对路径都会使构建失败）。
 - **组装**：把安装好的 `node_modules` 复制到 `dist/desktop/dsh/node_modules`；electron-builder（`apps/desktop/electron-builder.yml`，`target: dir`）把它作为 `resources/dsh` 打进产物，并把壳打包进 `app.asar`。
 - **启动**：打包态主进程以 `ELECTRON_RUN_AS_NODE=1`（并加 `--expose-internals`——Cordis loader 的 HMR 助手需要它，`node-addon-require-builtin` 回退无法在 Electron 的 Node 域内运行）派生自身可执行文件，运行 `resources/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js --profile web --host 127.0.0.1 --port 3080`，工作区设为用户主目录。子进程 stdio 在开发态与 smoke 模式继承宿主控制台，在正常打包 GUI 中忽略——该进程没有控制台，向已关闭的管道写入会触发 EPIPE。已安装的 `@deepseek-ai/dsh` 包就是启动器锚点，因此 profile bundle 解析与 `$DSH_HOME/profiles/node_modules` 回退都落在发行目录内部；会话仍写 `~/.dsh`。不依赖外部 Node、pnpm 或 PATH 条目，也不存在第二套进程管理实现——`apps/desktop/src/dsh-service.ts` 的 `resolveDshLaunch` 是两种模式共用的唯一启动路径。
 - **图标**：`scripts/generate-desktop-icon.ts` 把仓库的鲸鱼 favicon 渲染为品牌蓝圆角方块上的白色鲸鱼（256×256 PNG；electron-builder 自动转 ICO）。这是现有素材，不是新品牌设计。

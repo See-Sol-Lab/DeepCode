@@ -48,21 +48,19 @@ function input(overrides: Partial<ControlModelInput> = {}): ControlModelInput {
     discoveryError: null,
     logPath: undefined,
     existingHomeCandidate: null,
-    viewTitle: '',
-    themePreference: 'system',
     effectiveTheme: 'dark',
     highContrast: false,
-    expertDetailsExpanded: false,
     recoveryNotice: null,
     pluginManager: { profiles: [], error: null, operation: null, handoffPending: false, recovery: null },
     update: {
       channel: null, state: 'idle', result: null, latestVersion: null, releaseNotes: null,
       progressBytes: null, progressTotal: null, message: null,
     },
-    diagnostics: { buildInfo: [], logPath: null, lastExport: null, uncleanExit: null },
-    feedback: { open: false, diagnostics: '', phase: 'idle', reply: null, issueTitle: '', degradedReason: null, notice: null },
+    diagnostics: { buildInfo: [], homeDisplay: '', logPath: null, lastExport: null, uncleanExit: null },
+    feedback: { open: false, diagnostics: '', phase: 'idle', reply: null, issueTitle: '', degradedReason: null, notice: null, gatewayConfigured: false },
     permissions: { mode: 'sandbox', preset: 'workspace-write', detail: null },
     powerShell7Available: true,
+    browserPane: { present: false, open: false },
     ...overrides,
   }
 }
@@ -81,16 +79,12 @@ describe('buildControlModel', () => {
 
   it('主题、high contrast、专家详情与恢复通知透传', () => {
     const model = buildControlModel(input({
-      themePreference: 'light',
       effectiveTheme: 'light',
       highContrast: true,
-      expertDetailsExpanded: true,
       recoveryNotice: { profile: 'good', kind: 'boot-failure' },
     }))
-    expect(model.themePreference).toBe('light')
     expect(model.effectiveTheme).toBe('light')
     expect(model.highContrast).toBe(true)
-    expect(model.expertDetailsExpanded).toBe(true)
     expect(model.recoveryNotice).toEqual({ profile: 'good', kind: 'boot-failure' })
     expect(buildControlModel(input()).recoveryNotice).toBeNull()
   })
@@ -191,9 +185,7 @@ describe('parseControlCommand 边界验证', () => {
     'copy-full-path',
     'show-about',
     'show-terminal',
-    'toggle-expert-details',
     'quit',
-    'refresh-plugin-inventory',
     'plugin-op-cancel',
     'plugin-handoff-restart',
     'plugin-handoff-later',
@@ -202,9 +194,7 @@ describe('parseControlCommand 边界验证', () => {
     'update-download',
     'update-cancel-download',
     'update-install',
-    'update-cancel-install',
     'open-log-folder',
-    'copy-build-info',
     'export-diagnostics',
     'open-feedback',
     'close-feedback',
@@ -218,13 +208,6 @@ describe('parseControlCommand 边界验证', () => {
       .toEqual({ type: 'switch-profile', profile: '深 度 p' })
     expect(parseControlCommand({ type: 'choose-existing-profile', profile: 'web' }))
       .toEqual({ type: 'choose-existing-profile', profile: 'web' })
-  })
-
-  it('接受合法主题命令，拒绝非法主题与多余字段', () => {
-    expect(parseControlCommand({ type: 'set-theme', theme: 'light' })).toEqual({ type: 'set-theme', theme: 'light' })
-    expect(parseControlCommand({ type: 'set-theme', theme: 'blue' })).toBeNull()
-    expect(parseControlCommand({ type: 'set-theme' })).toBeNull()
-    expect(parseControlCommand({ type: 'set-theme', theme: 'dark', extra: 1 })).toBeNull()
   })
 
   it('接受合法权限模式命令（sandbox / full-access），拒绝非法模式与多余字段', () => {

@@ -19,9 +19,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { parityEnv } from './parity-env.ts'
 import { EXE, packagedExists } from './fixtures.ts'
 import {
+  portConnectable as portOpen,
   COMP_URL_PREFIX,
   evalInView,
-  portConnectable as portOpen,
   shutdownApp,
   waitForCompMount,
   waitForWindow,
@@ -70,13 +70,21 @@ describe.runIf(packagedExists)('官方 Web 等价：打包 Electron 启动与生
       const target = webContents.getAllWebContents().find(contents => contents.getURL().startsWith(prefix))
       return target?.getURL() ?? ''
     }, COMP_URL_PREFIX)
-    expect(url).toBe(APP_URL)
+    // P8-D39 之后这个 URL 带控制桥参数（?deepcode-control=<port>.<token>）：
+    // 那是 settings-plugin 连回桌面控制面的凭据，不是另一个地址——外部浏览器
+    // 打开 3080 时没有它，也因此看不到 DeepCode 分区。比对去掉 query 之后的
+    // 地址：既证明打开的确实是官方 Web UI，又不把桥参数当成差异。
+    expect(url.split('?')[0]).toBe(APP_URL)
   })
 
-  it('窗口标题固定为 DeepCode，Compatibility View 仍是官方 document.title', async () => {
+  it('窗口标题固定为 DeepCode，Compatibility View 的 title 来自品牌构建', async () => {
     const windowTitle = await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getTitle())
     expect(windowTitle).toBe('DeepCode')
-    expect(await evalInView<string>(app!, COMP_URL_PREFIX, 'document.title')).toBe('DeepSeek Harness')
+    // 品牌串在 build:lib:client（tsdown）阶段内联进前端产物，由
+    // build-web-branded 连同 client lib 一起带环境构建——所以**打包态**的
+    // document.title 是 DeepCode，裸跑才会退回上游的 DSH Local Build。
+    // 改的是我们自己的发行构建，不是上游文件。
+    expect(await evalInView<string>(app!, COMP_URL_PREFIX, 'document.title')).toBe('DeepCode')
   })
 
   it('第二实例立即退出，首实例窗口保持唯一并取得焦点', async () => {

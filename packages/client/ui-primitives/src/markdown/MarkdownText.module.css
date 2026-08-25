@@ -1,6 +1,14 @@
 /* Visual baseline: deepsuite `@deepseek/md` markdown.css, adapted to CSS
    Modules. Cite pills, header anchors, and thinking-small variants are
-   intentionally absent (no matching DOM). Token names match that sheet. */
+   intentionally absent (no matching DOM). Token names match that sheet.
+
+   Host hooks (DeepCode D45 续, 2026-08-24): the block rhythm below —
+   32px above a heading, 16px between paragraphs and lists — is drawn for
+   the 16px figma body. A host that shrinks the body type keeps every one
+   of these gaps at full size, and the transcript reads airier the smaller
+   the text gets. Each is a var() with the figma value as its fallback, so
+   vanilla `dsh web` renders byte-identical; only a host that supplies the
+   variables (DeepCode's theme plugin, via overrideTokens) tightens them. */
 
 .markdown {
   min-width: 0;
@@ -15,27 +23,27 @@
 
 .markdown h1 {
   font: var(--dsw-font-markdown-h1);
-  margin: 32px 0 16px;
+  margin: var(--dsh-markdown-heading-top, 32px) 0 var(--dsh-markdown-block-margin, 16px);
 }
 
 .markdown h2 {
   font: var(--dsw-font-markdown-h2);
-  margin: 32px 0 16px;
+  margin: var(--dsh-markdown-heading-top, 32px) 0 var(--dsh-markdown-block-margin, 16px);
 }
 
 .markdown h3 {
   font: var(--dsw-font-markdown-h3);
-  margin: 32px 0 16px;
+  margin: var(--dsh-markdown-heading-top, 32px) 0 var(--dsh-markdown-block-margin, 16px);
 }
 
 .markdown h4 {
   font: var(--dsw-font-markdown-h4);
-  margin: 16px 0;
+  margin: var(--dsh-markdown-block-margin, 16px) 0;
 }
 
 .markdown :where(h5, h6) {
   font: var(--dsw-font-markdown-base-strong);
-  margin: 16px 0;
+  margin: var(--dsh-markdown-block-margin, 16px) 0;
 }
 
 .markdown :where(h1, h2, h3, h4, h5, h6) strong {
@@ -43,7 +51,7 @@
 }
 
 .markdown p {
-  margin: 16px 0;
+  margin: var(--dsh-markdown-block-margin, 16px) 0;
 }
 
 /* Tighten h4–h6 against a following list (design: 8px gap). */
@@ -83,12 +91,12 @@
 }
 
 .markdown :where(ul, ol) {
-  margin: 16px 0;
+  margin: var(--dsh-markdown-block-margin, 16px) 0;
   padding-left: 18px;
 }
 
 .markdown li:not(:first-child) {
-  margin-top: 6px;
+  margin-top: var(--dsh-markdown-list-gap, 6px);
 }
 
 .markdown li > :where(ul, ol) {
@@ -96,7 +104,9 @@
 }
 
 .markdown li::marker {
-  line-height: 28px;
+  /* Must track the body's line-height or the bullet drifts off its own text
+     baseline; the figma 28px belongs to the 16px body. */
+  line-height: var(--dsh-markdown-marker-line-height, 28px);
   color: var(--dsw-alias-label-secondary);
 }
 
@@ -177,10 +187,49 @@
   overscroll-behavior-x: contain;
 }
 
+/* Wide tables reveal their horizontal bar on hover (or keyboard focus)
+   instead of keeping it painted. Chromium never repaints state-conditioned
+   scrollbar STYLES (neither hover-conditioned `::-webkit-scrollbar*` rules
+   nor a :hover `scrollbar-color` change reaches the painted bar), so the
+   toggle is `overflow-x` itself — a layout change repaints reliably. The
+   resting padding matches the themed bar's height, so on an overflowing
+   table the appearing bar exactly replaces it and nothing below shifts.
+   Wheel and trackpad scrolling need the pointer over the table, which is
+   already the hover that re-enables `auto`. */
+.tableScroll:global(.md-table-wide) {
+  overflow-x: hidden;
+  padding-bottom: var(--dsh-scrollbar-width, 8px);
+}
+
+.tableScroll:global(.md-table-wide):hover,
+.tableScroll:global(.md-table-wide):focus-visible {
+  overflow-x: auto;
+  padding-bottom: 0;
+}
+
+/* Chromium keyboard-focuses scrollable containers by default; the ring uses
+   the sheet's link focus color. */
+.tableScroll:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary);
+}
+
+/* Many-column tables (the renderer's `md-table-wide` hook) keep their
+   natural width and scroll inside the wrapper; a hosting layout may widen
+   the wrapper through the hook (deepsuite chat TableWrapper parity). */
 .tableScroll table {
   border-collapse: collapse;
   width: max-content;
   max-width: max-content;
+}
+
+/* Tables under four columns, and any table inside a blockquote, fill the
+   column instead: cells wrap down to their minimum readable width, and the
+   wrapper's scroll only remains for the below-floor case (deepsuite chat
+   parity: `.wrapper:not(:has(th:nth-child(4), td:nth-child(4)))`). */
+.tableFill table {
+  width: 100%;
+  max-width: none;
 }
 
 .tableScroll th {

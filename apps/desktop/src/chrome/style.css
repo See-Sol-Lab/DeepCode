@@ -101,16 +101,17 @@ html, body {
   -webkit-app-region: drag;
 }
 
-/* 顶栏下沿渐隐：底色淡出到透明，避免与官方页面硬切一条边。
-   画在 chrome view 自己的高度内，不额外覆盖下层内容。 */
-#topbar::after {
-  content: '';
-  position: absolute;
-  left: 0; right: 0; top: 100%;
-  height: 14px;
-  background: linear-gradient(var(--surface), transparent);
-  pointer-events: none;
-}
+/* 顶栏下沿渐隐已移到窗口背景页（P8-D10）。
+   这里原先是 `#topbar::after`：`top: 100%` + 14px 高，注释写着「画在 chrome view
+   自己的高度内」——实际正相反，它落在 47px 顶栏的**下方**，而这一层平时就只有
+   47px 高，于是那条渐变被裁掉，只有菜单展开（main 把本层扩到全窗）时才露出来。
+   住户看到的「菜单一开就有一条柔光、反复点就一闪一闪」正是这么来的。
+
+   让它常驻需要一块 47px 以下的像素，而这一层每多占一行就多吃一行官方页面的点击：
+   WebContentsView 之间没有 CSS 级的点击穿透，Electron 43 的 setIgnoreMouseEvents
+   只挂在 BaseWindow/BrowserWindow 上、整窗生效，救不了单独一层。那正是 D6 踩过的
+   坑（「按钮到达了预定位置，没有证明那个位置是空的」）。所以改画在 backdrop.html
+   上——那一层全窗、常驻，且天生吃不到点击。 */
 
 .no-drag { -webkit-app-region: no-drag; }
 
@@ -136,26 +137,14 @@ html, body {
 #brand-icon { width: 20px; height: 20px; }
 #brand-name { font-weight: 600; }
 
-#window-title {
-  flex: 1;
-  text-align: center;
-  color: var(--text-dim);
-  font-size: 13px;
-  font-weight: 400;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-/* 窄窗口优先隐藏中间标题，保留汉堡、状态与原生窗口按钮。 */
-@media (max-width: 900px) {
-  #window-title { visibility: hidden; }
-}
 
 /* ---- 状态胶囊 ---- */
 
 #status-pill {
+  /* 顶栏是 flex-start：中间那块标题（原 #window-title，P8-D15 已删）以前用
+     flex:1 把胶囊顶到右边去。标题没了，这里必须自己占住右侧，否则胶囊会滑
+     回来贴着品牌字。恢复横幅有自己的 flex:1，不受这条影响。 */
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -166,10 +155,10 @@ html, body {
   background: var(--surface-raised);
   color: var(--text);
   font-size: 12px;
-  cursor: pointer;
   white-space: nowrap;
+  /* 没有 cursor:pointer、没有 :hover —— 它是指示灯不是按钮（P8-D19）。
+     鼠标样式和悬停反馈都会让人以为能点。 */
 }
-#status-pill:hover { border-color: var(--border); }
 
 #status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dot-grey); }
 #status-pill[data-tone='grey'] #status-dot { background: var(--dot-grey); }
@@ -218,7 +207,9 @@ html, body {
   cursor: pointer;
 }
 .menu-item:hover:not(:disabled) { background: var(--surface-hover); }
-.menu-item:disabled { color: var(--text-dim); cursor: default; }
+/* 禁用态必须一眼可辨（P8-D38③ 通则：控件状态不外显=控件装死）：
+   仅换 --text-dim 与备注文字同色，用户分不出「不能点」和「小字说明」。 */
+.menu-item:disabled { color: var(--text-dim); cursor: default; opacity: 0.45; }
 .menu-item .chevron { color: var(--text-dim); }
 .menu-item .checkmark { color: var(--dot-green); }
 .menu-item .item-note { color: var(--text-dim); font-size: 12px; }
@@ -374,11 +365,24 @@ button:focus-visible {
 
 /* ---- Feedback（P7-A~E）---- */
 
-/* 左下角常驻入口：bug 语义、不抢焦点（半崩状态下依然可点）。 */
+/* Feedback 小窗层：整层就是按钮的地盘，背景透明让窗口底图透上来。
+   这一层不再用 fixed 定位——它曾经写成 `position: fixed; bottom: 8px`，
+   而 Chrome 那层只有 47px 高，"距底部 8px" 于是贴在顶栏下沿、压住汉堡
+   菜单，看起来落在左上角。窗口左下角这个位置现在由 main 给这一层的
+   bounds 决定，CSS 只负责把按钮摆在层中央。 */
+body.feedback-standalone {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* bug 语义、不抢焦点（半崩状态下依然可点）。 */
 #feedback-entry {
-  position: fixed;
-  left: 8px;
-  bottom: 8px;
   width: 26px;
   height: 26px;
   display: flex;

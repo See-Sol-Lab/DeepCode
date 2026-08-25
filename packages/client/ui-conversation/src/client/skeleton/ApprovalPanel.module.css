@@ -17,7 +17,9 @@
   overflow: hidden;
   width: 100%;
   max-width: var(--dsh-chat-content-width);
-  border: 1px solid var(--dsw-alias-state-warn-secondary);
+  /* Host hooks (DeepCode D29 follow-up): the approval accent defaults to the
+     warn family but a theme may rebind it (DeepCode uses its brand blue). */
+  border: 1px solid var(--dsh-approval-border, var(--dsw-alias-state-warn-secondary));
   border-radius: 20px;
   background: var(--dsw-specific-input-major);
   box-shadow: var(--dsw-shadow-lv2);
@@ -36,8 +38,8 @@
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  background: var(--dsw-alias-state-warn-tertiary);
-  color: var(--dsw-alias-state-warn-primary);
+  background: var(--dsh-approval-accent-soft, var(--dsw-alias-state-warn-tertiary));
+  color: var(--dsh-approval-accent, var(--dsw-alias-state-warn-primary));
   font-size: 13px;
   line-height: 18px;
 }
@@ -46,7 +48,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--dsw-alias-state-warn-primary);
+  background: var(--dsh-approval-accent, var(--dsw-alias-state-warn-primary));
 }
 
 /* Scroll region: an agent's justification and its command are unbounded model

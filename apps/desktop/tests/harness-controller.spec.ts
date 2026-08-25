@@ -36,6 +36,9 @@ const baseState = (): LauncherStateV1 => ({
 const resolve = (selection: HarnessSelection): ResolvedSelection => ({
   profile: selection.profile,
   dshHome: selection.home.kind === 'managed' ? 'C:/userdata/dsh' : selection.home.path,
+  // controller 把 home 的种类一并解析出来：Managed 下宿主的模型密钥不透传给
+  // DSH（P8-D23），所以这是 selection 的一部分事实，不是可有可无的装饰。
+  managedHome: selection.home.kind === 'managed',
 })
 
 /** 内存 + 写入序列的 fake store。 */
@@ -348,7 +351,7 @@ describe('defaultLauncherState 兼容', () => {
     const init = defaultLauncherState()
     const { controller, selections } = makeController(init)
     await controller.start()
-    expect(selections[0]).toEqual({ profile: 'web', dshHome: 'C:/userdata/dsh' })
+    expect(selections[0]).toEqual({ profile: 'web', dshHome: 'C:/userdata/dsh', managedHome: true })
     expect(controller.status().phase).toBe('running')
   })
 })

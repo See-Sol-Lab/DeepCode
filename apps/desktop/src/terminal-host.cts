@@ -19,13 +19,23 @@ import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { homedir } from 'node:os'
 
-/** 终端默认尺寸（本阶段固定；resize 协议留给后续包）。 */
+/** 终端启动尺寸（renderer fit 后立刻经 resize 帧校正为真实值）。 */
 const TERMINAL_COLS = 100
 const TERMINAL_ROWS = 30
+
+/**
+ * stdin 里的 resize 控制帧（P8-D47）：`ESC ] 51337 ; resize ; cols ; rows BEL`。
+ * pty 固定 100 列而 xterm 按窗宽 fit 时，PSReadLine 语法高亮重绘按 100 列
+ * 算光标定位，画到更宽的画布上输入行就叠影（住户实测「dsh --helpdsh --help」
+ * 三重鬼影，回车执行却正常——纯显示错位）。私有 OSC 51337 键盘打不出来；
+ * 帧由 main 单次 write 写入（管道小写入不裂），不做跨 chunk 拼接。
+ */
+const RESIZE_FRAME = /\x1b\]51337;resize;(\d{1,4});(\d{1,4})\x07/g
 
 /** node-pty 的 pty 进程接口（避免引入 node-pty 类型面，用最小结构）。 */
 interface PtyProcess {
   write: (data: string) => void
+  resize: (cols: number, rows: number) => void
   kill: () => void
   onData: (listener: (data: string) => void) => void
   onExit: (listener: (event: { exitCode: number; signal?: number }) => void) => void
@@ -121,7 +131,18 @@ spawned.onData((data) => {
 
 process.stdin.setEncoding('utf8')
 process.stdin.on('data', (chunk: string) => {
-  spawned.write(chunk)
+  // 先剥 resize 帧（见 RESIZE_FRAME 注释），剩余字节原样进 pty。
+  const cleaned = chunk.replace(RESIZE_FRAME, (_match, colsText: string, rowsText: string) => {
+    const cols = Math.min(500, Math.max(20, Number(colsText)))
+    const rows = Math.min(300, Math.max(5, Number(rowsText)))
+    try {
+      spawned.resize(cols, rows)
+    } catch {
+      // pty 已死时 resize 会抛：吞掉，exit 事件自会走正路。
+    }
+    return ''
+  })
+  if (cleaned !== '') spawned.write(cleaned)
 })
 process.stdin.on('end', () => {
   // 父进程关闭输入：用户终端可能仍在运行；不强制杀，交给父进程 cancel。

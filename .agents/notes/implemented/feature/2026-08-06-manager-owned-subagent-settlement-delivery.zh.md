@@ -8,7 +8,7 @@ Status: implemented
 
 可继续后台委派是模型唯一一种能够发起、却无法抵达终点的异步操作。其他每一种形态都有取回原语或返回值：后台 bash 命令与一次性后台 subagent 都通过 Task 结算，`job_output(wait: true)` 可以阻塞等待；workflow 与前台 subagent 会把结果返回给调用方。可继续后台 child 只返回它持久化的 id，而父级既没有可等待的对象，也不会被交付任何东西。
 
-[报告义务](2026-08-06-continuable-child-report-obligation.md)通过要求 child 在结束前上报，补上了这一缺口中协作的那一半。指令无法补上其余部分。被 token 上限、模型失败、取消或拆卸终止的 child 永远走不到能够遵守的那一步——不是很少，而是从不——而这些恰恰是等待中的父级最需要被告知的结束方式。可观察到的下游症状包括：父级忙轮询 `list_agents`、向已经结算的 child 反复发送消息，以及部署放弃 `subagent` 转用 `workflow`，因为 workflow 至少会返回点什么。
+[报告义务](2026-08-06-continuable-child-report-obligation.zh.md)通过要求 child 在结束前上报，补上了这一缺口中协作的那一半。指令无法补上其余部分。被 token 上限、模型失败、取消或拆卸终止的 child 永远走不到能够遵守的那一步——不是很少，而是从不——而这些恰恰是等待中的父级最需要被告知的结束方式。可观察到的下游症状包括：父级忙轮询 `list_agents`、向已经结算的 child 反复发送消息，以及部署放弃 `subagent` 转用 `workflow`，因为 workflow 至少会返回点什么。
 
 信号本身早就存在。自可继续 Activation 发布以来，`subagent/end` 就一直携带 `stopReason` 与 `lastAssistantMessage`。缺的是把它变成父级模型能看到的上下文的那个消费者。
 
@@ -62,7 +62,7 @@ Status: implemented
 
 另有一个无密钥的 headless Loader 快照端到端覆盖用户可见路径。其重放父级省略 `run_in_background` 以覆盖可继续后台默认路径，从不调用 `list_agents`、`send_message` 或 Task 工具，消费管理器写入的 `subagent-settled` 通知，并给出最终答案。child 从不调用 `report`，因此该 transcript 不可能经由协作式上报路径通过。一个仅用于测试的 Loader 栅栏会把父级启动后的请求保持到真实管理器通知进入其 inbox 为止，从 transcript 中排除平台调度差异，但不会伪造该通知。
 
-`subagent-report` 还需要多做一步让步。在随附的唤醒上报默认值下，该场景有两个互相独立的父级唤醒——上报与结算——而第二个究竟是延长第一个的轮次还是另开一个轮次，是一枚真正的硬币，多次运行实测约为五五开。任何手写 transcript 都无法同时容纳两种顺序。因此它的 overlay 固定 `reportDelivery: quiet`，使结算成为唯一唤醒；另一个仅用于快照的 pre-step 栅栏会把 child 保持到父级启动轮次结束，使这次唤醒开启一个确定轮次并同时认领两条消息。唤醒上报默认值的覆盖则保留在 report 包自身的测试中。
+`subagent-report` 场景使用默认 next-step 报告投递。一个仅用于快照的围栏会让 child 等到 parent 的派生轮次结束，随后让 parent 保持 maintenance，直至结算跟在报告之后到达。恢复的 parent 会先领取 next-step 报告、再领取排队的 next-turn 结算。[报告与结算顺序决策](../bug-fix/2026-08-17-subagent-report-settlement-ordering.zh.md)负责说明这种跨状态顺序。
 
 拒绝与中断两种措辞在单元测试中逐字钉死，而不进入重放 transcript：触发它们需要一个会拒绝的策略插件、或一次在 step 边界被栅栏卡住的取消，而无密钥组装本身并不携带这些；通知通路本身已由整体组装场景端到端钉住。
 
@@ -87,7 +87,7 @@ Status: implemented
 - `Activation` 携带 `parentSession` 与 `announced`。前者存在是因为 child handle 在投递前已被 dispose；后者让被回滚的物化保持静默。
 - `foldConsumedWork()` 取代 `dsh-session` 的 `findLastMessageTurnEnd()`，并迁移到 `dsh-agent`——它拥有该 fold 所读取的 inbox 标记；一次性 in-process 路径折叠同一个答案，不会把被中途切断的一次性 child 归类为 `completed`。
 - 单元覆盖固定了无条件约定、每种终止原因、空闲与繁忙两种调度、批量语义、维护期回归、释放前顺序、父级已消失，以及一次不得让拆卸失败的发送被拒。
-- 三个 ACP 场景使用显式的结算栅栏，`subagent-report` 带有固定静默上报投递的配置 overlay。
+- 三个 ACP 场景使用显式的结算围栏，`subagent-report` 固定默认的报告先于结算的 next-step 顺序。
 - 一个无密钥的 headless Loader 快照固定了「后台启动 → 管理器写入的结算通知 → 父级最终答案」路径，其中没有轮询，也没有 child `report` 调用。
 
 ### 已接受的风险
@@ -100,4 +100,4 @@ Status: implemented
 
 对于深或宽的树，轮次放大是真实存在的，而且按设计不可配置。step 边界的批量语义只能约束同时结算的情形，无法约束分散结算的 child。
 
-两个互相独立的唤醒源无法在手写 transcript 中排序。整体组装覆盖分别固定它们，而不固定它们的交错。
+报告与其稍后的结算通知通过 parent 的 next-step FIFO 排序。来自同级 child 的独立结算保留其实际投递顺序，不会虚构同级间的顺序。

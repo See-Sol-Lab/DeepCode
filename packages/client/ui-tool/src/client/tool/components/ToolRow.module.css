@@ -79,8 +79,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
-  line-height: 24px;
+  font-size: var(--dsh-chrome-row-font-size, 14px); /* Host hook (DeepCode P8-D45) */
+  line-height: var(--dsh-chrome-row-line-height, 24px);
   color: var(--dsw-alias-label-tertiary);
 }
 
@@ -93,8 +93,8 @@
   flex: none;
   margin-left: 4px;
   white-space: nowrap;
-  font-size: 14px;
-  line-height: 24px;
+  font-size: var(--dsh-chrome-row-font-size, 14px); /* Host hook (DeepCode P8-D45) */
+  line-height: var(--dsh-chrome-row-line-height, 24px);
   color: var(--dsw-alias-label-tertiary);
 }
 
@@ -111,8 +111,8 @@
   background: none;
   font: inherit;
   text-align: left;
-  font-size: 14px;
-  line-height: 24px;
+  font-size: var(--dsh-chrome-row-font-size, 14px); /* Host hook (DeepCode P8-D45) */
+  line-height: var(--dsh-chrome-row-line-height, 24px);
   color: var(--dsw-alias-label-secondary);
   text-decoration: underline;
   text-decoration-color: var(--dsw-alias-label-quaternary);

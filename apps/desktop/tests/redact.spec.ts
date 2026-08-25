@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { createStreamingRedactor, redactSecrets, redactUserContext } from '../src/redact.ts'
+import { createStreamingRedactor, maskWindowsLiteral, redactSecrets, redactUserContext } from '../src/redact.ts'
 
 /** 每个受支持凭据形态的假样本与期望的脱敏标记。 */
 const FAKE_SECRETS: readonly { name: string; secret: string; marker: string }[] = [
@@ -154,5 +154,69 @@ describe('redactUserContext（反馈诊断包规则层）', () => {
     const out = redactUserContext('deadbeef normal words ok', ctx)
     expect(out).toContain('deadbeef')
     expect(out).toContain('normal words ok')
+  })
+})
+
+describe('URL 里的账号密码要脱敏（否则诊断包一交出去就泄了）', () => {
+  it('https 里的 user:secret 被抹掉，主机与路径保留', () => {
+    const out = redactSecrets('fetching https://alice:s3cr3t@example.com/feed.json failed')
+    expect(out).not.toContain('s3cr3t')
+    expect(out).not.toContain('alice')
+    expect(out).toContain('example.com/feed.json')
+  })
+
+  it('git+https 同样处理', () => {
+    expect(redactSecrets('git+https://user:token@git.example.com/x.git')).not.toContain('token')
+  })
+
+  it('不带凭据的 URL 原样保留（别把正常地址也打码）', () => {
+    const url = 'https://example.com/a/b.json'
+    expect(redactSecrets(url)).toBe(url)
+  })
+
+  it('普通的冒号 @ 组合不受影响（邮箱那条规则另管）', () => {
+    expect(redactSecrets('see https://example.com:8443/x')).toContain('example.com:8443')
+  })
+})
+
+describe('Windows 的路径与主机名遮罩要按 Windows 的规矩来', () => {
+  const home = 'C:\\Users\\Alice'
+
+  it('大小写不同照样遮掉（Windows 路径本来就不区分大小写）', () => {
+    expect(maskWindowsLiteral('open c:\\users\\ALICE\\x.log', home, '<H>')).toBe('open <H>\\x.log')
+    expect(maskWindowsLiteral('open C:\\USERS\\alice\\x.log', home, '<H>')).toBe('open <H>\\x.log')
+  })
+
+  it('正反斜杠等价', () => {
+    expect(maskWindowsLiteral('open C:/Users/Alice/x.log', home, '<H>')).toBe('open <H>/x.log')
+  })
+
+  it('同一段文本里的多处都遮掉', () => {
+    const out = maskWindowsLiteral('a C:/users/alice b c:\\Users\\ALICE c', home, '<H>')
+    expect(out).toBe('a <H> b <H> c')
+  })
+
+  it('主机名同样不区分大小写', () => {
+    expect(maskWindowsLiteral('host=MYBOX failed', 'mybox', '<HOSTNAME>')).toBe('host=<HOSTNAME> failed')
+  })
+
+  it('空字面量与不匹配的文本原样返回', () => {
+    expect(maskWindowsLiteral('nothing here', '', '<H>')).toBe('nothing here')
+    expect(maskWindowsLiteral('nothing here', 'C:/other', '<H>')).toBe('nothing here')
+  })
+
+  it('redactUserContext 用上了同一套规则', () => {
+    const out = redactUserContext('log at c:\\users\\ALICE\\app.log on MYBOX', {
+      home, hostname: 'mybox',
+    })
+    expect(out).not.toContain('ALICE')
+    expect(out).toContain('<USER_HOME>')
+    expect(out).toContain('<HOSTNAME>')
+  })
+
+  it('大写的 USERS 段也能打码（原先的 [Uu]sers 覆盖不到）', () => {
+    const out = redactUserContext('D:\\USERS\\Bob\\x', { home: '', hostname: '' })
+    expect(out).not.toContain('Bob')
+    expect(out).toContain('[REDACTED]')
   })
 })

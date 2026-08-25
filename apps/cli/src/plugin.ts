@@ -124,13 +124,31 @@ export function runPlugin(profile: string, args: readonly string[]): number {
     process.stderr.write(`${NAME}: initialized profile ${profile} at ${dir}\n`)
   }
   const before = readProfileManifest(NAME, dir)
+  const anchored = args.map(argument => anchorPathSpec(argument, process.cwd()))
   // Windows resolves pnpm through its .cmd shim, which spawn() refuses
-  // without a shell since the CVE-2024-27980 hardening.
-  const result = spawnSync('pnpm', args.map(argument => anchorPathSpec(argument, process.cwd())), {
-    cwd: dir,
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
-  })
+  // without a shell since the CVE-2024-27980 hardening. A shell means
+  // cmd.exe, and cmd.exe inherits stdio from its parent: under a GUI host
+  // whose process was started with `windowsHide`, there is no console to
+  // inherit, so Windows opens a fresh one. The user sees a terminal window
+  // nobody asked for, and its pipes never reach the host — no output, no
+  // exit code, the operation hangs while pnpm quietly finishes its work.
+  //
+  // A host that ships its own pnpm can hand us the entry directly through
+  // DSH_PNPM_ENTRY; running it as a plain Node script needs no shell and
+  // therefore no cmd.exe. Anything else keeps the original path unchanged.
+  const hostPnpmEntry = process.env.DSH_PNPM_ENTRY
+  const result = hostPnpmEntry !== undefined && hostPnpmEntry !== '' && existsSync(hostPnpmEntry)
+    ? spawnSync(process.execPath, [hostPnpmEntry, ...anchored], {
+      cwd: dir,
+      stdio: 'inherit',
+      shell: false,
+      windowsHide: true,
+    })
+    : spawnSync('pnpm', anchored, {
+      cwd: dir,
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    })
   if (result.error !== undefined) {
     const code = (result.error as NodeJS.ErrnoException).code
     if (code === 'ENOENT') {

@@ -1,0 +1,29 @@
+{
+  "name": "@see-sol-lab/deepcode-settings",
+  "description": "DeepCode desktop control sections inside the official settings page (P8-D39): Harness/profile control and local plugin management, over the loopback control bridge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ],
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "license": "SEE LICENSE IN ../../../DEEPCODE-LICENSE.md",
+  "files": [
+    "lib/client.js",
+    "lib/index.js"
+  ]
+}

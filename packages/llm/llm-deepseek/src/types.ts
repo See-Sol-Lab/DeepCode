@@ -17,8 +17,8 @@ export interface WireRequest {
   stream_options: { include_usage: true }
   /** Thinking-mode toggle (top level, NOT inside extra_body on the wire). */
   thinking?: { type: 'enabled' | 'disabled' }
-  /** Thinking effort (official levels; low/medium map to high server-side). */
-  reasoning_effort?: 'high' | 'max'
+  /** Thinking effort (official levels). */
+  reasoning_effort?: 'low' | 'high' | 'max'
   tools?: WireTool[]
   temperature?: number
   max_tokens?: number
@@ -35,10 +35,34 @@ export interface WireSystemMessage {
   content: string
 }
 
-/** User-role message: a single string of user input. */
+/** Text part inside a multimodal user message. */
+export interface WireTextContentPart {
+  type: 'text'
+  text: string
+}
+
+/** Files API reference inside a multimodal user message. */
+export interface WireFileContentPart {
+  type: 'file'
+  file_id: string
+}
+
+/** Inline base64 data URL inside a multimodal user message. */
+export interface WireImageUrlContentPart {
+  type: 'image_url'
+  image_url: { url: string }
+}
+
+/** One image representation accepted by a multimodal user message. */
+export type WireImageContentPart = WireFileContentPart | WireImageUrlContentPart
+
+/** Ordered input part accepted by a multimodal user message. */
+export type WireUserContentPart = WireTextContentPart | WireImageContentPart
+
+/** User-role message: text-only string or ordered multimodal input. */
 export interface WireUserMessage {
   role: 'user'
-  content: string
+  content: string | WireUserContentPart[]
 }
 
 /** Tool-role message: the result of one tool call, keyed by its call id. */
@@ -64,9 +88,11 @@ export interface WireAssistantMessage {
   role: 'assistant'
   content: string | null
   /**
-   * CoT passback. REQUIRED on assistant turns that carried tool calls
-   * (thinking mode); ignored on tool-call-free turns (we omit it there to
-   * save tokens). See guides/thinking_mode.mdx § Tool Calls.
+   * CoT passback, present on every turn whose assistant content carried
+   * reasoning. REQUIRED on tool-call turns in thinking mode (see
+   * guides/thinking_mode.mdx § Tool Calls); DeepSeek ignores it elsewhere,
+   * while a gateway re-encoding for another vendor recovers that turn's
+   * thinking signature by hashing it.
    */
   reasoning_content?: string
   tool_calls?: WireToolCall[]

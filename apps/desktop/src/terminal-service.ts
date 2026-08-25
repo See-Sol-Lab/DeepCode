@@ -89,11 +89,12 @@ export interface TerminalCwdChoice {
 /**
  * 终端 cwd：优先 active Profile 目录（discovery 的 dir 事实）；无法解析
  * 时使用 Harness Home 并在 welcome 说明。绝不静默锚到 Electron install
- * dir。
+ * dir。说明文案按 locale 双语（D29）。
  * @param discovery - 最近一次只读 discovery（可能为 null）。
  * @param activeProfile - active Profile 名。
  * @param dshHome - launcher active Home 解析出的真实 DSH_HOME。
  * @param exists - 目录存在性探测。
+ * @param locale - 界面语言（说明文案语言）。
  * @returns cwd 选择。
  */
 export function resolveTerminalCwd(
@@ -101,14 +102,20 @@ export function resolveTerminalCwd(
   activeProfile: string,
   dshHome: string,
   exists: (path: string) => boolean,
+  locale: 'zh' | 'en',
 ): TerminalCwdChoice {
+  const zh = locale === 'zh'
   const profileDir = discovery?.profiles.find((profile: DiscoveredProfile) => profile.name === activeProfile)?.dir
   if (profileDir !== undefined && exists(profileDir)) {
     return { cwd: profileDir, note: null }
   }
   const note = profileDir === undefined
-    ? '未在 discovery 中找到当前 Profile 目录，已使用 Harness Home 作为工作目录。'
-    : '当前 Profile 目录不可用，已使用 Harness Home 作为工作目录。'
+    ? (zh
+      ? '未在 discovery 中找到当前 Profile 目录，已使用 Harness Home 作为工作目录。'
+      : 'The active profile directory was not found in discovery; using the Harness Home as the working directory.')
+    : (zh
+      ? '当前 Profile 目录不可用，已使用 Harness Home 作为工作目录。'
+      : 'The active profile directory is unavailable; using the Harness Home as the working directory.')
   return { cwd: dshHome, note }
 }
 
@@ -128,20 +135,30 @@ export interface TerminalWelcomeFacts {
 /**
  * Terminal welcome：DeepCode version、DSH version、Active Profile、
  * DSH_HOME、Node/pnpm/dsh 的私有 Runtime 来源，以及终端宿主与 cwd
- * （含 cwd 回退说明）。不显示任何凭据或环境变量。
+ * （含 cwd 回退说明）。不显示任何凭据或环境变量。文案按 locale 双语
+ * （D29：zh 保持原样，en 为母语级新写）。
  * @param facts - 受控事实。
+ * @param locale - 界面语言。
  * @returns 多行 welcome 文本（host 以 echo 逐行写入 pty）。
  */
-export function buildTerminalWelcome(facts: TerminalWelcomeFacts): string[] {
+export function buildTerminalWelcome(facts: TerminalWelcomeFacts, locale: 'zh' | 'en'): string[] {
+  const zh = locale === 'zh'
   const pnpm = facts.pnpmVersion ?? 'unknown'
   return [
     'DeepCode DSH Terminal',
     `DeepCode ${facts.appVersion} · DSH ${facts.dshVersion}`,
     `Active Profile: ${facts.activeProfile}`,
     `DSH_HOME: ${facts.dshHome}`,
-    `Runtime: Node ${facts.nodeVersion} · pnpm ${pnpm} · dsh — 全部来自 DeepCode 私有 Runtime`,
+    zh
+      ? `Runtime: Node ${facts.nodeVersion} · pnpm ${pnpm} · dsh — 全部来自 DeepCode 私有 Runtime`
+      : `Runtime: Node ${facts.nodeVersion} · pnpm ${pnpm} · dsh — all from the DeepCode private runtime`,
     `Terminal: ${facts.shellLabel} · cwd: ${facts.cwd}`,
     ...facts.cwdNote === null ? [] : [facts.cwdNote],
+    // P8-D36：没有提示符语义的用户不知道黑窗在等输入——住户实测对着一个
+    // 正常工作的终端说「没反应，光标都没有」。最后一行必须说人话。
+    zh
+      ? '这是已配好 DSH 环境的命令行，输入命令后按回车执行，例如：dsh --help'
+      : 'This command line is pre-configured with the DSH environment. Type a command and press Enter, e.g. dsh --help',
   ]
 }
 

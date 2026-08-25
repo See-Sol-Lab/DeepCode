@@ -9,6 +9,7 @@ import json
 import os
 import queue
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -28,7 +29,11 @@ WORKFLOW_WORKER_TEXT = "workflow worker smoke ok"
 MINIMAL_PROMPT = "Exercise the packaged minimal agent's persistent Bash and string-replacement editor."
 MINIMAL_TEXT = "minimal agent smoke ok"
 MINIMAL_EDITOR_PATH_PREFIX = "Editor path: "
-MINIMAL_SYSTEM_PROMPT = "You are a helpful software engineer assistant."
+FS_SEARCH_PROMPT = "Exercise the packaged filesystem search tools."
+FS_SEARCH_TEXT = "filesystem search smoke ok"
+FS_SEARCH_MARKER = "PACKAGED_FS_SEARCH_OK"
+MCP_PROMPT = "Exercise the packaged MCP client with one external stdio server."
+MCP_TEXT = "MCP client smoke ok"
 MINIMAL_CORDIS = (
     Path(__file__).resolve().parent.parent / "examples" / "jsonrpc-agent" / "minimal.cordis.yml"
 )
@@ -65,10 +70,18 @@ SNAPSHOT_WORKFLOW_SCRIPT = (
     f"const reply = await agent('{SNAPSHOT_WORKFLOW_CHILD_PROMPT}', {{ label: 'workflow-child' }})\n"
     "return { reply }"
 )
-SNAPSHOT_DIRECTORY = (
+ADVANCED_SNAPSHOT_DIRECTORY = (
     Path(__file__).resolve().parent / "snapshots" / "python-sdk-single-exe" / "advanced"
 )
-SNAPSHOT_FILENAMES = ("result.json", "session.jsonl", "session.1.jsonl", "session.2.jsonl")
+ADVANCED_SNAPSHOT_FILENAMES = ("result.json", "session.jsonl", "session.1.jsonl", "session.2.jsonl")
+MINIMAL_SNAPSHOT_DIRECTORY = (
+    Path(__file__).resolve().parent / "snapshots" / "python-sdk-single-exe" / "minimal"
+)
+MINIMAL_SNAPSHOT_FILENAMES = ("model-visible.json",)
+# The agent loop's dynamic runtime-context snapshot is the one model-visible message this
+# expected output cannot carry: the same composition emits it on macOS and not on Linux
+# (deepseek-harness#2488), and the file must replay on both. Everything else is compared.
+RUNTIME_CONTEXT_PREFIX = "Current runtime context"
 CUSTOM_CORDIS = """\
 - id: sdk-jsonrpc-server
   name: '@deepseek-ai/dsh-sdk-jsonrpc-server'
@@ -109,6 +122,144 @@ CUSTOM_CORDIS = """\
 - id: cordis-tool
   name: '@deepseek-ai/dsh-tool-cordis'
 """
+FS_SEARCH_CORDIS = """\
+- id: sdk-jsonrpc-server
+  name: '@deepseek-ai/dsh-sdk-jsonrpc-server'
+- id: agent-core
+  name: '@deepseek-ai/dsh-agent-spine-demo'
+  config:
+    workspaceContext: false
+    skills:
+      enabled: false
+    toolBash: false
+    toolJobs: false
+- id: sessions
+  name: '@deepseek-ai/dsh-session-persistence-jsonl'
+  config:
+    root: !!js process.env.DSH_SESSION_ROOT
+    compression: 'none'
+- id: subprocess
+  name: '@deepseek-ai/dsh-subprocess-local'
+- id: fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: false
+"""
+MCP_SERVER_SCRIPT = """\
+import json
+import os
+import sys
+import time
+
+
+log_path = os.environ.get("MCP_SMOKE_LOG")
+
+
+def send(message):
+    sys.stdout.write(json.dumps(message, separators=(",", ":")) + "\\n")
+    sys.stdout.flush()
+
+
+for line in sys.stdin:
+    request = json.loads(line)
+    if log_path is not None:
+        with open(log_path, "a", encoding="utf-8") as log:
+            log.write(str(request.get("method")) + "\\n")
+    request_id = request.get("id")
+    if request_id is None:
+        continue
+    method = request.get("method")
+    if method == "initialize":
+        send({
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": {
+                "protocolVersion": request["params"]["protocolVersion"],
+                "capabilities": {"tools": {"listChanged": False}},
+                "serverInfo": {"name": "python-wheel-fixture", "version": "1.0.0"},
+            },
+        })
+    elif method == "tools/list":
+        # Keep discovery pending longer than the old smoke's 100 ms grace
+        # period. An SDK runtime that answers initialize too early will make
+        # its first model request without this tool and fail deterministically.
+        time.sleep(0.25)
+        send({
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": {
+                "tools": [{
+                    "name": "add",
+                    "description": "Add two numbers.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {"a": {"type": "number"}, "b": {"type": "number"}},
+                        "required": ["a", "b"],
+                        "additionalProperties": False,
+                    },
+                }],
+            },
+        })
+    elif method == "tools/call":
+        params = request["params"]
+        if params.get("name") != "add" or params.get("arguments") != {"a": 19, "b": 23}:
+            send({
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "error": {"code": -32602, "message": "unexpected tool call"},
+            })
+            continue
+        send({
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": {"content": [{"type": "text", "text": "42"}]},
+        })
+    else:
+        send({
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "error": {"code": -32601, "message": f"unsupported method: {method}"},
+        })
+"""
+
+
+def mcp_cordis(server_script: Path) -> str:
+    """Build an external config that mounts the packaged MCP client."""
+    return json.dumps([
+        {
+            "id": "sdk-jsonrpc-server",
+            "name": "@deepseek-ai/dsh-sdk-jsonrpc-server",
+        },
+        {
+            "id": "agent-core",
+            "name": "@deepseek-ai/dsh-agent-spine-demo",
+            "config": {
+                "workspaceContext": False,
+                "skills": {"enabled": False},
+                "toolBash": False,
+            },
+        },
+        {
+            "id": "sessions",
+            "name": "@deepseek-ai/dsh-session-persistence-jsonl",
+            "config": {"root": "./sessions", "compression": "none"},
+        },
+        {
+            "id": "mcp-fixture",
+            "name": "@deepseek-ai/dsh-mcp-client",
+            "config": {
+                "serverName": "fixture",
+                "transport": "stdio",
+                "command": sys.executable,
+                "args": [str(server_script)],
+                "env": {"MCP_SMOKE_LOG": str(server_script.with_suffix(".log"))},
+                "failOnStartupError": True,
+                "reconnect": {"enabled": False},
+            },
+        },
+    ], indent=2)
+
+
 class MockModelHandler(BaseHTTPRequestHandler):
     """Return deterministic text, worker, and orchestration completions."""
 
@@ -143,6 +294,12 @@ def completion_chunks(body: dict[str, object]) -> list[dict[str, object]]:
     if latest.get("role") == "tool":
         call_id, tool_name = latest_tool_call(messages)
         tool_text = message_text(latest.get("content"))
+        mcp = mcp_tool_followup(call_id, tool_name, tool_text)
+        if mcp is not None:
+            return mcp
+        fs_search = fs_search_tool_followup(call_id, tool_name, tool_text)
+        if fs_search is not None:
+            return fs_search
         minimal = minimal_tool_followup(body, call_id, tool_name, tool_text)
         if minimal is not None:
             return minimal
@@ -170,17 +327,9 @@ def completion_chunks(body: dict[str, object]) -> list[dict[str, object]]:
         ),
         None,
     )
+    # The minimal composition's assembled system prompt, advertised tool schemas, and
+    # model-visible messages are pinned by its snapshot, not asserted here.
     if minimal_prompt is not None:
-        names = advertised_tool_names(body)
-        if names != {"bash", "str_replace_editor"}:
-            raise AssertionError(f"minimal agent smoke advertised unexpected tools: {names}")
-        system_prompts = [
-            message_text(message.get("content"))
-            for message in messages
-            if isinstance(message, dict) and message.get("role") == "system"
-        ]
-        if system_prompts != [MINIMAL_SYSTEM_PROMPT]:
-            raise AssertionError(f"minimal agent smoke assembled unexpected system prompts: {system_prompts}")
         return tool_call_chunks(
             "minimal-bash-1",
             "bash",
@@ -192,6 +341,8 @@ def completion_chunks(body: dict[str, object]) -> list[dict[str, object]]:
         SNAPSHOT_PROMPT,
         CODE_PROMPT,
         WORKFLOW_PROMPT,
+        FS_SEARCH_PROMPT,
+        MCP_PROMPT,
     }
     prompt = next(
         (candidate for candidate in user_prompts if candidate in scenario_prompts),
@@ -233,7 +384,58 @@ def completion_chunks(body: dict[str, object]) -> list[dict[str, object]]:
                 },
             },
         )
+    if prompt == FS_SEARCH_PROMPT:
+        assert_advertised_tool(body, "grep")
+        assert_advertised_tool(body, "glob")
+        return tool_call_chunks(
+            "fs-search-grep",
+            "grep",
+            {"pattern": FS_SEARCH_MARKER, "path": "."},
+        )
+    if prompt == MCP_PROMPT:
+        assert_advertised_tool(body, "mcp__fixture__add")
+        return tool_call_chunks(
+            "mcp-add",
+            "mcp__fixture__add",
+            {"a": 19, "b": 23},
+        )
     return text_chunks(EXPECTED_TEXT)
+
+
+def mcp_tool_followup(
+    call_id: str,
+    tool_name: str,
+    tool_text: str,
+) -> list[dict[str, object]] | None:
+    """Verify one tool call through the packaged MCP client."""
+    if call_id != "mcp-add":
+        return None
+    if tool_name != "mcp__fixture__add" or "42" not in tool_text:
+        raise AssertionError(f"packaged MCP call returned an unexpected result: {tool_name}: {tool_text}")
+    return text_chunks(MCP_TEXT)
+
+
+def fs_search_tool_followup(
+    call_id: str,
+    tool_name: str,
+    tool_text: str,
+) -> list[dict[str, object]] | None:
+    """Exercise both ripgrep-backed tools through the packaged executable."""
+    if not call_id.startswith("fs-search-"):
+        return None
+    if call_id == "fs-search-grep" and tool_name == "grep":
+        if "needle.txt" not in tool_text or FS_SEARCH_MARKER not in tool_text:
+            raise AssertionError(f"packaged grep returned no marker: {tool_text}")
+        return tool_call_chunks(
+            "fs-search-glob",
+            "glob",
+            {"pattern": "**/*.txt"},
+        )
+    if call_id == "fs-search-glob" and tool_name == "glob":
+        if "needle.txt" not in tool_text:
+            raise AssertionError(f"packaged glob returned no fixture path: {tool_text}")
+        return text_chunks(FS_SEARCH_TEXT)
+    raise AssertionError(f"unexpected filesystem-search follow-up: {call_id} {tool_name}: {tool_text}")
 
 
 def minimal_tool_followup(
@@ -477,16 +679,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--scenario",
-        choices=("all", "sdk-default", "sdk-custom", "sdk-minimal", "sdk-snapshot", "direct"),
+        choices=("all", "sdk-default", "sdk-custom", "sdk-minimal", "sdk-fs-search", "sdk-mcp", "sdk-snapshot", "direct"),
         default="all",
     )
     parser.add_argument("--exe", type=Path)
     parser.add_argument("--update-snapshots", action="store_true")
     args = parser.parse_args()
-    if args.scenario in {"all", "sdk-custom", "sdk-minimal", "sdk-snapshot", "direct"} and args.exe is None:
+    if args.scenario in {"all", "sdk-custom", "sdk-minimal", "sdk-fs-search", "sdk-snapshot", "direct"} and args.exe is None:
         parser.error("--exe is required for custom, minimal, snapshot, and direct scenarios")
-    if args.update_snapshots and args.scenario not in {"all", "sdk-snapshot"}:
-        parser.error("--update-snapshots requires --scenario sdk-snapshot or all")
+    if args.update_snapshots and args.scenario not in {"all", "sdk-minimal", "sdk-snapshot"}:
+        parser.error("--update-snapshots requires --scenario sdk-minimal, sdk-snapshot, or all")
     if args.exe is not None and not args.exe.is_file():
         parser.error(f"runtime executable does not exist: {args.exe}")
 
@@ -498,7 +700,12 @@ def main() -> None:
             smoke_sdk_custom(model.url, args.exe.resolve())
         if args.scenario in {"all", "sdk-minimal"}:
             assert args.exe is not None
-            smoke_sdk_minimal(model.url, args.exe.resolve())
+            smoke_sdk_minimal(model.url, args.exe.resolve(), args.update_snapshots)
+        if args.scenario in {"all", "sdk-fs-search"}:
+            assert args.exe is not None
+            smoke_sdk_fs_search(model.url, args.exe.resolve())
+        if args.scenario in {"all", "sdk-mcp"}:
+            smoke_sdk_mcp(model.url, None if args.exe is None else args.exe.resolve())
         if args.scenario in {"all", "sdk-snapshot"}:
             assert args.exe is not None
             smoke_sdk_snapshot(model.url, args.exe.resolve(), args.update_snapshots)
@@ -558,10 +765,12 @@ def smoke_sdk_custom(base_url: str, executable: Path) -> None:
         assert_session_log(sessions, root, EXPECTED_TEXT, CODE_WORKER_TEXT, WORKFLOW_WORKER_TEXT)
 
 
-def smoke_sdk_minimal(base_url: str, executable: Path) -> None:
+def smoke_sdk_minimal(base_url: str, executable: Path, update_snapshots: bool) -> None:
     """Exercise the checked-in minimal composition through the packaged executable."""
     from deepseek_harness import DeepSeekHarness
 
+    # One mock model serves every scenario of a run, so the snapshot takes this turn's slice.
+    first_request = len(MockModelHandler.requests)
     with tempfile.TemporaryDirectory(prefix="dsh-sdk-minimal-") as temporary:
         root = Path(temporary).resolve()
         editor_path = root / "created.txt"
@@ -586,6 +795,73 @@ def smoke_sdk_minimal(base_url: str, executable: Path) -> None:
         if editor_path.read_text() != "created by packaged editor\n":
             raise AssertionError(f"packaged editor wrote unexpected content: {editor_path.read_text()!r}")
         assert_session_log(sessions, root, MINIMAL_TEXT, "COUNT=1", "COUNT=2 CWD=/tmp")
+
+        files = build_minimal_snapshot_files(MockModelHandler.requests[first_request:], root)
+        compare_snapshot_files(
+            files, update_snapshots, MINIMAL_SNAPSHOT_DIRECTORY, MINIMAL_SNAPSHOT_FILENAMES,
+        )
+
+
+def smoke_sdk_fs_search(base_url: str, executable: Path) -> None:
+    """Exercise real grep and glob spawns through the packaged executable."""
+    from deepseek_harness import DeepSeekHarness
+
+    with tempfile.TemporaryDirectory(prefix="dsh-sdk-fs-search-") as temporary:
+        root = Path(temporary).resolve()
+        (root / "needle.txt").write_text(f"{FS_SEARCH_MARKER}\n")
+        sessions = root / "sessions"
+        cordis = root / "cordis.yml"
+        cordis.write_text(FS_SEARCH_CORDIS)
+        with DeepSeekHarness(
+            provider="deepseek-official",
+            model="smoke-model",
+            cwd=str(root),
+            session_root=str(sessions),
+            cordis=str(cordis),
+            runtime_bin=str(executable),
+            api_key="sk-keyless-smoke",
+            base_url=base_url,
+            request_timeout_seconds=60,
+        ) as harness:
+            result = harness.run(FS_SEARCH_PROMPT, session_id="fs-search-smoke")
+
+        assert result.final_response == FS_SEARCH_TEXT, result.final_response
+        assert_session_log(sessions, root, FS_SEARCH_TEXT, FS_SEARCH_MARKER, "needle.txt")
+
+
+def smoke_sdk_mcp(base_url: str, executable: Path | None) -> None:
+    """Discover and call an external stdio MCP tool through the packaged client."""
+    from deepseek_harness import DeepSeekHarness
+
+    with tempfile.TemporaryDirectory(prefix="dsh-sdk-mcp-") as temporary:
+        root = Path(temporary).resolve()
+        sessions = root / "sessions"
+        server_script = root / "mcp_server.py"
+        server_script.write_text(MCP_SERVER_SCRIPT)
+        cordis = root / "cordis.yml"
+        cordis.write_text(mcp_cordis(server_script))
+        discovery_log = server_script.with_suffix(".log")
+        with DeepSeekHarness(
+            provider="deepseek-official",
+            model="smoke-model",
+            cwd=str(root),
+            session_root=str(sessions),
+            cordis=str(cordis),
+            runtime_bin=None if executable is None else str(executable),
+            api_key="sk-keyless-smoke",
+            base_url=base_url,
+            request_timeout_seconds=60,
+        ) as harness:
+            result = harness.run(MCP_PROMPT, session_id="mcp-smoke")
+
+        assert result.final_response == MCP_TEXT, result.final_response
+        assert discovery_log.read_text().splitlines() == [
+            "initialize",
+            "notifications/initialized",
+            "tools/list",
+            "tools/call",
+        ]
+        assert_session_log(sessions, root, MCP_TEXT, "mcp__fixture__add", "42")
 
 
 def smoke_sdk_snapshot(base_url: str, executable: Path, update_snapshots: bool) -> None:
@@ -628,7 +904,9 @@ def smoke_sdk_snapshot(base_url: str, executable: Path, update_snapshots: bool) 
             raise AssertionError("second advanced child log has no workflow-subagent result")
 
         files = build_snapshot_files(result, logs, child_ids, root)
-        compare_snapshot_files(files, update_snapshots)
+        compare_snapshot_files(
+            files, update_snapshots, ADVANCED_SNAPSHOT_DIRECTORY, ADVANCED_SNAPSHOT_FILENAMES,
+        )
 
 
 def smoke_direct(base_url: str, executable: Path) -> None:
@@ -802,6 +1080,79 @@ def snapshot_child_ids(result: "RunResult") -> list[str]:
     return child_ids
 
 
+def build_minimal_snapshot_files(
+    requests: list[dict[str, object]],
+    cwd: Path,
+) -> dict[str, str]:
+    """Render the minimal composition's model-visible surface as expected output.
+
+    Every assembled system prompt, advertised tool schema, and system or user message is
+    kept verbatim: they carry what the deployment actually shows the model, so a plugin
+    that contributes an unintended system section or user message cannot pass unnoticed.
+    Assistant and tool payloads keep only their call identity, and the dynamic
+    runtime-context snapshot is dropped, because their text differs across the platforms
+    this expected output must replay on.
+    """
+    snapshot = []
+    for body in requests:
+        messages = body.get("messages")
+        if not isinstance(messages, list):
+            raise AssertionError(f"minimal model request has no messages: {body}")
+        snapshot.append({
+            "tools": minimal_snapshot_text(body.get("tools"), cwd),
+            "messages": [
+                minimal_snapshot_message(message, cwd)
+                for message in messages
+                if not is_runtime_context_message(message)
+            ],
+        })
+    return {"model-visible.json": json.dumps(snapshot, indent=2, ensure_ascii=False) + "\n"}
+
+
+def is_runtime_context_message(message: object) -> bool:
+    """Identify the agent loop's dynamic runtime-context snapshot, current or cleared."""
+    return (
+        isinstance(message, dict)
+        and message.get("role") == "user"
+        and message_text(message.get("content")).startswith(RUNTIME_CONTEXT_PREFIX)
+    )
+
+
+def minimal_snapshot_message(message: object, cwd: Path) -> dict[str, object]:
+    """Reduce one model-visible message to its stable, behavior-carrying parts."""
+    if not isinstance(message, dict):
+        raise AssertionError(f"minimal model request has an invalid message: {message}")
+    role = message.get("role")
+    if role in ("system", "user"):
+        return {"role": role, "text": minimal_snapshot_text(message_text(message.get("content")), cwd)}
+    if role == "assistant":
+        calls = message.get("tool_calls")
+        if not isinstance(calls, list):
+            raise AssertionError(f"minimal assistant message has no tool calls: {message}")
+        return {
+            "role": role,
+            "toolCalls": [
+                {"id": call.get("id"), "name": (call.get("function") or {}).get("name")}
+                for call in calls
+                if isinstance(call, dict)
+            ],
+        }
+    if role == "tool":
+        return {"role": role, "toolCallId": message.get("tool_call_id"), "text": "{{tool-result}}"}
+    raise AssertionError(f"minimal model request has an unexpected message role: {message}")
+
+
+def minimal_snapshot_text(value: object, cwd: Path) -> object:
+    """Replace the scenario's temporary working directory everywhere it appears."""
+    if isinstance(value, str):
+        return value.replace(str(cwd), "{{cwd}}")
+    if isinstance(value, list):
+        return [minimal_snapshot_text(item, cwd) for item in value]
+    if isinstance(value, dict):
+        return {key: minimal_snapshot_text(item, cwd) for key, item in value.items()}
+    return value
+
+
 def build_snapshot_files(
     result: "RunResult",
     logs: dict[str, list[dict[str, object]]],
@@ -831,15 +1182,17 @@ def build_snapshot_files(
     files = {
         "result.json": json.dumps(normalized_result, indent=2, ensure_ascii=False) + "\n",
         "session.jsonl": render_jsonl(
-            [normalize_snapshot_value(record, replacements) for record in logs[SNAPSHOT_SESSION_ID]]
+            project_session_snapshot([
+                normalize_snapshot_value(record, replacements) for record in logs[SNAPSHOT_SESSION_ID]
+            ])
         ),
     }
     for index, child_id in enumerate(child_ids, start=1):
         files[f"session.{index}.jsonl"] = render_jsonl(
-            [normalize_snapshot_value(record, replacements) for record in logs[child_id]]
+            project_session_snapshot([
+                normalize_snapshot_value(record, replacements) for record in logs[child_id]
+            ])
         )
-    if tuple(files) != SNAPSHOT_FILENAMES:
-        raise AssertionError(f"advanced snapshot file set drifted: {tuple(files)}")
     return files
 
 
@@ -930,27 +1283,44 @@ def render_jsonl(records: list[object]) -> str:
     )
 
 
-def compare_snapshot_files(files: dict[str, str], update: bool) -> None:
-    """Write or exactly compare the advanced executable snapshot files."""
+def project_session_snapshot(records: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Omit storage sequence/time envelopes from snapshot body records."""
+    projected = [dict(record) for record in records]
+    for record in projected[1:]:
+        for key in ("seq", "time", "seq0", "time0"):
+            record.pop(key, None)
+    return projected
+
+
+def compare_snapshot_files(
+    files: dict[str, str],
+    update: bool,
+    directory: Path,
+    filenames: tuple[str, ...],
+) -> None:
+    """Write or exactly compare one scenario's expected snapshot files."""
+    scenario = directory.name
+    if tuple(files) != filenames:
+        raise AssertionError(f"{scenario} snapshot builder produced {tuple(files)}, expected {filenames}")
     if update:
-        SNAPSHOT_DIRECTORY.mkdir(parents=True, exist_ok=True)
+        directory.mkdir(parents=True, exist_ok=True)
         for name, content in files.items():
-            (SNAPSHOT_DIRECTORY / name).write_text(content, encoding="utf-8")
-        print(f"smoke-python-runtime: updated snapshots in {SNAPSHOT_DIRECTORY}")
+            (directory / name).write_text(content, encoding="utf-8")
+        print(f"smoke-python-runtime: updated snapshots in {directory}")
 
     existing = {
         path.name
-        for path in SNAPSHOT_DIRECTORY.iterdir()
+        for path in directory.iterdir()
         if path.is_file()
-    } if SNAPSHOT_DIRECTORY.is_dir() else set()
-    expected = set(SNAPSHOT_FILENAMES)
+    } if directory.is_dir() else set()
+    expected = set(filenames)
     if existing != expected:
         raise AssertionError(
-            "advanced snapshot files differ: "
+            f"{scenario} snapshot files differ: "
             f"missing={sorted(expected - existing)}, unexpected={sorted(existing - expected)}"
         )
     for name, actual in files.items():
-        expected_text = (SNAPSHOT_DIRECTORY / name).read_text(encoding="utf-8")
+        expected_text = (directory / name).read_text(encoding="utf-8")
         if actual == expected_text:
             continue
         diff = "".join(difflib.unified_diff(
@@ -960,7 +1330,7 @@ def compare_snapshot_files(files: dict[str, str], update: bool) -> None:
             tofile=f"actual/{name}",
         ))
         raise AssertionError(
-            f"advanced executable snapshot mismatch in {name}; "
+            f"{scenario} executable snapshot mismatch in {name}; "
             "rerun with --update-snapshots after reviewing the behavior\n"
             f"{diff}"
         )

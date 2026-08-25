@@ -14,92 +14,70 @@
 </head>
 <body>
   <header id="topbar">
-    <button id="hamburger" class="icon-button no-drag" aria-haspopup="menu" aria-expanded="false" aria-controls="main-menu" title="菜单">
+    <button id="hamburger" class="icon-button no-drag" aria-haspopup="menu" aria-expanded="false" aria-controls="main-menu" title="菜单" data-i18n-title="menu.hamburger.title">
       <span class="hamburger-lines" aria-hidden="true"><i></i><i></i><i></i></span>
     </button>
     <div id="brand" aria-hidden="true">
       <img id="brand-icon" src="./icon.png" alt="">
       <span id="brand-name">DeepCode</span>
     </div>
-    <div id="window-title" role="heading" aria-level="1">DeepCode</div>
     <div id="recovery-banner" role="status" hidden>
       <span id="recovery-banner-text"></span>
       <button id="recovery-banner-details" class="mini-button no-drag" data-i18n="notice.details">查看详情</button>
       <button id="recovery-banner-ack" class="mini-button no-drag" data-i18n="notice.ack">知道了</button>
     </div>
-    <button id="status-pill" class="no-drag" aria-haspopup="menu" aria-controls="harness-panel">
+    <!-- 内置浏览器 pane 的开关不在顶栏（B3-11 返工二审，住户定）：产品内
+         功能按钮住在产品内容区——settings-plugin 把地球注册进官方会话头部
+         的 utilities 槽（Session log 同排）；汉堡菜单里保留文字项作后备。 -->
+    <!-- 状态胶囊是纯指示灯，不是按钮（P8-D19）：Harness 面板只从左上角菜单进，
+         界面上不再有第二个入口。role=status 让读屏软件把它读成状态而不是控件；
+         也不再加 no-drag——不可点的东西没理由占着顶栏的拖拽区。 -->
+    <div id="status-pill" role="status" aria-live="polite">
       <span id="status-dot" aria-hidden="true"></span>
       <span id="status-text"></span>
-    </button>
+    </div>
   </header>
 
   <div id="overlay" hidden>
-    <div id="main-menu" class="panel" role="menu" aria-label="DeepCode 菜单" hidden>
-      <button class="menu-item" role="menuitem" data-open="harness">
-        <span data-i18n="menu.harness">Harness</span><span class="chevron" aria-hidden="true">›</span>
-      </button>
-      <button class="menu-item" role="menuitem" data-open="theme">
-        <span data-i18n="menu.theme">主题</span><span class="chevron" aria-hidden="true">›</span>
-      </button>
+    <div id="main-menu" class="panel" role="menu" aria-label="DeepCode 菜单" data-i18n-aria="menu.aria" hidden>
+      <!-- 状态区（只读）：菜单一打开就看得见「它活着吗 / 跑的哪套 / 家在哪 / 什么
+           权限」，不必先点进 Harness（P8-D19 信息区上提）。这里只陈述事实，动作
+           全留在 Harness 二级面板里。 -->
+      <div id="menu-status"><!-- 状态行由 renderer 填充 --></div>
+      <!-- Harness 控制面 / 插件管理 / BUG 诊断与反馈已移居官方设置页的
+           DeepCode 分区（P8-D39 第二批，住户 2026-08-23 定稿）：本菜单只剩
+           状态区与桌面壳自己的事。 -->
+      <div class="separator" role="separator"></div>
+      <!-- 重启 Harness（B3-15，住户 2026-08-24 批准）：Harness 崩掉时设置页
+           随官方 web UI 一起不可达（控制面就住在 3080 里），此前主窗口没有
+           任何重启入口、只剩系统托盘——而故障态正是最需要它的时刻。chrome
+           层是我们自己的 renderer，DSH 死了它照样在。 -->
+      <button class="menu-item" role="menuitem" id="menu-restart-harness" data-command="restart-harness" data-i18n="menu.restart-harness">重启 Harness</button>
       <button class="menu-item" role="menuitem" id="menu-terminal" data-command="terminal" data-i18n="menu.terminal">DSH 终端</button>
+      <!-- 内置浏览器 pane 开合（B3-11）：只在插件创建过 pane 后出现（hidden 由
+           renderer 按 model.browserPane.present 控制），文案随开合状态切换。 -->
+      <button class="menu-item" role="menuitem" id="menu-browser-pane" data-command="browser-pane" hidden>浏览器面板</button>
+      <button class="menu-item" role="menuitem" id="menu-check-updates" data-command="check-updates" data-i18n="menu.update">检查更新</button>
+      <div class="separator" role="separator"></div>
       <button class="menu-item" role="menuitem" id="menu-about" data-command="about" data-i18n="menu.about">关于 DeepCode</button>
-      <button class="menu-item" role="menuitem" data-command="check-updates" data-i18n="menu.update">检查更新</button>
-      <button class="menu-item" role="menuitem" id="menu-diagnostics" data-command="diagnostics" data-i18n="menu.diagnostics">诊断中心</button>
+      <!-- 「退出 DeepCode」已按 P8-D19 移除：退出走托盘右键，与菜单这条本来就是
+           同一条 requestQuit 路径（main 的注释原话：「显式 Quit 的唯一入口，
+           Chrome 菜单与 Tray 共用」）。人不会为了退出专门钻进菜单，而窗口的 X
+           是隐藏不是退出，关窗时那条一次性提示已经把托盘那条路说清楚了。 -->
+    </div>
+
+    <!-- 检查更新（P8-D35①）：从诊断面板独立出来的专属小面板——版本简行 +
+         检查动作 + 结果状态。之前与「BUG诊断与反馈」共用一个面板，住户实测
+         点名不对（「检查更新进去就该是版本信息和检查」）。 -->
+    <div id="update-panel" class="panel" role="dialog" aria-label="检查更新" data-i18n-aria="update.panel.aria" hidden>
+      <button class="menu-item" id="update-back" data-i18n="action.back">‹ 返回</button>
       <div class="separator" role="separator"></div>
-      <button class="menu-item" role="menuitem" id="menu-quit" data-command="quit" data-i18n="menu.quit">退出 DeepCode</button>
+      <div id="update-info"><!-- 版本简行由 renderer 填充 --></div>
+      <div id="update-status"><!-- 检查动作与结果由 renderer 填充 --></div>
     </div>
 
-    <div id="theme-panel" class="panel" role="menu" aria-label="主题" hidden>
-      <button class="menu-item" role="menuitemradio" id="theme-system" data-theme="system">
-        <span data-i18n="theme.system">跟随系统</span><span class="checkmark" aria-hidden="true">✓</span>
-      </button>
-      <button class="menu-item" role="menuitemradio" id="theme-light" data-theme="light">
-        <span data-i18n="theme.light">浅色</span><span class="checkmark" aria-hidden="true">✓</span>
-      </button>
-      <button class="menu-item" role="menuitemradio" id="theme-dark" data-theme="dark">
-        <span data-i18n="theme.dark">深色</span><span class="checkmark" aria-hidden="true">✓</span>
-      </button>
-    </div>
-
-    <div id="harness-panel" class="panel wide" role="menu" aria-label="Harness" hidden>
-      <div id="harness-info"><!-- 信息行由 renderer 填充 --></div>
-      <div id="harness-permissions"><!-- 权限事实（Harness 唯一真相源）由 renderer 填充 --></div>
-      <button class="menu-item" id="harness-toggle-expert" aria-expanded="false">
-        <span data-i18n="action.expert">专家详情</span>
-      </button>
-      <div id="harness-expert" hidden><!-- pending / boot-failing 详情由 renderer 填充 --></div>
-      <div class="separator" role="separator"></div>
-      <div id="harness-actions"><!-- 动作与 profile 列表由 renderer 填充 --></div>
-      <!-- Plugin Manager v1：Harness 面板二级页面（只展示/操作事实，无 Marketplace/推荐） -->
-      <div id="plugin-view" hidden>
-        <div id="plugin-target"><!-- 目标 Profile 选择由 renderer 填充 --></div>
-        <div id="plugin-inventory"><!-- bundles/dependencies/effective 三区由 renderer 填充 --></div>
-        <div id="plugin-operation"><!-- 运行中操作：步骤/输出/Cancel/handoff 由 renderer 填充 --></div>
-      </div>
-    </div>
-
-    <!-- Diagnostics Center：独立面板（Build Info + Update + 诊断操作） -->
-    <div id="diagnostics-panel" class="panel wide" role="dialog" aria-label="诊断中心" hidden>
-      <div id="diagnostics-build-info"><!-- Build Info 行由 renderer 填充 --></div>
-      <div id="diagnostics-update"><!-- 更新状态与操作由 renderer 填充 --></div>
-      <div class="separator" role="separator"></div>
-      <div id="diagnostics-actions"><!-- Open Log Folder / Copy Build Info / Export 由 renderer 填充 --></div>
-    </div>
-
-    <!-- Feedback：先发泄后排查（P7-A~E）。发送永不因 AI 不可用而不可用。 -->
-    <div id="feedback-panel" class="panel wide" role="dialog" aria-label="发送反馈" hidden>
-      <div id="feedback-user"><!-- 问题描述输入由 renderer 填充 --></div>
-      <div id="feedback-diagnostics"><!-- 诊断包预览（折叠、可编辑）由 renderer 填充 --></div>
-      <div id="feedback-send-row"><!-- 发送按钮由 renderer 填充 --></div>
-      <div id="feedback-reply"><!-- AI 排查回复 / issue 预览由 renderer 填充 --></div>
-      <div id="feedback-submit-row"><!-- 复制 + 打开 GitHub 由 renderer 填充 --></div>
-    </div>
   </div>
 
-  <!-- Feedback 入口：左下角常驻，bug 语义（不抢焦点，半崩状态下仍可点）。 -->
-  <button id="feedback-entry" class="no-drag" aria-haspopup="dialog" aria-controls="feedback-panel" title="发送反馈">
-    <span class="feedback-bug" aria-hidden="true"></span>
-  </button>
 
   <script type="module" src="../../lib/chrome/renderer.js"></script>
 </body>

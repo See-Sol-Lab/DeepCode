@@ -6,7 +6,10 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self';">
+  <!-- style-src 需要 'unsafe-inline'：xterm 的 DOM 渲染器运行时注入动态
+       <style>（行高/字宽尺寸表），拦掉它字符全部塌为不可见（P8-D36 根因）。
+       本窗 sandbox 且不加载任何远程内容，放行内联样式不扩大攻击面。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self';">
   <title>DSH Terminal</title>
   <link rel="stylesheet" href="./vendor/xterm.css">
   <link rel="stylesheet" href="./style.css">

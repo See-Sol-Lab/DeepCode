@@ -28,7 +28,9 @@ await withFileLock('/home/u/.dsh/settings.yaml', async () => {
 - **Same-directory sibling** keeps the rename on one filesystem, so the swap stays atomic.
 - Parent directories are created; on any failure the temp is removed and the failure rethrown; readers observe either the old or the new complete content.
 
-`withFileLock` serializes the writers of one file across processes, for the read-render-commit cycles a bare atomic commit cannot make safe on its own. The lock is a `wx`-created `<filename>.lock` sibling, so readers never contend; waiters back off exponentially and fail with a timeout rather than block forever. A contender never removes the existing lock: age cannot distinguish a crashed owner from a paused live writer.
+`withFileLock` serializes the writers of one file across processes, for the read-render-commit cycles a bare atomic commit cannot make safe on its own. The lock is a `wx`-created `<filename>.lock` sibling, so readers never contend; waiters back off exponentially and fail with a timeout rather than block forever. `EEXIST` identifies contention directly; `EPERM` does so only when a fresh `lstat` confirms that the lock path exists, covering Windows exclusive-create behavior without hiding an unrelated permission failure. A contender never removes the existing lock: age cannot distinguish a crashed owner from a paused live writer.
+
+How long a contender waits is a property of the operation the holder runs, so it is stated per call through `waitMs`. The default is sized for file work alone; a holder whose cycle includes a network round trip — a credential mutation that refreshes an expired token — states a longer one, because leaving the default would fail every other writer of that file for the duration. The retry cadence stays fixed: it governs how often a contender asks, which no caller has a reason to vary.
 
 ## Model Experience
 

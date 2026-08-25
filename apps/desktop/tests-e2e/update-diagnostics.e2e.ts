@@ -36,11 +36,15 @@ import {
 } from './fixtures.ts'
 import {
   CHROME_URL_PREFIX,
-  clickChromeButton,
+  COMP_URL_PREFIX,
+  clickDeepCodeButton,
   ensureCleanStage,
   evalInView,
+  openDeepCodeSection,
+  openHarnessPanel,
+  openUpdatePanel,
   shutdownApp,
-  waitForChromeElement,
+  waitForDeepCodeElement,
 } from './chrome-driver.ts'
 
 /** 本套件的隔离根：Unicode、无空格（与既有打包验收同一约束）。 */
@@ -57,29 +61,42 @@ function writeUpdateFeed(temp: string, feedUrl: string): void {
 
 /** 打开诊断中心面板（汉堡菜单 → 诊断中心，production 入口）。幂等。 */
 async function openDiagnostics(app: ElectronApplication): Promise<void> {
-  const visible = await evalInView<boolean>(
-    app,
-    CHROME_URL_PREFIX,
-    "document.getElementById('diagnostics-panel')?.hidden === false",
-  )
-  if (visible) return
-  await clickChromeButton(app, 'hamburger')
-  await waitForChromeElement(app, 'menu-diagnostics')
-  await clickChromeButton(app, 'menu-diagnostics')
-  await waitForChromeElement(app, 'diagnostics-build-info')
+  // P8-D39：诊断中心搬进官方设置页的「BUG 诊断与反馈」分区。
+  // openDeepCodeSection 自身幂等（面板已开、分区已选就不重复点），不需要
+  // 前置的"是否已可见"判断——旧实现那句读的是 D39 之前的 chrome 元素，
+  // 恒 false，是死代码。
+  await openDeepCodeSection(app, 'feedback')
+  await waitForDeepCodeElement(app, 'diag-build-info')
 }
 
-/** 诊断面板当前文本（更新状态与 Build Info 的唯一可见事实）。 */
+/**
+ * 面板当前文本（更新状态与构建信息的唯一可见事实）。
+ *
+ * **横跨两个面**：P8-D39 把诊断中心搬进官方设置页（compat view 的 DeepCode
+ * 分区），而「检查更新」按 D35① 仍住在 Chrome 菜单里——这个套件的断言两边
+ * 都要，所以两边都读、拼起来给 includes 用。
+ *
+ * 旧实现读的是 chrome 侧的 `#diagnostics-panel`，那是 D39 之前的形态，元素
+ * 早已不存在，函数**恒返回空串**。它一直没暴露，是因为每个用例都先在
+ * openDeepCodeSection 上超时了（首启欢迎公告那个 modal），根本走不到断言——
+ * 一个坑盖住了另一个坑（2026-08-24 六套件跑齐后才见天日）。
+ * @param app - 打包应用。
+ * @returns 两侧文本拼接；任一侧读失败按空串计。
+ */
 async function diagnosticsText(app: ElectronApplication): Promise<string> {
-  try {
-    return await evalInView<string>(
-      app,
-      CHROME_URL_PREFIX,
-      "document.getElementById('diagnostics-panel')?.textContent ?? ''",
-    )
-  } catch {
-    return ''
+  const read = async (prefix: string, script: string): Promise<string> => {
+    try {
+      return await evalInView<string>(app, prefix, script)
+    } catch {
+      return ''
+    }
   }
+  const chrome = await read(CHROME_URL_PREFIX, "document.body?.textContent ?? ''")
+  const comp = await read(
+    COMP_URL_PREFIX,
+    "document.querySelector('[role=\"dialog\"][aria-modal=\"true\"]')?.textContent ?? ''",
+  )
+  return `${chrome}\n${comp}`
 }
 
 /**
@@ -127,7 +144,7 @@ describe.runIf(packagedExists)('Packaged Update service（P4）', () => {
     }
   })
 
-  it('未配置公开更新通道：Manual Check 明确说明，Build Info 的 Update Channel 为 unconfigured，且不产生任何下载缓存', async () => {
+  it('未配置公开更新通道：Manual Check 明确说明，构建信息里不露通道地址，且不产生任何下载缓存', async () => {
     const temp = isolationRoot('unconfigured')
     // V1 起「没有配置文件」= 走内置公开通道，所以 unconfigured 要显式制造：
     // 写一个非 https 的通道。这本身也是产品语义的一部分——配置存在却非法
@@ -136,9 +153,14 @@ describe.runIf(packagedExists)('Packaged Update service（P4）', () => {
     app = await launch(temp)
     await stubDialogs(app)
     await openDiagnostics(app)
-    await waitDiagnostics(app, 'Update Channel')
-    expect(await diagnosticsText(app)).toContain('unconfigured')
-    await clickChromeButton(app, 'diag-check-updates')
+    // 构建信息区已渲染（用「上次更新」这一行当锚，它取代了原来的通道行）。
+    await waitDiagnostics(app, '上次更新')
+    // 通道是**我们的**发行事实，住户 2026-08-24 定：收出界面、只留导出。
+    // 断言界面上确实不再出现它，免得哪天又被顺手加回来。
+    const shown = await diagnosticsText(app)
+    expect(shown).not.toContain('Update Channel')
+    expect(shown).not.toContain('not-https.invalid')
+    await openUpdatePanel(app)
     await waitDiagnostics(app, '当前未配置公开更新通道')
     expect(updateCacheFiles(temp)).toEqual([])
     // 未配置时绝不请求凭据：整个流程没有任何对话框。
@@ -152,10 +174,18 @@ describe.runIf(packagedExists)('Packaged Update service（P4）', () => {
     app = await launch(temp)
     await stubDialogs(app)
     await openDiagnostics(app)
-    await clickChromeButton(app, 'diag-check-updates')
+    await openUpdatePanel(app)
     await waitDiagnostics(app, '检查更新失败')
-    // 明确可重试：失败态仍提供"立即检查"。
-    expect(await diagnosticsText(app)).toContain('立即检查')
+    // 明确可重试。断言的不再是面板里的「立即检查」按钮——那个按 P8-D18
+    // 通则已经删除（renderer.ts 的原话：一级菜单的「检查更新」本身就是
+    // 「打开本面板 ＋ 立刻检查」，面板里再放一个就是同一命令的第二入口）。
+    // 重试路径因此是那一条菜单项，断言它在失败之后仍然可点。
+    const retryable = await evalInView<boolean>(
+      app,
+      CHROME_URL_PREFIX,
+      "(() => { const b = document.getElementById('menu-check-updates'); return b !== null && b.disabled !== true })()",
+    )
+    expect(retryable).toBe(true)
     // 失败不产生任何下载物，Harness 不受影响。
     expect(updateCacheFiles(temp)).toEqual([])
     expect(await evalInView<string>(
@@ -192,7 +222,7 @@ describe.runIf(packagedExists)('Packaged Diagnostics + log retention（P4）', (
     // 导出确认框选"确定"（不打开资源管理器）。
     await stubDialogs(app, [['诊断包已导出', 1]])
     await openDiagnostics(app)
-    await clickChromeButton(app, 'diag-export')
+    await clickDeepCodeButton(app, 'diag-export')
     await waitDiagnostics(app, '最近导出')
 
     const exportsRoot = join(userDataDir(temp), 'diagnostics')
@@ -239,17 +269,15 @@ describe.runIf(packagedExists)('Packaged Diagnostics + log retention（P4）', (
     // 重启 4 次：每次 DSH 启动都会开一份新日志并轮转一次。重启必须被
     // 证明真的发生过（状态先离开"运行中"再回来）——否则这个用例会在
     // 一次都没重启的情况下"通过"，正是典型的蒙眼验收。
-    await waitForChromeElement(app, 'status-pill')
     for (let round = 0; round < 4; round += 1) {
       if (!await evalInView<boolean>(
         app,
         CHROME_URL_PREFIX,
         "document.getElementById('harness-panel')?.hidden === false",
       )) {
-        await clickChromeButton(app, 'status-pill')
-        await waitForChromeElement(app, 'harness-restart')
+        await openHarnessPanel(app)
       }
-      await clickChromeButton(app, 'harness-restart')
+      await clickDeepCodeButton(app, 'harness-restart')
       await expect.poll(statusText, { timeout: 60_000 }).not.toContain('运行中')
       await expect.poll(statusText, { timeout: 120_000 }).toContain('运行中')
     }

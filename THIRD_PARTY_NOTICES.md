@@ -5,7 +5,7 @@
 
 DeepSeek Harness is licensed under [MIT](LICENSE). It depends on the third-party software listed below. Each project remains under its own license; nothing in this file changes those terms.
 
-This file lists **direct** dependencies declared by the workspace and the explicitly disclosed official Claude platform payload closure. It is generated from the workspace manifests by `scripts/gen-third-party-notices.ts`: a pre-commit hook regenerates it whenever a staged file changes one of its inputs, and `scripts/gen-third-party-notices.spec.ts` asserts in the test lane that the committed bytes match. Deleting a manifest runs no hook, so that case is caught by the assertion instead. Run `pnpm run verify-third-party-notices` for the standalone check.
+This file lists **direct** dependencies declared by the workspace and the explicitly disclosed official Claude Code platform payload closure. It is generated from the workspace manifests by `scripts/gen-third-party-notices.ts`: a pre-commit hook regenerates it whenever a staged file changes one of its inputs, and `scripts/gen-third-party-notices.spec.ts` asserts in the test lane that the committed bytes match. Deleting a manifest runs no hook, so that case is caught by the assertion instead. Run `pnpm run verify-third-party-notices` for the standalone check.
 
 The complete npm transitive closure, including the Landlock launcher workspace, is recorded with exact pinned versions in [`pnpm-lock.yaml`](pnpm-lock.yaml) — inspect it with `pnpm licenses list`. The Python closure is recorded separately in [`python/sdk/uv.lock`](python/sdk/uv.lock).
 
@@ -39,6 +39,7 @@ External packages that a workspace package resolves at runtime. The tier covers 
 | [`@joplin/turndown-plugin-gfm`](https://github.com/laurent22/joplin-turndown-plugin-gfm) | MIT |
 | [`@jridgewell/gen-mapping`](https://github.com/jridgewell/sourcemaps) | MIT |
 | [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk) | MIT |
+| [`@openai/codex`](https://github.com/openai/codex) | Apache-2.0 |
 | [`@opentelemetry/api`](https://github.com/open-telemetry/opentelemetry-js) | Apache-2.0 |
 | [`@opentelemetry/api-logs`](https://github.com/open-telemetry/opentelemetry-js) | Apache-2.0 |
 | [`@opentelemetry/exporter-logs-otlp-http`](https://github.com/open-telemetry/opentelemetry-js) | Apache-2.0 |
@@ -76,6 +77,7 @@ External packages that a workspace package resolves at runtime. The tier covers 
 | [`micromark-util-types`](https://github.com/micromark/micromark/tree/main/packages/micromark-util-types) | MIT |
 | [`node-addon-require-builtin`](https://www.npmjs.com/package/node-addon-require-builtin) | MIT |
 | [`node-pty`](https://github.com/microsoft/node-pty) | MIT |
+| [`open`](https://github.com/sindresorhus/open) | MIT |
 | [`picomatch`](https://github.com/micromatch/picomatch) | MIT |
 | [`react`](https://github.com/facebook/react) | MIT |
 | [`react-dom`](https://github.com/facebook/react) | MIT |
@@ -93,7 +95,8 @@ External packages that a workspace package resolves at runtime. The tier covers 
 
 pnpm applies local patches to the following packages at install time, so shipped artifacts carry modified copies; each patch file is the complete record of the modification:
 
-- `node-pty@1.1.0` — [`patches/node-pty@1.1.0.patch`](patches/node-pty@1.1.0.patch)
+- `app-builder-lib@26.15.3` — [`patches/app-builder-lib@26.15.3.patch`](patches/app-builder-lib@26.15.3.patch)
+- `node-pty@1.2.0-beta.15` — [`patches/node-pty@1.2.0-beta.15.patch`](patches/node-pty@1.2.0-beta.15.patch)
 
 ## Official Claude Code platform payloads
 
@@ -122,7 +125,6 @@ External packages **directly declared** only by repository tooling, test infrast
 | [`@braintree/sanitize-url`](https://github.com/braintree/sanitize-url) | MIT |
 | [`@modelcontextprotocol/server-everything`](https://github.com/modelcontextprotocol/servers) | MIT / Apache-2.0 |
 | [`@modelcontextprotocol/server-filesystem`](https://github.com/modelcontextprotocol/servers) | MIT / Apache-2.0 |
-| [`@openai/codex`](https://github.com/openai/codex) | Apache-2.0 |
 | [`@stylistic/eslint-plugin`](https://github.com/eslint-stylistic/eslint-stylistic) | MIT |
 | [`@testing-library/dom`](https://github.com/testing-library/dom-testing-library) | MIT |
 | [`@testing-library/react`](https://github.com/testing-library/react-testing-library) | MIT |
@@ -172,6 +174,7 @@ External packages **directly declared** only by repository tooling, test infrast
 | [`vitepress`](https://github.com/vuejs/vitepress) | MIT |
 | [`vitepress-plugin-mermaid`](https://github.com/emersonbottero/vitepress-plugin-mermaid) | MIT |
 | [`vitest`](https://github.com/vitest-dev/vitest) | MIT |
+| [`vue`](https://github.com/vuejs/core) | MIT |
 
 `eslint-plugin-sonarjs` (LGPL-3.0-only) and `lightningcss` (MPL-2.0) run only as development tooling; their code is not linked into or distributed with any DeepSeek Harness artifact.
 

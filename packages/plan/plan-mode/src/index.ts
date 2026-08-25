@@ -33,7 +33,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 // Type-only edge: resolves `ctx.commands` for the optional command child.
-import type {} from '@deepseek-ai/dsh-commands'
+import type { CommandId } from '@deepseek-ai/dsh-commands'
 // Type-only: resolves ctx.sessionProjections for the optional unit child.
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type { PlanProjection } from './types.ts'
@@ -138,15 +138,33 @@ export function foldPlanMode(events: readonly SessionEvent[], end = events.lengt
 }
 
 /**
- * Projection unit state: the logged mode plus the latest logged `/plan`
- * selection (`command/run`) not yet resolved by a `plan/mode` commit. Plain
- * JSON (persisted-cache precondition).
+ * Projection unit state: the logged mode, the latest successful `/plan`
+ * selection not yet resolved by a `plan/mode` commit, and an execution whose
+ * paired `command/done` has not settled. Plain JSON (persisted-cache
+ * precondition).
  */
 interface PlanUnitState {
   active: boolean
   /** The selection's target mode; null when no selection is outstanding. */
   wanted: boolean | null
+  /** The latest plan command awaiting its paired settlement. */
+  running: { commandId: CommandId; wanted: boolean } | null
 }
+
+declare module '@deepseek-ai/dsh-session-projection/types' {
+  interface SessionProjectionStateMap {
+    plan: PlanUnitState
+  }
+}
+
+const planUnitStateSchema: ZodType<PlanUnitState> = zod.object({
+  active: zod.boolean(),
+  wanted: zod.boolean().nullable(),
+  running: zod.object({
+    commandId: zod.string() as unknown as ZodType<CommandId>,
+    wanted: zod.boolean(),
+  }).strict().nullable(),
+}).strict()
 
 /** Wire payload schema of the `plan` projection. */
 const planProjectionSchema: ZodType<PlanProjection> = zod.object({
@@ -232,36 +250,44 @@ export class PlanModeController extends Service {
       },
     })
 
-    // The plan projection unit (session-projection RFC): a pure double-event
-    // fold serving clients the whole {active, pending} value. `command/run`
-    // records the user's logged /plan selection (the handler calls `set()`
-    // before any failing path, so a failed handler cannot leave the recorded
-    // command without its plan selection); `plan/mode` records that selection
-    // and clears it. Pending is thereby a pure
+    // The plan projection unit (session-projection RFC): a pure event fold
+    // serving clients the whole {active, pending} value. `command/run`
+    // records the user's logged /plan selection, its paired `command/done`
+    // keeps only successful selections, and `plan/mode` records that
+    // selection and clears it. Pending is thereby a pure
     // replay quantity: host restarts, other tabs, and cold reads all recover
     // it from the log alone. The unit child activates only when a projection
     // registry is composed (headless assemblies stay unaffected).
     ctx.inject(['sessionProjections'], (projectionCtx) => {
       projectionCtx.sessionProjections.register<'plan', PlanUnitState>({
         key: 'plan',
-        schema: planProjectionSchema,
-        init: () => ({ active: false, wanted: null }),
+        stateSchema: planUnitStateSchema,
+        init: () => ({ active: false, wanted: null, running: null }),
         apply: (state, event) => {
           if (event.type === 'command/run' && event.data.name === 'plan') {
             if (event.data.args === undefined) return state
             const wanted = event.data.args.trim() !== 'off'
-            return wanted === state.wanted ? state : { active: state.active, wanted }
+            return { ...state, running: { commandId: event.data.commandId, wanted } }
+          }
+          if (event.type === 'command/done' && event.data.commandId === state.running?.commandId) {
+            const wanted = event.data.kind === 'success' && state.running.wanted !== state.active
+              ? state.running.wanted
+              : null
+            return { ...state, wanted, running: null }
           }
           if (event.type === 'plan/mode') {
-            return { active: event.data.active, wanted: null }
+            return { ...state, active: event.data.active, wanted: null }
           }
           return state
         },
-        view: state => ({
-          active: state.active,
-          pending: state.wanted !== null && state.wanted !== state.active,
-        }),
-        stateVersion: 1,
+        wire: {
+          viewSchema: planProjectionSchema,
+          view: (state) => {
+            const wanted = state.running?.wanted ?? state.wanted
+            return { active: state.active, pending: wanted !== null && wanted !== state.active }
+          },
+        },
+        stateVersion: 2,
       })
     })
 
@@ -270,9 +296,12 @@ export class PlanModeController extends Service {
       commandCtx.commands.register({
         name: 'plan',
         description: 'Enter or leave plan mode',
-        input: { hint: '[off|message]' },
-        handler: ({ agent, rawInput }) => {
+        input: { hint: '[off|message]', images: true },
+        handler: ({ agent, rawInput, attachments }) => {
           const message = rawInput.trim()
+          if (message === 'off' && attachments.length > 0) {
+            return { kind: 'error', text: 'Image attachments cannot accompany /plan off.' }
+          }
           if (message === 'off') {
             switch (this.set(agent, false)) {
               case 'committed':
@@ -291,7 +320,15 @@ export class PlanModeController extends Service {
             }
           }
           const outcome = this.set(agent, true)
-          if (message !== '') agent.steer(createUserMessage({ content: [{ type: 'text', text: message }], source: { kind: 'user' } }))
+          if (message !== '' || attachments.length > 0) {
+            agent.steer(createUserMessage({
+              content: [
+                ...attachments,
+                ...(message === '' ? [] : [{ type: 'text' as const, text: message }]),
+              ],
+              source: { kind: 'user' },
+            }))
+          }
           return {
             kind: 'success',
             text: outcome === 'committed'

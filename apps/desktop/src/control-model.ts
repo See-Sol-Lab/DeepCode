@@ -18,7 +18,6 @@ import {
   type LauncherStateV1,
 } from './launcher-state.ts'
 import { redactSecrets } from './redact.ts'
-import { THEME_PREFERENCES, type ThemePreference } from './ui-state.ts'
 import type { DiscoveredProfile, ProfileDiscoveryV1 } from './profile-discovery.ts'
 import { isPluginAction, type PluginAction, type PluginInventory } from './plugin-service.ts'
 import type { PermissionsView } from './permission-view.ts'
@@ -126,16 +125,10 @@ export interface DesktopControlModel {
   } | null
   /** Existing Home 两段式流程的候选（已选目录 + 其只读 discovery）。 */
   existingHomeCandidate: { path: string; profiles: DesktopProfileItem[] } | null
-  /** Compatibility View 的页面标题；空串时 renderer 显示产品名。 */
-  viewTitle: string
-  /** 主题偏好（system/light/dark）。 */
-  themePreference: ThemePreference
   /** 实际生效主题（system 已解析为 light/dark）。 */
   effectiveTheme: 'light' | 'dark'
   /** 系统是否处于 high contrast 模式（renderer 据此保持基本可读）。 */
   highContrast: boolean
-  /** Harness 面板"专家详情"是否展开（panel preference，持久化于 UI state）。 */
-  expertDetailsExpanded: boolean
   /**
    * 待显示的一次性恢复提示；null = 无提示。只由 main 在两种真实事实
    * （lastBootFailure + 本次已恢复到 lastKnownGood；或 interruptedSwitch
@@ -155,6 +148,8 @@ export interface DesktopControlModel {
   permissions: PermissionsView
   /** PowerShell 7 是否已安装（仅用户 Terminal 的推荐项；绝不影响 Agent sandbox）。 */
   powerShell7Available: boolean
+  /** 内置浏览器 pane（B3-11）：present = 曾被插件创建；open = 当前展开。 */
+  browserPane: { present: boolean; open: boolean }
 }
 
 /** Update service 的运行状态（单一状态机，main 单处持有）。 */
@@ -178,8 +173,25 @@ export interface UpdateView {
 
 /** Diagnostics Center 面板事实。 */
 export interface DiagnosticsView {
-  /** 组装好的 Build Info 行（allowlist 事实，绝无凭据/环境变量）。 */
-  buildInfo: { label: string; value: string }[]
+  /**
+   * 组装好的 Build Info 行（allowlist 事实，绝无凭据/环境变量）。
+   * 形状见 diagnostics-service 的 BuildInfoLine：`key` 供界面本地化、
+   * `value` 是打码后的显示值、`exportValue` 是复制用原值、`exportOnly`
+   * 的行只进导出文本不上界面。
+   */
+  buildInfo: {
+    label: string
+    key: string
+    value: string
+    valueKey?: string
+    exportValue?: string
+    exportOnly?: boolean
+  }[]
+  /**
+   * Harness 目录的**打码**显示值（面板用；真路径在 `dshHome`）。
+   * 用户报 bug 多半是截图，界面上不该出现 `C:\Users\<真名>\…`。
+   */
+  homeDisplay: string
   /** 诊断日志位置（可缺失）。 */
   logPath: string | null
   /** 最近一次 bundle 导出目录（可缺失）。 */
@@ -209,6 +221,11 @@ export interface FeedbackView {
   degradedReason: string | null
   /** 最近一次操作的提示（复制完成/失败等）；null = 无。 */
   notice: string | null
+  /**
+   * 无 GitHub 通道（P8-D32）的形态：网关已配置时按钮做直传，未配置时
+   * 按钮直接导出反馈文件。事实由 main 从环境/常量解析。
+   */
+  gatewayConfigured: boolean
 }
 
 /** Chrome renderer 能发出的全部动作（封闭联合）。 */
@@ -225,10 +242,7 @@ export type DesktopControlCommand =
   | { type: 'copy-full-path' }
   | { type: 'show-about' }
   | { type: 'show-terminal' }
-  | { type: 'set-theme'; theme: ThemePreference }
-  | { type: 'toggle-expert-details' }
   | { type: 'quit' }
-  | { type: 'refresh-plugin-inventory' }
   | { type: 'plugin-op-request'; action: PluginAction; profile: string; spec: string | null }
   | { type: 'plugin-op-cancel' }
   | { type: 'plugin-handoff-restart' }
@@ -241,9 +255,7 @@ export type DesktopControlCommand =
   | { type: 'update-download' }
   | { type: 'update-cancel-download' }
   | { type: 'update-install' }
-  | { type: 'update-cancel-install' }
   | { type: 'open-log-folder' }
-  | { type: 'copy-build-info' }
   | { type: 'export-diagnostics' }
   | { type: 'set-permission-mode'; mode: 'sandbox' | 'full-access' }
   | { type: 'open-feedback' }
@@ -251,6 +263,10 @@ export type DesktopControlCommand =
   /** 发送：用户问题 + 面板里（可能被编辑过的）诊断包文本。 */
   | { type: 'feedback-send'; text: string; diagnostics: string }
   | { type: 'feedback-copy-open' }
+  /** 无 GitHub 通道（P8-D32）：网关直传，未配置/失败降级导出反馈文件。 */
+  | { type: 'feedback-submit-gateway' }
+  /** 内置浏览器 pane 开合（B3-11；pane 未创建时为 no-op）。 */
+  | { type: 'browser-pane-toggle' }
 
 /** 不带载荷的命令类型集合。 */
 const BARE_COMMANDS = new Set([
@@ -264,9 +280,7 @@ const BARE_COMMANDS = new Set([
   'copy-full-path',
   'show-about',
   'show-terminal',
-  'toggle-expert-details',
   'quit',
-  'refresh-plugin-inventory',
   'plugin-op-cancel',
   'plugin-handoff-restart',
   'plugin-handoff-later',
@@ -278,13 +292,13 @@ const BARE_COMMANDS = new Set([
   'update-download',
   'update-cancel-download',
   'update-install',
-  'update-cancel-install',
   'open-log-folder',
-  'copy-build-info',
   'export-diagnostics',
   'open-feedback',
   'close-feedback',
   'feedback-copy-open',
+  'feedback-submit-gateway',
+  'browser-pane-toggle',
 ])
 
 /** 带 profile 载荷的命令类型集合。 */
@@ -319,10 +333,6 @@ export function parseControlCommand(raw: unknown): DesktopControlCommand | null 
   if (PROFILE_COMMANDS.has(type)) {
     if (keys.length !== 2 || !isValidProfileName(record.profile)) return null
     return { type, profile: record.profile } as DesktopControlCommand
-  }
-  if (type === 'set-theme') {
-    if (keys.length !== 2 || !(THEME_PREFERENCES as readonly unknown[]).includes(record.theme)) return null
-    return { type, theme: record.theme as ThemePreference }
   }
   if (type === 'set-permission-mode') {
     if (keys.length !== 2 || !PERMISSION_MODES.includes(record.mode as string)) return null
@@ -400,15 +410,10 @@ export interface ControlModelInput {
   discoveryError: string | null
   logPath: string | undefined
   existingHomeCandidate: { path: string; discovery: ProfileDiscoveryV1 } | null
-  viewTitle: string
-  /** 主题偏好（UI state）。 */
-  themePreference: ThemePreference
   /** 实际生效主题。 */
   effectiveTheme: 'light' | 'dark'
   /** 系统 high contrast 模式。 */
   highContrast: boolean
-  /** 专家详情是否展开（UI state 的 panel preference）。 */
-  expertDetailsExpanded: boolean
   /** 待显示的一次性恢复提示；null = 无提示（kind 选文案，见模型注释）。 */
   recoveryNotice: { profile: string; kind: 'boot-failure' | 'interrupted-switch' } | null
   /** Plugin Manager 面板事实（main 单处持有）。 */
@@ -423,6 +428,8 @@ export interface ControlModelInput {
   permissions: PermissionsView
   /** PowerShell 7 是否已安装（启动时探测一次）。 */
   powerShell7Available: boolean
+  /** 内置浏览器 pane 事实（B3-11；main 单处持有）。 */
+  browserPane: { present: boolean; open: boolean }
 }
 
 /**
@@ -461,11 +468,8 @@ export function buildControlModel(input: ControlModelInput): DesktopControlModel
         ...profile.error === undefined ? {} : { error: redactSecrets(profile.error) },
       })),
     },
-    viewTitle: input.viewTitle,
-    themePreference: input.themePreference,
     effectiveTheme: input.effectiveTheme,
     highContrast: input.highContrast,
-    expertDetailsExpanded: input.expertDetailsExpanded,
     recoveryNotice: input.recoveryNotice,
     pluginManager: input.pluginManager,
     update: input.update,
@@ -473,5 +477,6 @@ export function buildControlModel(input: ControlModelInput): DesktopControlModel
     feedback: input.feedback,
     permissions: input.permissions,
     powerShell7Available: input.powerShell7Available,
+    browserPane: input.browserPane,
   }
 }

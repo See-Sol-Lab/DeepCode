@@ -11,6 +11,8 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   discoverProfiles,
+  DISCOVERY_STDERR_TAIL,
+  DISCOVERY_STDOUT_LIMIT,
   parseProfileDiscovery,
   ProfileDiscoveryError,
   runDshProfilesDiscovery,
@@ -261,5 +263,25 @@ describe('discoverProfiles（真实 dev 入口）', () => {
       // expect.not.stringContaining 的返回是 any：先落 unknown 再进对象。
       message: expect.not.stringContaining('sk-b1p2execsecret123') as unknown,
     })
+  })
+})
+
+describe('discovery 的输出必须有上限（否则一个坏掉的 CLI 能撑爆主进程）', () => {
+  it('stdout 无节制输出 → 中止并明确报错，不把内存吃光', async () => {
+    // 一个一直往 stdout 灌数据、永不结束的假 CLI。
+    const script = "const line='x'.repeat(64*1024);setInterval(()=>{process.stdout.write(line)},1)"
+    const startedAt = Date.now()
+    await expect(runDshProfilesDiscovery(
+      { command: process.execPath, args: ['-e', script], cwd: process.cwd(), env: { ...process.env } },
+      30_000,
+    )).rejects.toThrow(/超过|上限/)
+    // 靠的是容量上限，不是那个 30 秒超时。
+    expect(Date.now() - startedAt).toBeLessThan(25_000)
+  })
+
+  it('上限是个正数，且 stderr 只留尾部', () => {
+    expect(DISCOVERY_STDOUT_LIMIT).toBeGreaterThan(0)
+    expect(DISCOVERY_STDERR_TAIL).toBeGreaterThan(0)
+    expect(DISCOVERY_STDERR_TAIL).toBeLessThan(DISCOVERY_STDOUT_LIMIT)
   })
 })

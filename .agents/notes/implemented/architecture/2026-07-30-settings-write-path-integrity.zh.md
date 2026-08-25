@@ -4,7 +4,7 @@ Status: implemented
 
 [English](2026-07-30-settings-write-path-integrity.md) | 中文
 
-> 范围：`dsh-settings-file` 的写路径数据完整性（操作链、读-改-写、跨进程写锁、diff 形态的 YAML 编辑）与 `dsh-settings` 的观察者生命周期（watch 的 dispose（资源释放）、异步监听器收容、JSON 形态写入边界）。本 note 推翻了[用户设置 seam note](2026-07-28-user-settings-seam.md)所记录的一项延后决定：跨进程锁文件现已交付。
+> 范围：`dsh-settings-file` 的写路径数据完整性（操作链、读-改-写、跨进程写锁、diff 形态的 YAML 编辑）与 `dsh-settings` 的观察者生命周期（watch 的 dispose（资源释放）、异步监听器收容、JSON 形态写入边界）。本 note 推翻了[用户设置 seam note](2026-07-28-user-settings-seam.zh.md)所记录的一项延后决定：跨进程锁文件现已交付。
 
 ## 问题
 
@@ -18,7 +18,7 @@ YAML 写入则整体替换 namespace 节点，把分节内的每条注释都删�
 
 **单一操作链，且每次写入都是读-改-写。**watcher 的刷新与来自各 namespace 队列的持久化共享同一条结算链；`persistSection` 会先把磁盘上的文本对账进 seam——任何未被观察到的差异都先发布出去——然后才对照这份新鲜文本渲染。写入不再可能复活一份陈旧文档；磁盘上已变非法的文档会让写入响亮失败，而不是被覆盖（重载路径保持其「告警并保留最后可用值」策略；共享的 `reconcileFromDisk` 抛错，各调用方自选策略）。watcher 的 `ready` 信号会额外排入一次对账，弥合初始加载与 watcher 生效之间的启动缺口。
 
-**写入持有以 `wx` 创建的同目录 `<file>.lock`。**读-渲染-rename 循环在一把跨进程写锁下运行，采用指数退避与 2 s 获取期限。竞争者会超时，但不会移除现有锁，因为锁龄无法区分已经崩溃的所有者与被暂停但仍存活的写入方；遗留锁恢复须由操作者执行。读方从不加锁——rename 提交是原子的——因此竞争只发生在写方之间。重试与期限常量是协议不变式，而非部署配置。
+**写入持有以 `wx` 创建的同目录 `<file>.lock`。**读-渲染-rename 循环在一把跨进程写锁下运行，采用指数退避与 2 s 获取期限。`EEXIST` 直接表示竞争；只有 `lstat` 确认锁路径存在时，`EPERM` 才表示竞争，因为 Windows 可能把针对该现有路径的独占创建报告为权限拒绝。无关的权限故障仍会响亮失败。竞争者会超时，但不会移除现有锁，因为锁龄无法区分已经崩溃的所有者与被暂停但仍存活的写入方；遗留锁恢复须由操作者执行。读方从不加锁——rename 提交是原子的——因此竞争只发生在写方之间。重试与期限常量是协议不变式，而非部署配置。
 
 **观察者 dispose 达到完全停稳。**watcher 携带一个 `active` 标志，排队的调用即将启动时先检查它，因此在调用等待期间已经运行过的释放器能让这次启动彻底不发生；已启动的调用会登记进服务级的 `pendingTails` 集合，dispose 排空除了等待各写队列，还会等待该集合。`settings/updated` 扇出会把监听器返回的 thenable 的 rejection 收容进与同步抛错相同的监听器诊断；事件约定现已写明 `INVARIANT` 重抛只服务同步监听器——不变式配套插件必须保持同步，而已交付的那个配套插件本就是同步的。
 
@@ -38,4 +38,4 @@ YAML 写入则整体替换 namespace 节点，把分节内的每条注释都删�
 
 `update()` 对锁获取期限与磁盘文档非法都有成文的失败模式，rejection 消息携带以 `$` 为根的路径。持有者崩溃后可能留下锁，需要操作者核实后移除；若按锁龄自动接管，则会允许多个写入方重叠。仍然存在、且已记录在提供方 README 中的有：同 namespace 并发编辑仍是后写胜出（没有逐值合并，也没有修订号检查）；OS 从未投递的 watcher 事件会让缓存保持陈旧，直到下一个信号或下一次写入；被替换数组内部的注释、以及行内附着在被改标量值上的注释，会随其描述的值一起消失。
 
-[用户设置 seam note](2026-07-28-user-settings-seam.md)里「延后锁文件」那条替代方案已被本 note 取代。同类缺陷曾存在于 `dsh-credentials-local`（两条链共用一个 `.env`、按缓存整文件写回、持久化之后才发事件）与 `llm/adapters-updated` 扇出；[credential-boundaries note](2026-07-30-credential-boundaries-and-atomic-registration.md) 在那里套用了本模板。
+[用户设置 seam note](2026-07-28-user-settings-seam.zh.md)里「延后锁文件」那条替代方案已被本 note 取代。同类缺陷曾存在于 `dsh-credentials-local`（两条链共用一个 `.env`、按缓存整文件写回、持久化之后才发事件）与 `llm/adapters-updated` 扇出；[credential-boundaries note](2026-07-30-credential-boundaries-and-atomic-registration.zh.md) 在那里套用了本模板。

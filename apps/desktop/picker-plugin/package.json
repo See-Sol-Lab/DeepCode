@@ -1,0 +1,16 @@
+{
+  "name": "@see-sol-lab/deepcode-directory-picker",
+  "description": "DeepCode directory-picker backend: serves the native capability from the Electron host's own dialog instead of a koffi COM worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "license": "SEE LICENSE IN ../../../DEEPCODE-LICENSE.md",
+  "files": [
+    "lib/index.js"
+  ]
+}

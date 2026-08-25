@@ -154,7 +154,11 @@ export function resolveUpdateFeed(text: string | null): string | null {
     const raw = JSON.parse(text) as Record<string, unknown>
     const url = raw.feedUrl
     if (typeof url !== 'string' || url.length === 0) return null
-    return new URL(url).protocol === 'https:' ? url : null
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:') return null
+    // 带凭据的 feed 会随 diagnostics 的 Update Channel 一起导出。
+    if (parsed.username !== '' || parsed.password !== '') return null
+    return url
   } catch {
     return null
   }
@@ -231,7 +235,8 @@ export function parseUpdateManifest(text: string): UpdateManifest {
 export function isSafeAssetUrl(url: string): boolean {
   try {
     const parsed = new URL(url)
-    return parsed.protocol === 'https:'
+    // 凭据不进 URL：资产地址会出现在日志、进度提示和诊断包里。
+    return parsed.protocol === 'https:' && parsed.username === '' && parsed.password === ''
   } catch {
     return false
   }
@@ -294,7 +299,11 @@ export class UpdateDownloadError extends Error {
 /** 下载到本地文件的注入面（测试用 fake；默认 Node https.get）。 */
 export type HttpGet = (
   url: string,
-  callback: (response: { statusCode?: number | undefined; on: (event: string, fn: (...args: unknown[]) => void) => void }) => void,
+  callback: (response: {
+    statusCode?: number | undefined
+    headers?: Record<string, unknown> | undefined
+    on: (event: string, fn: (...args: unknown[]) => void) => void
+  }) => void,
 ) => { on: (event: string, fn: (...args: unknown[]) => void) => void; destroy?: () => void }
 
 /**
@@ -309,34 +318,104 @@ export type HttpGet = (
  * @param get - HTTP 客户端注入面。
  * @returns 总字节数。
  */
-export async function streamDownload(
+/** 重定向跳数上限：GitHub 的 latest/download 正常只需 1-2 跳。 */
+export const MAX_UPDATE_REDIRECTS = 5
+
+/** 3xx 响应里取 Location（Node 的 header 名是小写；fake 可能给原样大小写）。 */
+function pickLocation(headers: Record<string, unknown> | undefined): unknown {
+  if (headers === undefined) return undefined
+  return headers.location ?? headers.Location
+}
+
+/**
+ * 解析一次重定向的目标地址，任何可疑形态都明确拒绝而不是猜测。
+ *
+ * 更新包是会被执行的东西，所以这里的每一条拒绝都不是洁癖：降级到 HTTP
+ * 意味着中间人可以换掉安装包；带凭据的地址会把用户名密码写进日志和
+ * 诊断包；成环会让检查更新永远转下去。相对地址必须支持——GitHub 的
+ * 302 就是相对形式。
+ * @param current - 当前地址（相对 Location 的解析基准）。
+ * @param location - 响应给出的 Location 头。
+ * @returns 绝对 HTTPS 目标地址。
+ * @throws {UpdateDownloadError} Location 缺失、无法解析、非 HTTPS 或带凭据。
+ */
+export function resolveRedirectTarget(current: string, location: unknown): string {
+  if (typeof location !== 'string' || location.trim() === '') {
+    throw new UpdateDownloadError('更新服务器要求跳转，但没有给出目标地址')
+  }
+  let next: URL
+  try {
+    next = new URL(location, current)
+  } catch {
+    throw new UpdateDownloadError('更新服务器给出的跳转地址无法解析，已停止')
+  }
+  if (next.protocol !== 'https:') {
+    throw new UpdateDownloadError(`更新地址跳转到了非 HTTPS 地址（${next.protocol}//），已拒绝`)
+  }
+  if (next.username !== '' || next.password !== '') {
+    throw new UpdateDownloadError('更新地址跳转到了带账号密码的地址，已拒绝')
+  }
+  return next.toString()
+}
+
+/** 单次请求的结果：下完了，或者被要求跳转。 */
+type DownloadAttempt = { kind: 'done'; bytes: number } | { kind: 'redirect'; location: unknown }
+
+/**
+ * 发一次请求并把它读完（不跟随跳转——跳转交给 {@link streamDownload}）。
+ * @param url - 目标 URL。
+ * @param write - 追加写入一段字节。
+ * @param maxBytes - 大小上限。
+ * @param signal - 取消信号。
+ * @param onProgress - 已下载字节回调。
+ * @param get - HTTP 客户端注入面。
+ * @returns 下载完成的字节数，或需要跳转的 Location。
+ */
+async function attemptDownload(
   url: string,
   write: (chunk: Uint8Array) => void,
   maxBytes: number,
   signal: AbortSignal,
   onProgress: (bytes: number) => void,
   get: HttpGet,
-): Promise<{ bytes: number }> {
-  if (signal.aborted) throw new UpdateDownloadError('下载已取消')
+): Promise<DownloadAttempt> {
   return new Promise((resolve, reject) => {
     let total = 0
     let settled = false
     // ref 而非直接变量：get 的同步回调（fake 测试里常见）可能在
     // request 初始化前就触发 data/error，直接引用会撞 TDZ。
     const requestRef: { current: ReturnType<HttpGet> | undefined } = { current: undefined }
+    const cleanup = (): void => {
+      signal.removeEventListener('abort', onAbort)
+      requestRef.current?.destroy?.()
+    }
     // 所有失败/中止路径的收口：拒绝的同时切断连接——只 reject 会让
     // socket 继续把整个响应下完（取消、超上限、写入失败同理）。
     const fail = (error: UpdateDownloadError): void => {
       if (settled) return
       settled = true
-      requestRef.current?.destroy?.()
+      cleanup()
       reject(error)
+    }
+    // 跳转与成功同样要断开当前连接：3xx 的响应体我们一个字节都不要，
+    // 留着它会让上一跳的 socket 在下一跳期间继续挂着。
+    const finish = (outcome: DownloadAttempt): void => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve(outcome)
     }
     const onAbort = (): void => {
       fail(new UpdateDownloadError('下载已取消'))
     }
     requestRef.current = get(url, (response) => {
       const status = response.statusCode ?? 0
+      // 3xx：交给调用方决定跟不跟（301/302/303/307/308 一视同仁——我们
+      // 只做 GET，方法语义的差别在这里没有区别）。
+      if (status >= 300 && status < 400) {
+        finish({ kind: 'redirect', location: pickLocation(response.headers) })
+        return
+      }
       if (status < 200 || status >= 300) {
         fail(new UpdateDownloadError(`下载失败：HTTP ${String(status)}`))
         return
@@ -357,10 +436,7 @@ export async function streamDownload(
         }
       })
       response.on('end', () => {
-        if (!settled) {
-          settled = true
-          resolve({ bytes: total })
-        }
+        finish({ kind: 'done', bytes: total })
       })
       response.on('error', (error: unknown) => {
         fail(new UpdateDownloadError(`下载中断: ${String(error instanceof Error ? error.message : error)}`))
@@ -372,6 +448,29 @@ export async function streamDownload(
     })
     signal.addEventListener('abort', onAbort, { once: true })
   })
+}
+
+export async function streamDownload(
+  url: string,
+  write: (chunk: Uint8Array) => void,
+  maxBytes: number,
+  signal: AbortSignal,
+  onProgress: (bytes: number) => void,
+  get: HttpGet,
+): Promise<{ bytes: number }> {
+  if (signal.aborted) throw new UpdateDownloadError('下载已取消')
+  let target = url
+  const visited = new Set<string>([url])
+  for (let hop = 0; ; hop++) {
+    const attempt = await attemptDownload(target, write, maxBytes, signal, onProgress, get)
+    if (attempt.kind === 'done') return { bytes: attempt.bytes }
+    if (hop >= MAX_UPDATE_REDIRECTS) {
+      throw new UpdateDownloadError(`更新地址跳转超过 ${String(MAX_UPDATE_REDIRECTS)} 次，已停止`)
+    }
+    target = resolveRedirectTarget(target, attempt.location)
+    if (visited.has(target)) throw new UpdateDownloadError('更新地址跳转绕回了走过的地址，已停止')
+    visited.add(target)
+  }
 }
 
 // ---- manifest 抓取（HTTP 层校验：状态码/大小/取消；复用 streamDownload 注入面） ----

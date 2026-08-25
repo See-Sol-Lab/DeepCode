@@ -27,6 +27,15 @@ uv run --project python/sdk pytest
 
 `python/sdk/tests/test_bundled_runtime.py` exercises available bundled carriers and skips a carrier when its artifact has not been built. For repository-wide test policy, see [Testing](../docs/testing.md).
 
+That suite drives fake runtime peers. `scripts/smoke-python-runtime.py` drives the real packaged runtime instead, and the required `python-runtime` CI job runs every scenario against a freshly built executable:
+
+```sh
+uv run --project python/sdk python scripts/smoke-python-runtime.py \
+  --scenario sdk-minimal --exe dist-exe/dsh-jsonrpc-agent-pkg-macos-arm64
+```
+
+Two scenarios compare committed expected output under `scripts/snapshots/python-sdk-single-exe/`. `minimal/model-visible.json` pins the checked-in minimal composition's assembled system prompts, advertised tool schemas, and model-visible messages, so a plugin that contributes an unintended system section or user message fails the job; it drops the dynamic runtime-context snapshot, which the same composition emits on macOS and not on Linux ([#2488](https://github.com/deepseek-harness/deepseek-harness/issues/2488)). `advanced/` pins the SDK result and the persisted session logs. Rerun the owning scenario with `--update-snapshots` and review that diff before committing it.
+
 An interactive smoke test needs `DEEPSEEK_API_KEY` in the environment or repository-root `.env`:
 
 ```python
@@ -52,10 +61,18 @@ The root `package.json` version is authoritative for both Python distributions. 
 Build the pure SDK wheel once and one runtime wheel on each native platform:
 
 ```sh
-version="$(node -p "require('./package.json').version")"
+version="$(python - <<'PY'
+import runpy
+
+release = runpy.run_path("scripts/build-python-release.py")
+print(release["pep440_version"](release["repository_version"]()))
+PY
+)"
 python scripts/build-python-release.py --package sdk --output-dir dist-python
 python scripts/build-python-release.py --package runtime --platform macos-arm64 --runtime-exe dist-exe/dsh-jsonrpc-agent-pkg-macos-arm64 --output-dir dist-python
-pip install --find-links dist-python deepseek-harness-sdk=="$version"
+pip install \
+  "dist-python/deepseek_harness_sdk-$version-py3-none-any.whl" \
+  "dist-python/deepseek_harness_runtime_bin-$version-py3-none-macosx_14_0_arm64.whl"
 ```
 
 The runtime distribution is wheel-only. The release pipeline publishes three platform wheels with the pure SDK wheel: Linux x64, Linux arm64, and macOS 14 or newer on arm64. A `python-v<repository-version>` tag is accepted only when it matches the repository version; prerelease repository versions such as `0.0.1-rc.1` use their normalized PEP 440 spelling, such as `0.0.1rc1`, inside wheel filenames and metadata.

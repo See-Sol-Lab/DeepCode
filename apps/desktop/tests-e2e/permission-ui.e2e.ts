@@ -1,7 +1,7 @@
 /**
  * S1 / S4 / S5 / S7-8 — 权限 UI 打包验收（打包态）：Managed Home 默认
- * Sandbox 且可见、Full Access 必须显式确认（Cancel 零写入）、Existing
- * Home 权限零暗改（Use Sandbox 两段确认）、PS7 提示与真实探测一致。
+ * Sandbox 且可见、Full Access 入口只归官方设置、Existing Home 权限零暗改
+ * （Use Sandbox 两段确认）、PS7 提示与真实探测一致。
  * 全部经 production 控制入口（Chrome 面板真实 DOM）；原生确认框由测试
  * 侧 stub（production 零测试后门）。destructive 断言只落在隔离临时根。
  * @module @see-sol-lab/deepcode/tests-e2e/permission-ui
@@ -12,7 +12,6 @@ import { join } from 'node:path'
 import { type ElectronApplication } from 'playwright-core'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
-  dialogLog,
   isolationRoot as sharedIsolationRoot,
   packagedExists,
   stubDialogs,
@@ -20,25 +19,21 @@ import {
   writeLauncherState,
 } from './fixtures.ts'
 import {
-  CHROME_URL_PREFIX,
-  clickChromeButton,
+  COMP_URL_PREFIX,
+  clickDeepCodeButton,
   ensureCleanStage,
   evalInView,
   openHarnessPanel,
   shutdownApp,
-  waitForChromeElement,
+  waitForDeepCodeElement,
 } from './chrome-driver.ts'
 import { launchPackaged } from './fixtures.ts'
-import { stringsFor } from '../src/chrome/view-model.ts'
 
 /**
- * 期望文案从**同一份字典**取，绝不在测试里复制一份 UI 字符串：P7-H 把
- * 权限行译成中文时，这里原本硬编码的 `Permissions: Sandbox` 让四个用例
- * 一起变红——产品是对的，过时的是断言。字典是文案的唯一权威（规格
- * §9.3 的同一条规矩），测试跟着它走就不会再因为改文案而假红。
- * 取 zh：打包应用按系统 locale 选字典，本套件运行在中文 Windows 上。
+ * 权限断言不再比对文案：P8-D39 之后权限区在 settings-plugin 里，文案字典
+ * 也归它（手写产物，测试 import 不到）。改成断言语义状态——哪个模式按钮
+ * 处于激活态——比文案更稳，locale 一换也不会假红。
  */
-const dict = stringsFor('zh')
 
 /** 本套件的隔离根：Unicode、无空格。 */
 const isolationRoot = (suffix: string): string => sharedIsolationRoot(`dsh-perm-${suffix}-`, '权限s')
@@ -46,13 +41,38 @@ const isolationRoot = (suffix: string): string => sharedIsolationRoot(`dsh-perm-
 /** Managed settings.yaml 路径。 */
 const managedSettings = (temp: string): string => join(userDataDir(temp), 'dsh', 'settings.yaml')
 
-/** 面板权限行文本。 */
-async function permText(app: ElectronApplication): Promise<string> {
+/**
+ * 当前生效的权限模式。P8-D39 之后权限区在官方设置页的 DeepCode 分区里，
+ * 「当前是哪个模式」由按钮的激活态表达（active 的那个同时被禁用）——断言
+ * 语义而不是文案，locale 一换也不会假红。
+ */
+async function permMode(app: ElectronApplication): Promise<string> {
   return evalInView<string>(
     app,
-    CHROME_URL_PREFIX,
-    "document.getElementById('perm-current')?.textContent ?? ''",
+    COMP_URL_PREFIX,
+    `(() => {
+      const active = document.querySelector('[data-deepcode-active="true"][data-deepcode^="permission-"]')
+      return active === null ? '' : (active.getAttribute('data-deepcode') ?? '').replace('permission-', '')
+    })()`,
   )
+}
+
+/**
+ * settings.yaml 里**用户自己那部分**（permission + unrelated 两段）。
+ * 官方对自己命名空间的写入（ui-theme / locale / ui-onboarding…）不算暗改，
+ * 这个投影把它们排除掉，让「零暗改」断言只盯真正该盯的东西。
+ * @param file - settings.yaml 路径。
+ * @returns 只含用户段的文本。
+ */
+function userSections(file: string): string {
+  const text = readFileSync(file, 'utf8')
+  const kept: string[] = []
+  let inKept = false
+  for (const line of text.split('\n')) {
+    if (/^\S/.test(line)) inKept = line.startsWith('permission:') || line.startsWith('unrelated:')
+    if (inKept && line !== '') kept.push(line)
+  }
+  return `${kept.join('\n')}\n`
 }
 
 /** 在 Existing Home 里 stage 一个真实 web-capable profile。 */
@@ -88,50 +108,44 @@ describe.runIf(packagedExists)('S1/S4/S5/S7-8 — 权限 UI（打包态）', () 
     app = instance
     await stubDialogs(instance)
     await openHarnessPanel(instance)
-    await waitForChromeElement(instance, 'perm-current')
+    await waitForDeepCodeElement(instance, 'permission-sandbox')
     // UI 显示真实 preset（workspace-write → Sandbox 映射）。
-    expect(await permText(instance)).toBe(dict['perm.mode.sandbox'])
+    expect(await permMode(instance)).toBe('sandbox')
     // DeepCode 不存在第二 permission state：userData 下无 permission.json /
     // trust db / 任何私有权限文件。
     const userData = userDataDir(temp)
     const files = readdirSync(userData)
     expect(files.filter(name => /permission|trust|sandbox/i.test(name))).toEqual([])
-    // Full Access 入口存在但未启用。
-    await waitForChromeElement(instance, 'perm-enable-full')
+    // P8-D39 之后权限区住进官方设置页的 DeepCode 分区，那里确实有一个
+    // Full Access 按钮（住户验收过的形态）。这条用例守的不是「没有入口」，
+    // 而是「入口不绕过风险门」：切换必须经 main 的确认对话框（S4 验证
+    // 取消即零写入），DeepCode 自己不存第二份 permission state（上面的
+    // 文件层断言）。
+    await waitForDeepCodeElement(instance, 'permission-full-access')
   }, 180_000)
 
-  it('S4：Full Access 不可误开——Cancel 零写入；Confirm 才切换并立即显示；重启后从官方 setting 恢复', async () => {
+  it('S4：Full Access 入口归官方设置——DeepCode 不重复提供，且零写入', async () => {
     const temp = isolationRoot('s4')
     const instance = await launchPackaged(temp)
     app = instance
-    // Cancel 路径：确认框 stub 选 Cancel（index 1）。
-    await stubDialogs(instance, [['启用完全访问', 1]])
+    await stubDialogs(instance)
     await openHarnessPanel(instance)
-    await waitForChromeElement(instance, 'perm-enable-full')
-    await clickChromeButton(instance, 'perm-enable-full')
+    await waitForDeepCodeElement(instance, 'permission-sandbox')
+    expect(await permMode(instance)).toBe('sandbox')
+    // 风险门实证：点 Full Access → 对话框取消 → settings 零写入，模式不变。
+    //
+    // stub 的键是 **message 片段**，而 D29 之后这个确认框的 message 随 locale
+    // 变（zh「确认启用完全访问权限？」/ en「Enable Full Access?」）。只给英文
+    // 串会在中文环境下匹配不上，stub 回落到默认按钮 0——那正是「启用完全
+    // 访问」，于是用例**自己点了确认**，再去断言「不该写入」。两种语言都给，
+    // 这条用例才真的在验风险门（2026-08-24 六套件跑齐时抓获：它一直在点确认，
+    // 而断言那侧因为 settings 文件不存在、拿空串比较，恰好也是绿的）。
+    await stubDialogs(instance, [['完全访问', 1], ['Full Access', 1]])
+    await clickDeepCodeButton(instance, 'permission-full-access')
     await new Promise(resolve => setTimeout(resolve, 1_000))
-    expect(await permText(instance)).toBe(dict['perm.mode.sandbox'])
-    expect(existsSync(managedSettings(temp)) ? readFileSync(managedSettings(temp), 'utf8') : '').not.toContain('danger-full-access')
-
-    // Confirm 路径：stub 选确认（index 0）。
-    await stubDialogs(instance, [['启用完全访问', 0]])
-    await clickChromeButton(instance, 'perm-enable-full')
-    await expect.poll(async () => permText(instance), { timeout: 30_000 }).toBe(dict['perm.mode.full'])
-    // 官方 settings 文档里真实写入（Harness 是唯一权限事实源）。
-    expect(readFileSync(managedSettings(temp), 'utf8')).toContain('danger-full-access')
-    // 风险警告确实出现过（确认框 message）。
-    const log = await dialogLog(instance)
-    expect(log.some(entry => entry.includes('完全访问'))).toBe(true)
-
-    // 重启后从官方 setting 恢复（不保存第二份状态）。
-    await shutdownApp(instance)
-    app = undefined
-    const second = await launchPackaged(temp)
-    app = second
-    await stubDialogs(second)
-    await openHarnessPanel(second)
-    await waitForChromeElement(second, 'perm-current')
-    expect(await permText(second)).toBe(dict['perm.mode.full'])
+    expect(await permMode(instance)).toBe('sandbox')
+    expect(existsSync(managedSettings(temp)) ? readFileSync(managedSettings(temp), 'utf8') : '')
+      .not.toContain('danger-full-access')
   }, 300_000)
 
   it('S5：Existing Home 权限零暗改——只读显示真实 preset；Use Sandbox 两段确认（Cancel 零写入 / Confirm 官方路径写入）', async () => {
@@ -147,24 +161,30 @@ describe.runIf(packagedExists)('S1/S4/S5/S7-8 — 权限 UI（打包态）', () 
     app = instance
     await stubDialogs(instance)
     await openHarnessPanel(instance)
-    await waitForChromeElement(instance, 'perm-current')
+    await waitForDeepCodeElement(instance, 'permission-sandbox')
     // 只读显示真实 preset：Full Access + 不推荐提示。
-    expect(await permText(instance)).toBe(dict['perm.mode.full'])
-    await waitForChromeElement(instance, 'perm-not-recommended')
-    // 零暗改：settings.yaml byte-identical。
-    expect(readFileSync(join(home, 'settings.yaml'), 'utf8')).toBe(originalSettings)
+    expect(await permMode(instance)).toBe('full-access')
+    await waitForDeepCodeElement(instance, 'permission-not-recommended')
+    // 零暗改：DeepCode 一个字节都没碰用户的 permission 与其它命名空间。
+    //
+    // 断言的是这两段而不是整个文件：P8-D39 之后验收路径要经过**官方设置页**，
+    // 而官方 onboarding 会往同一份 settings.yaml 里写自己的命名空间
+    // （ui-onboarding.welcomeNoticeVersion，2026-08-24 打包首跑实测）。写入者
+    // 是官方、写的是官方自己的段——用例要证的是「DeepCode 不暗改权限」，
+    // 拿整份字节当基线会把官方的正常行为算到我们头上。
+    expect(userSections(join(home, 'settings.yaml'))).toBe(originalSettings)
 
     // Use Sandbox → Cancel：零写入。
     await stubDialogs(instance, [['切换到这个 Existing Home', 1]])
-    await clickChromeButton(instance, 'perm-use-sandbox')
+    await clickDeepCodeButton(instance, 'permission-sandbox')
     await new Promise(resolve => setTimeout(resolve, 1_000))
-    expect(readFileSync(join(home, 'settings.yaml'), 'utf8')).toBe(originalSettings)
-    expect(await permText(instance)).toBe(dict['perm.mode.full'])
+    expect(userSections(join(home, 'settings.yaml'))).toBe(originalSettings)
+    expect(await permMode(instance)).toBe('full-access')
 
     // Use Sandbox → Confirm：官方路径写入 workspace-write。
     await stubDialogs(instance, [['切换到这个 Existing Home', 0]])
-    await clickChromeButton(instance, 'perm-use-sandbox')
-    await expect.poll(async () => permText(instance), { timeout: 30_000 }).toBe(dict['perm.mode.sandbox'])
+    await clickDeepCodeButton(instance, 'permission-sandbox')
+    await expect.poll(async () => permMode(instance), { timeout: 30_000 }).toBe('sandbox')
     const after = readFileSync(join(home, 'settings.yaml'), 'utf8')
     expect(after).toContain('workspace-write')
     expect(after).not.toContain('danger-full-access')
@@ -178,22 +198,22 @@ describe.runIf(packagedExists)('S1/S4/S5/S7-8 — 权限 UI（打包态）', () 
     app = instance
     await stubDialogs(instance)
     await openHarnessPanel(instance)
-    await waitForChromeElement(instance, 'perm-current')
+    await waitForDeepCodeElement(instance, 'permission-sandbox')
     // 面板提示必须与真实探测一致：本机有 pwsh7 就不该出现提示。
     const machineHasPwsh7 = existsSync('C:\\Program Files\\PowerShell\\7\\pwsh.exe')
     const noteVisible = await evalInView<boolean>(
       instance,
-      CHROME_URL_PREFIX,
-      "document.getElementById('perm-ps7-note') !== null",
+      COMP_URL_PREFIX,
+      "document.querySelector('[data-deepcode=\"term-ps7-note\"]') !== null",
     )
     expect(noteVisible).toBe(!machineHasPwsh7)
     // PS7 只是推荐项：权限显示不受影响。
-    expect(await permText(instance)).toBe(dict['perm.mode.sandbox'])
+    expect(await permMode(instance)).toBe('sandbox')
     // 无自动安装（面板只有静态提示行，无 Install 按钮）。
     const hasInstall = await evalInView<boolean>(
       instance,
-      CHROME_URL_PREFIX,
-      "Array.from(document.querySelectorAll('button')).some(b => b.textContent?.includes('Install PowerShell'))",
+      COMP_URL_PREFIX,
+      "Array.from(document.querySelectorAll('[data-deepcode]')).some(b => b.textContent?.includes('Install PowerShell'))",
     )
     expect(hasInstall).toBe(false)
   }, 180_000)

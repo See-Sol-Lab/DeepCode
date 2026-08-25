@@ -101,14 +101,34 @@ export function buildIssueBody(input: FeedbackIssueInput): string {
 }
 
 /**
- * GitHub issue 新建页 URL：标题走 query（URL-encoded，短），标签固定
- * user-feedback，模板名与仓库文件一致。
+ * GitHub issue 新建页 URL：标题与正文都走 query（URL-encoded），标签固定
+ * user-feedback。
+ *
+ * 带 body 时 GitHub 会忽略 template，正好是想要的语义：有现成正文（AI 收敛
+ * 后的一段话 + 诊断信息）就整页预填，用户打开只剩点 Create——住户 2026-08-23
+ * 实测反馈"打开后还要自己往模板里粘"之后的改进；没有正文才回落 Bug Report
+ * 模板骨架让用户照着填。
+ *
+ * body 长度守门：浏览器与 GitHub 对 URL 长度的容忍在几千字符量级，正文是
+ * 提示词约束的 ≤400 字中文（编码后 ~3600 字符）加诊断块，超过 6000 编码
+ * 字符就截断并提示看剪贴板——剪贴板里始终是完整正文（调用方先复制再开页）。
  * @param title - issue 标题。
+ * @param body - issue 正文；空串或省略时回落模板。
  * @returns 完整 URL。
  */
-export function githubNewIssueUrl(title: string): string {
-  return 'https://github.com/See-Sol-Lab/DeepCode/issues/new'
-    + '?template=bug_report.md'
-    + '&labels=user-feedback'
-    + `&title=${encodeURIComponent(title)}`
+export function githubNewIssueUrl(title: string, body = ''): string {
+  const base = 'https://github.com/See-Sol-Lab/DeepCode/issues/new'
+  if (body === '') {
+    return `${base}?template=bug_report.md&labels=user-feedback&title=${encodeURIComponent(title)}`
+  }
+  let encoded = encodeURIComponent(body)
+  if (encoded.length > 6000) {
+    // 按编码长度截断会切进多字节序列，改为按原文逐步缩短。
+    let cut = body
+    while (encoded.length > 6000 && cut.length > 0) {
+      cut = cut.slice(0, Math.max(0, cut.length - 200))
+      encoded = encodeURIComponent(`${cut}\n\n…（正文过长已截断，完整内容在剪贴板里，粘贴覆盖即可）`)
+    }
+  }
+  return `${base}?labels=user-feedback&title=${encodeURIComponent(title)}&body=${encoded}`
 }

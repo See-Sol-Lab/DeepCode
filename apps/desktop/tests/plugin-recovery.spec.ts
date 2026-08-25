@@ -11,8 +11,11 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   applyRestore,
+  describePluginFailure,
+  describeWriteFailure,
   bootHealthySettleAction,
   detectDrift,
+  hashesOfFacts,
   isJournalPending,
   parseRecoveryJournal,
   planRestore,
@@ -51,7 +54,7 @@ afterEach(() => {
 function baseJournal(): PluginRecoveryJournal {
   return {
     schemaVersion: 1,
-    txId: 'tx-1',
+    txId: '9f8a1c2d-4b5e-4f60-8a71-2c3d4e5f6a7b',
     homeKind: 'managed',
     homePath: 'C:/ud/dsh',
     profile: 'web',
@@ -244,7 +247,7 @@ describe('bootHealthySettleAction（boot 健康结算的状态判定）', () => 
 
 describe('journal 解析与序列化', () => {
   it('往返保留全部事实', () => {
-    const journal = { ...baseJournal(), postHashes: { 'package.json': 'x' }, state: 'pending-verification' as const }
+    const journal = { ...baseJournal(), postHashes: { 'package.json': 'aa11bb22cc33dd44ee55ff6600778899aabbccddeeff00112233445566778899' }, state: 'pending-verification' as const }
     expect(parseRecoveryJournal(serializeRecoveryJournal(journal))).toEqual(journal)
   })
 
@@ -266,5 +269,211 @@ describe('isJournalPending', () => {
     for (const state of ['verified', 'recovered', 'abandoned'] as const) {
       expect(isJournalPending({ ...baseJournal(), state })).toBe(false)
     }
+  })
+})
+
+describe('journal 解析的严格性（被篡改或损坏的 journal 绝不能驱动删除）', () => {
+  const withField = (patch: Record<string, unknown>): string =>
+    JSON.stringify({ ...baseJournal(), ...patch })
+
+  it.each([
+    ['txId 不是 UUID', 'tx-1'],
+    ['txId 想上溯目录', '../../../windows/system32'],
+    ['txId 带路径分隔符', '9f8a1c2d-4b5e-4f60-8a71-2c3d4e5f6a7b/x'],
+    ['txId 大写十六进制', '9F8A1C2D-4B5E-4F60-8A71-2C3D4E5F6A7B'],
+    ['txId 版本位不是 4', '9f8a1c2d-4b5e-1f60-8a71-2c3d4e5f6a7b'],
+    ['txId 变体位非法', '9f8a1c2d-4b5e-4f60-0a71-2c3d4e5f6a7b'],
+    ['txId 空串', ''],
+  ])('%s → 拒绝解析（txId 会直接拼进有递归删除的快照路径）', (_label, txId) => {
+    expect(() => parseRecoveryJournal(withField({ txId }))).toThrow(/txId/)
+  })
+
+  it.each([
+    ['相对路径', 'ud/dsh'],
+    ['空串', ''],
+    ['只有盘符没有分隔符', 'C:'],
+  ])('homePath %s → 拒绝解析', (_label, homePath) => {
+    expect(() => parseRecoveryJournal(withField({ homePath }))).toThrow(/homePath/)
+  })
+
+  it.each([
+    ['带正斜杠', 'a/b'],
+    ['带反斜杠', 'a' + String.fromCharCode(92) + 'b'],
+    ['上级目录', '..'],
+    ['当前目录', '.'],
+    ['node_modules', 'node_modules'],
+    ['空串', ''],
+  ])('profile %s → 拒绝解析', (_label, profile) => {
+    expect(() => parseRecoveryJournal(withField({ profile }))).toThrow(/profile/)
+  })
+
+  it('preFacts 缺白名单项 → 拒绝（少一条事实就少一份归属证明）', () => {
+    const journal = baseJournal()
+    const partial = { 'package.json': journal.preFacts['package.json'] }
+    expect(() => parseRecoveryJournal(withField({ preFacts: partial }))).toThrow(/缺失/)
+  })
+
+  it.each([
+    ['太短', 'abc'],
+    ['大写十六进制', 'AA11BB22CC33DD44EE55FF6600778899AABBCCDDEEFF00112233445566778899'],
+    ['含非十六进制字符', 'zz11bb22cc33dd44ee55ff6600778899aabbccddeeff00112233445566778899'],
+    ['多一位', 'aa11bb22cc33dd44ee55ff6600778899aabbccddeeff001122334455667788990'],
+  ])('preFacts 的 sha256 %s → 拒绝解析', (_label, sha256) => {
+    const journal = baseJournal()
+    const facts = { ...journal.preFacts, 'package.json': { present: true, sha256 } }
+    expect(() => parseRecoveryJournal(withField({ preFacts: facts }))).toThrow(/十六进制/)
+  })
+
+  it('postHashes 的 sha256 形态同样严格', () => {
+    expect(() => parseRecoveryJournal(withField({
+      postHashes: { 'package.json': 'nope' },
+      state: 'pending-verification',
+    }))).toThrow(/十六进制/)
+  })
+
+  it('合法 journal 仍然正常往返（收紧不能误伤自己写的记录）', () => {
+    const journal = baseJournal()
+    expect(parseRecoveryJournal(serializeRecoveryJournal(journal))).toEqual(journal)
+  })
+})
+
+describe('快照必须与记录的事实逐字节相符', () => {
+  it('记录的 hash 与实际文件对不上 → 抛错，一个字节都不写进事务', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deepcode-snapshot-'))
+    try {
+      const profileDir = join(root, 'profile')
+      const snapshotDir = join(root, 'snapshot')
+      mkdirSync(profileDir, { recursive: true })
+      mkdirSync(snapshotDir, { recursive: true })
+      writeFileSync(join(profileDir, 'package.json'), 'actual content')
+      // 事实表声称的是另一份内容的 hash：模拟"算 hash 与复制之间文件被改"。
+      const facts = {
+        'package.json': { present: true, sha256: sha256Of(Buffer.from('a different content')) },
+        'pnpm-lock.yaml': { present: false, sha256: null },
+        'pnpm-workspace.yaml': { present: false, sha256: null },
+      }
+      expect(() => writeWhitelistSnapshot(profileDir, facts, snapshotDir)).toThrow(RecoveryFactsError)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('事实相符时正常落盘', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deepcode-snapshot-ok-'))
+    try {
+      const profileDir = join(root, 'profile')
+      const snapshotDir = join(root, 'snapshot')
+      mkdirSync(profileDir, { recursive: true })
+      mkdirSync(snapshotDir, { recursive: true })
+      writeFileSync(join(profileDir, 'package.json'), 'actual content')
+      const facts = {
+        'package.json': { present: true, sha256: sha256Of(Buffer.from('actual content')) },
+        'pnpm-lock.yaml': { present: false, sha256: null },
+        'pnpm-workspace.yaml': { present: false, sha256: null },
+      }
+      expect(writeWhitelistSnapshot(profileDir, facts, snapshotDir)).toEqual(['package.json'])
+      expect(readFileSync(join(snapshotDir, 'package.json.bak'), 'utf8')).toBe('actual content')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('写入失败要说人话（用户看到 ENOSPC 什么也做不了）', () => {
+  it.each([
+    ['ENOSPC: no space left on device, open ...', '磁盘空间不足'],
+    ['EACCES: permission denied, rename ...', '没有写入权限'],
+    ['EPERM: operation not permitted, rename ...', '没有写入权限'],
+    ['EROFS: read-only file system, open ...', '只读'],
+    ['EBUSY: resource busy or locked, rename ...', '占用'],
+    ['ENOENT: no such file or directory, open ...', '目录不存在'],
+  ])('%s → 中文人话', (message, expected) => {
+    expect(describeWriteFailure(message, true)).toContain(expected)
+  })
+
+  it('英文环境给英文', () => {
+    expect(describeWriteFailure('ENOSPC: no space left', false)).toContain('disk is full')
+  })
+
+  it('认不出来的错误返回 null，绝不编一个听起来合理的原因', () => {
+    expect(describeWriteFailure('something entirely unexpected', true)).toBeNull()
+    expect(describeWriteFailure('', true)).toBeNull()
+  })
+})
+
+describe('失败归因要写清是谁造成的（用户和 Profile 里的 AI 都要读）', () => {
+  it('用户取消：明说是用户点的，并说明这不是程序故障', () => {
+    const text = describePluginFailure({ kind: 'cancelled' }, true)
+    expect(text).toContain('用户取消')
+    expect(text).toContain('不是程序故障')
+    // 快照还在，是"留着"这个决定的意义所在。
+    expect(text).toContain('保留')
+  })
+
+  it('pnpm 非零退出：明说是安装工具自己报的错', () => {
+    const text = describePluginFailure({ kind: 'exit-code', code: 137 }, true)
+    expect(text).toContain('137')
+    expect(text).toContain('pnpm')
+    expect(text).toContain('不是用户做错了什么')
+  })
+
+  it('启动失败：明说磁盘没被动过', () => {
+    const text = describePluginFailure({ kind: 'spawn-failed' }, true)
+    expect(text).toContain('没有被改动')
+  })
+
+  it('验证不符：明说操作不算数且退路还在', () => {
+    const text = describePluginFailure({ kind: 'post-check' }, true)
+    expect(text).toContain('对不上')
+    expect(text).toContain('保留')
+  })
+
+  it('四种归因都有英文版本，且互不相同', () => {
+    const texts = [
+      describePluginFailure({ kind: 'cancelled' }, false),
+      describePluginFailure({ kind: 'exit-code', code: 1 }, false),
+      describePluginFailure({ kind: 'spawn-failed' }, false),
+      describePluginFailure({ kind: 'post-check' }, false),
+    ]
+    expect(new Set(texts).size).toBe(4)
+    for (const text of texts) expect(text.length).toBeGreaterThan(20)
+  })
+})
+
+describe('开始改动之前的最后一次核对', () => {
+  const facts = (over: Record<string, { present: boolean; sha256: string | null }>) => ({
+    'package.json': { present: true, sha256: 'a'.repeat(64) },
+    'pnpm-lock.yaml': { present: true, sha256: 'b'.repeat(64) },
+    'pnpm-workspace.yaml': { present: false, sha256: null },
+    ...over,
+  })
+
+  it('事实表压成 hash 表：不存在的压成 null', () => {
+    expect(hashesOfFacts(facts({}))).toEqual({
+      'package.json': 'a'.repeat(64),
+      'pnpm-lock.yaml': 'b'.repeat(64),
+      'pnpm-workspace.yaml': null,
+    })
+  })
+
+  it('没有变化 → 没有漂移，操作可以开始', () => {
+    expect(detectDrift(hashesOfFacts(facts({})), facts({}))).toEqual([])
+  })
+
+  it('已存在的文件在准备期间被改 → 漂移', () => {
+    const after = facts({ 'package.json': { present: true, sha256: 'c'.repeat(64) } })
+    expect(detectDrift(hashesOfFacts(facts({})), after)).toEqual(['package.json'])
+  })
+
+  it('本来不存在的文件在准备期间冒出来 → 也算漂移（否则将来会被误删）', () => {
+    // 这是 Sol 特别点名的那一条：中间被别的程序创建的文件，如果记进 journal
+    // 当成本次事务的产物，恢复时就会被删掉。
+    const after = facts({ 'pnpm-workspace.yaml': { present: true, sha256: 'd'.repeat(64) } })
+    expect(detectDrift(hashesOfFacts(facts({})), after)).toEqual(['pnpm-workspace.yaml'])
+  })
+
+  it('本来存在的文件在准备期间被删掉 → 漂移', () => {
+    const after = facts({ 'pnpm-lock.yaml': { present: false, sha256: null } })
+    expect(detectDrift(hashesOfFacts(facts({})), after)).toEqual(['pnpm-lock.yaml'])
   })
 })

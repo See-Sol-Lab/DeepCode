@@ -191,7 +191,7 @@ interface ContinuableStart {
 
 An optional continuable-child setup contribution can install scope-local capabilities after base child composition and before Activation publication. The registry is ordered and transactional: a failed or revoked setup rolls back the unpublished Activation, child-scope disposal releases every installation, new registrations affect the next Activation, and registration removal revokes every resident installation immediately.
 
-`SubagentRuntime.reportFrom()` uses that extension point without adding a second queue or a result-bearing child wrapper. The exact live child Agent authorizes the call; callers cannot name a recipient. The manager derives the only recipient from the child's durable `parentSession`, requires that parent Agent to be live, frames the selected content as one `subagent-report` user message, and returns the message's stable `MessageId`. Quiet delivery uses `Agent.inject()` and creates no inbox occurrence or parent turn; waking delivery uses `Agent.followup()` and creates one ordinary later parent turn. Neither mode concludes the child's turn, and no final answer reports implicitly.
+`SubagentRuntime.reportFrom()` uses that extension point without adding a second queue or a result-bearing child wrapper. The exact live child Agent authorizes the call; callers cannot name a recipient. The manager derives the only recipient from the child's durable `parentSession`, requires that parent Agent to be live, frames the selected content as one `subagent-report` user message, and returns the message's stable `MessageId`. Quiet delivery uses `Agent.inject()` and does not wake the parent; next-step delivery uses `Agent.steer()`, waking an idle parent or joining a running parent's nearest step boundary. Neither mode concludes the child's turn, and no final answer reports implicitly.
 
 ```ts type-equiv
 /** Durable attribution for a continuable child's explicit parent report. */
@@ -206,7 +206,7 @@ interface SubagentReportMessageSource {
 
 ```ts type-equiv
 /** Deployment scheduling policy for accepted child reports. */
-type SubagentReportDelivery = 'quiet' | 'wakeup'
+type SubagentReportDelivery = 'quiet' | 'next-step'
 ```
 
 Reporting is the child's own choice, so the manager keeps a separate account of its own: when a resident Activation settles, it delivers one notice to the child's durable direct parent describing how that epoch ended and carrying its final assistant content. That delivery is unconditional for every child whose id a caller received, happens before the ownership release that would let the parent be judged settled, and reaches a resident parent through the same waking-admission accounting as a report. A parent whose own lineage is already tearing down receives it without a wake, because waking a quiescent Agent starts a turn rather than queueing work. Its provenance is a distinct kind so a transcript never presents a runtime account as something the child wrote.
@@ -307,7 +307,7 @@ type SubagentDescendantListEntry = SubagentListEntry & {
 
 ## The terminal result: `SubagentResult`
 
-The outcome of a one-shot run, resolved by `SubagentRun.result`. `structured` is present only after a requested `outputSchema` was successfully satisfied; requesting a schema does not guarantee it, and a provider may return `stopReason: 'error'` when the child fails or finishes without a valid capture. A non-`completed` `stopReason` means `output` may be partial — the consumer maps it to an `isError` tool result rather than reporting partial output as success.
+The outcome of a one-shot run, resolved by `SubagentRun.result`. `structured` is present only after a requested `outputSchema` was successfully satisfied; requesting a schema does not guarantee it, and a provider may return `stopReason: 'error'` when the child fails or finishes without a valid capture. A provider may attach a safe, non-assistant `diagnostic` to a non-`completed` result; the provider removes tool inputs, file contents, environment values, credentials, and raw protocol payloads and limits the complete value to 4096 UTF-8 bytes before consumers present it separately from `output`. A non-`completed` `stopReason` means `output` may be partial — the consumer maps it to an `isError` tool result rather than reporting partial output as success.
 
 ```ts type-equiv
 /**
@@ -330,6 +330,13 @@ interface SubagentResult {
    * schema-agnostic.
    */
   readonly structured?: unknown
+  /**
+   * Provider-authored, non-assistant failure detail for a non-`completed`
+   * result. Providers keep this text free of tool inputs, file contents,
+   * environment values, credentials, and raw protocol payloads, and limit it
+   * to 4096 UTF-8 bytes. Consumers present it separately from {@link output}.
+   */
+  readonly diagnostic?: string
   /** Why the run ended. A non-`completed` reason means `output` may be partial. */
   readonly stopReason: SubagentStopReason
 }
@@ -473,7 +480,7 @@ The spawn and fork backends create an ordinary one-shot agent through `parent.ct
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxsubagents--subagentruntime"></a>
 
@@ -563,6 +570,18 @@ registerContinuableSetup(contribution: ContinuableSetupContribution): () => void
 async drainContinuableDescendants(parents: readonly Agent[]): Promise<void>
 
 /**
+ * Release selected resident continuable direct children of one exact live
+ * parent. Other children of the same parent remain admitted and resident.
+ * Absent targets and a manager-less composition are accepted no-ops.
+ * @param parent - exact live direct parent authorizing the selected release.
+ * @param childIds - durable direct-child ids to release when resident.
+ * @returns once every selected Activation released its `AgentHandle`.
+ * @throws {SubagentError} `UNAUTHORIZED` when a resident target belongs to a
+ *   different parent or the supplied parent identity is stale.
+ */
+async drainContinuableChildren(parent: Agent, childIds: readonly SessionId[]): Promise<void>
+
+/**
  * Enumerate the parent's direct session-backed subagents without loading or
  * resuming an Agent and without any query service: the listing merges the live
  * session store with optional session persistence (live-preferred) and
@@ -646,7 +665,7 @@ async start(name: string, request: SubagentStartRequest): Promise<SubagentRun>
 
 Types: [Agent](core.md) · [ContentBlock](llm-streaming.md) · [MessageId](llm-streaming.md) · [SessionId](core.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:171`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagent-events"></a>
 
@@ -672,7 +691,7 @@ A published child settled. Scope-filtered dispatch uses the same delegating pare
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:166`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentprovider-added--emit"></a>
 
@@ -689,7 +708,7 @@ A provider became resolvable in the registry.
 'subagent/provider-added'(provider: SubagentProvider): void
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:140`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentprovider-removed--emit"></a>
 
@@ -706,7 +725,7 @@ A provider left the registry. Accepted runs remain holder-owned.
 'subagent/provider-removed'(name: string): void
 ```
 
-Source: [`packages/subagent/subagent/src/index.ts:146`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/subagent/src/index.ts)
 
 <a id="subagentstart--emit"></a>
 
@@ -730,5 +749,5 @@ A provider established a published child. For in-process providers, `ctx.agents.
 
 Types: [Scoped](scope.md)
 
-Source: [`packages/subagent/subagent/src/index.ts:157`](../../packages/subagent/subagent/src/index.ts)
+Source: [`packages/subagent/subagent/src/index.ts`](../../packages/subagent/subagent/src/index.ts)
 <!-- END GENERATED cordis-surface -->

@@ -10,13 +10,13 @@ Status: implemented
 
 ## 决策
 
-三个必需的 Linux 工作作业、独立的原生 Windows 作业，以及 `all checks passed` 判定作业（若不随切换，即使全部工作作业通过，它仍会滞留在故障池的队列中）——各自通过仓库变量解析运行器池，且开关按平台拆分，使一个平台的故障不会重定向另一个平台。三个 Linux 工作作业与 `all checks passed` 判定作业（其 `needs` 是必需的 Linux 工作作业，且运行在 `vm-backup` 池上）通过 `DSH_CI_FAILOVER_LINUX` 解析；原生 Windows 作业通过 `DSH_CI_FAILOVER_WINDOWS` 解析。变量不存在（正常）时它们运行在托管企业池上；由任何具备写权限的协作者设为 `selfhosted` 时，对应作业切换到公司自有的自托管池：`DSH_CI_FAILOVER_LINUX` 下，Linux 作业与判定作业切到 `vm-backup` 池，覆盖率与快照的并发降到共享虚拟机上限，并跳过托管路径的 pnpm 缓存恢复；`DSH_CI_FAILOVER_WINDOWS` 下，原生 Windows 作业切到 `dsh-win-ci` 池。每个开关都是写者可管理的仓库状态而非一次合并，因此在所有检查都是红色时仍然有效。自有池的就绪状态由 `serial / linux (self-hosted standby)` 与 `serial / windows (self-hosted standby)` 通道持续验证——每次 master 推送都在其上运行完整的未分片聚合流程。
+三个必需的 Linux 工作作业、独立的原生 Windows 作业，以及 `all checks passed` 判定作业（若不随切换，即使全部工作作业通过，它仍会滞留在故障池的队列中）——各自通过仓库变量解析运行器池，且开关按平台拆分，使一个平台的故障不会重定向另一个平台。三个 Linux 工作作业与 `all checks passed` 判定作业（其 `needs` 是必需的 Linux 工作作业，且运行在 `vm-backup` 池上）通过 `DSH_CI_FAILOVER_LINUX` 解析；原生 Windows 作业通过 `DSH_CI_FAILOVER_WINDOWS` 解析。变量不存在（正常）时它们运行在托管企业池上；由任何具备写权限的协作者设为 `selfhosted` 时，对应作业切换到公司自有的自托管池：`DSH_CI_FAILOVER_LINUX` 下，Linux 作业与判定作业切到 `vm-backup` 池，快照并发降到共享虚拟机上限，并跳过托管路径的 pnpm 缓存恢复；`DSH_CI_FAILOVER_WINDOWS` 下，原生 Windows 作业切到 `dsh-win-ci` 池。每个开关都是写者可管理的仓库状态而非一次合并，因此在所有检查都是红色时仍然有效。自有池的就绪状态由 `serial / linux (self-hosted standby)` 与 `serial / windows (self-hosted standby)` 通道持续验证——每次 master 推送都在其上运行完整的未分片聚合流程。
 
-`ci.yml` 只豁免一个事件不做取消（`${{ github.event_name != 'push' }}`），因此一次 master 推送不会取消上一次推送留下的、仍在运行的演练。每次演练以单门禁工作进程执行完整的未分片聚合流程，耗时长于 master 合并的间隔；在无条件取消下，演练会在得出结论前被后续运行取代，该通道无法产出供响应者查看的就绪证据。
+`ci-master.yml` 只豁免一个事件不做取消（`${{ github.event_name != 'push' }}`），因此一次 master 推送不会取消上一次推送留下的、仍在运行的演练。每次演练以单门禁工作进程执行完整的未分片聚合流程，耗时长于 master 合并的间隔；在无条件取消下，演练会在得出结论前被后续运行取代，该通道无法产出供响应者查看的就绪证据。
 
-这项豁免比「演练总能跑完」要窄，有两点限制。其一，GitHub 每个组只保留一个待运行条目，更新的待运行条目会顶掉更早的，繁忙时段中间的推送运行仍会以 `cancelled` 结束。其二，该表达式是针对**新触发的运行**求值的，因此自身事件不是 `push` 的运行——例如在 master 上派发的基准测试，与演练共用 `CI-<ref>` 组——求值为 `true`，会取消正在运行中的演练。这属于罕见的手动操作，且下一次 master 推送即可恢复证据，因此不值得为它再加机制。这项豁免换来的是该通道**周期性**地得出结论，而这正是它能作为证据的前提。
+这项豁免比「演练总能跑完」要窄，有两点限制。其一，GitHub 每个组只保留一个待运行条目，更新的待运行条目会顶掉更早的，繁忙时段中间的推送运行仍会以 `cancelled` 结束。其二，该表达式是针对**新触发的运行**求值的，因此自身事件不是 `push` 的运行——例如在 `ci-master.yml` 内的 master 上派发的基准测试，与其演练共用 `CI master-<ref>` 组——求值为 `true`，会取消正在运行中的演练。这属于罕见的手动操作，且下一次 master 推送即可恢复证据，因此不值得为它再加机制。这项豁免换来的是该通道**周期性**地得出结论，而这正是它能作为证据的前提。
 
-这个决定必须放在工作流级：取消作用于被取代的整个运行，作业级 `concurrency` 组并不能豁免其所属作业。采用否定式写法而非仅指名 `pull_request`，是有实质作用的：后者会连 `workflow_dispatch` 一起停止取消，而每次运行器基准测试会在 master 上的同一并发组内同时占用 12 台大规格运行器、最长 15 分钟，届时重复派发会排在演练之前，而不是替换掉已过时的测量。成本之所以可控，是因为一次 master 推送只承载 `wine-apt-cache` 和这两条演练；其余作业都受拉取请求门控、`workflow_dispatch` 门控或 `if: false`，并且 `scripts/ci-workflow.spec.ts` 会锁定这个集合——按条件精确匹配，因为否定式事件判断会包含它所排除的事件名——使新的推送可达作业无法悄悄开始累积未取消的运行。
+这个决定必须放在工作流级：取消作用于被取代的整个运行，作业级 `concurrency` 组并不能豁免其所属作业。采用否定式写法而非仅指名 `pull_request`，是有实质作用的：后者会连 `workflow_dispatch` 一起停止取消，而每次运行器基准测试会在 master 上的同一并发组内同时占用 12 台大规格运行器、最长 15 分钟，届时重复派发会排在演练之前，而不是替换掉已过时的测量。成本之所以可控，是因为 `ci-master.yml` 中一次 master 推送只承载 `wine-apt-cache` 和这两条演练；拉取请求作业位于独立的 `ci.yml`（不监听 `push`），而基准测试在 `ci-master.yml` 内受 `workflow_dispatch` 门控。`scripts/ci-workflow.spec.ts` 会锁定这个推送可达集合——按条件精确匹配，因为否定式事件判断会包含它所排除的事件名——使新的推送可达作业无法悄悄开始累积未取消的运行。
 
 ### 自有池是什么
 
@@ -32,7 +32,7 @@ Status: implemented
 
 1. 仓库 **Settings → Secrets and variables → Actions → Variables → New repository variable**：名称 `DSH_CI_FAILOVER_LINUX`（Linux 池故障）或 `DSH_CI_FAILOVER_WINDOWS`（Windows 池故障），值 `selfhosted`。
 2. 重新触发必需作业，使其重新解析运行器池。已经为托管标签**排队**的作业不会重定向，也无法原地 re-run，因此对于本手册所述的无限排队故障，应取消卡住的运行并 re-run all jobs，或推送一个新提交；“Re-run failed jobs”只有在作业真正失败（而非仍在排队）时才有用。
-3. 切换到此完成。Linux 故障切换状态下工作流还会自动：把 `DSH_COVERAGE_MAX_WORKERS` 降为 8、`DSH_SNAPSHOT_MAX_CONCURRENCY` 降为 12（按 6 个常驻实例定容：最坏情况下，6 × 8 = 48 个覆盖率工作进程运行在 64 核虚拟机上）（共享虚拟机的争抢上限），并跳过托管路径的 pnpm 缓存恢复（虚拟机的持久 store 直接提供热安装）。Windows 开关没有这类并发或缓存分支；它只重定向原生 Windows 作业的运行器池。
+3. 切换到此完成。Linux 故障切换状态下，工作流还会把 `DSH_SNAPSHOT_MAX_CONCURRENCY` 降为 12，以限制共享虚拟机上的争抢，并跳过托管路径的 pnpm 缓存恢复，因为虚拟机的持久 store 会直接提供热安装。覆盖率在两个 Linux 池上都使用 4 个单 worker 插桩分区与 2 个豁免 worker。Windows 开关没有并发或缓存分支；它只重定向原生 Windows 作业的运行器池。
 
 #**Dependabot 例外。**两个开关的选择器都刻意排除了 `dependabot[bot]`：故障切换期间，Dependabot 拉取请求继续在托管池排队，而不是把依赖项提供的代码放到持久化虚拟机上执行。故障期间 Dependabot PR 持续排队是预期行为而非切换失败；托管池恢复后它会自行完成。
 
@@ -59,4 +59,4 @@ Status: implemented
 
 ## 后果
 
-从托管池故障中恢复只需切换受影响平台的变量（任何写者可设）加一次重跑，关键路径上没有合并。代价是每个平台都要维护第二套运行器拓扑：热备通道在每次 master 推送时都运行它们，避免故障切换目标变得陈旧；而 `ci.yml` 中的并发与缓存恢复分支带有一条 `selfhosted` 支路（仅 Linux），必须与托管支路保持同步。按平台拆分开关多了一个需要管理的变量，但把每个开关的影响范围限定在单个平台的作业上。
+从托管池故障中恢复只需切换受影响平台的变量（任何写者可设）加一次重跑，关键路径上没有合并。代价是每个平台都要维护第二套运行器拓扑：热备通道在每次 master 推送时都运行它们，避免故障切换目标变得陈旧；而 `ci.yml` 中的快照并发与缓存恢复分支带有一条 `selfhosted` 支路（仅 Linux），必须与托管支路保持同步。按平台拆分开关多了一个需要管理的变量，但把每个开关的影响范围限定在单个平台的作业上。

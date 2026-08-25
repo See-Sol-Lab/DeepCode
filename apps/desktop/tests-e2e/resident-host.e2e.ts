@@ -24,11 +24,10 @@ import {
 } from './fixtures.ts'
 import {
   portConnectable as portOpen,
-  shutdownApp,
   CHROME_URL_PREFIX,
   clickChromeButton,
   evalInView,
-  openHarnessPanel,
+  shutdownApp,
   waitForChromeElement,
   waitForCompMount,
   waitForWindow,
@@ -190,9 +189,14 @@ describe.runIf(packagedExists)('Resident Host（P2 常驻生命周期）', () =>
         // 不自动重启：端口保持释放。
         await new Promise(resolve => setTimeout(resolve, 1_500))
         expect(await portOpen(3080)).toBe(false)
-        // Restart Harness 用 active 恢复：面板 → restart → 端口回来。
-        await openHarnessPanel(app)
-        await clickChromeButton(app, 'harness-restart')
+        // Restart Harness 用 active 恢复。走的是**汉堡菜单**里的重启项，
+        // 不是设置页：P8-D39 之后 Harness 控制面住在官方 web UI（3080）里，
+        // 而这个用例的前提正是 DSH 已死、3080 已断——设置页在这一刻本来
+        // 就不该指望。菜单项是 B3-15 为此补的（住户 2026-08-24 批准），
+        // chrome 层是我们自己的 renderer，DSH 死了它照样在，也正是真实
+        // 用户在这个场景下唯一能在主窗口里够到的入口。
+        await clickChromeButton(app, 'hamburger')
+        await clickChromeButton(app, 'menu-restart-harness')
         await expect.poll(() => portOpen(3080), { timeout: 90_000 }).toBe(true)
         await waitForChromeElement(app, 'status-pill')
       } finally {

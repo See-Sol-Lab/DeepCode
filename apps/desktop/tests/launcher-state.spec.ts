@@ -518,6 +518,7 @@ describe('Managed/Existing 参数向量（selection → resolveDshLaunch）', ()
       '--profile', 'web',
       '--host', '127.0.0.1',
       '--port', '3080',
+      '--no-open',
     ])
     expect(env.ELECTRON_RUN_AS_NODE).toBe('1')
     expect(env.DSH_HOME).toBe(home)

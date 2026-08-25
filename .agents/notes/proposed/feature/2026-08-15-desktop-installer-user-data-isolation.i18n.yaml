@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-08-15-desktop-installer-user-data-isolation.md
 2026-08-15-desktop-installer-user-data-isolation.md: 42d139c51ef79d4abca7d619e8bf3c19a783f8e6
-2026-08-15-desktop-installer-user-data-isolation.zh.md: 2ed22f4d564f210305f27fef834aac54fdefd868
+2026-08-15-desktop-installer-user-data-isolation.zh.md: b8c975e842e7435561e57391cd658fa2e3c37f12

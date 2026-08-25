@@ -113,7 +113,9 @@ async function settleStart(start: Promise<SubagentRun>, signal: AbortSignal): Pr
   try {
     return await settleRun(await start)
   } catch (error: unknown) {
-    return signal.aborted
+    // Product providers aggregate startup and rollback failures. Cancellation
+    // must not turn a failed cleanup into a cleanly killed Job.
+    return signal.aborted && !(error instanceof AggregateError)
       ? { status: 'killed' }
       : { status: 'failed', detail: String(error) }
   }
@@ -140,18 +142,25 @@ function stopReasonError(result: SubagentResult): string | undefined {
 }
 
 /**
- * Append the child's preserved partial answer to a stop-reason error so a
- * truncated or cancelled child's real text still reaches the parent model.
+ * Append provider-authored failure detail and the child's preserved partial
+ * answer to a stop-reason error, keeping diagnostic text separate from the
+ * child's assistant output.
  * @param error - the stop-reason headline.
- * @param output - the child's selected output (`SubagentResult.output`).
- * @returns the headline, extended with the partial text when any exists.
+ * @param result - the child's terminal result.
+ * @returns the headline, diagnostic, and partial text that are present.
  */
-function withPartialText(error: string, output: ContentBlock[]): string {
-  const text = output
+function withDiagnosticAndPartialText(error: string, result: SubagentResult): string {
+  const diagnostic = result.diagnostic === undefined
+    ? ''
+    : `\nDiagnostic: ${result.diagnostic}`
+  const text = result.output
     .filter((block): block is Extract<ContentBlock, { type: 'text' }> => block.type === 'text')
     .map(block => block.text)
     .join('')
-  return text.length === 0 ? error : `${error}\nPartial output before the run ended:\n${text}`
+  const partial = text.length === 0
+    ? ''
+    : `\nPartial output before the run ended:\n${text}`
+  return `${error}${diagnostic}${partial}`
 }
 
 type ForegroundToolResult = {
@@ -171,7 +180,7 @@ async function settleForegroundRun(run: SubagentRun): Promise<ForegroundToolResu
       if (error !== undefined) {
         // The registry converts this throw to isError; partial output is not
         // success, but the preserved partial answer still reaches the parent.
-        throw new Error(withPartialText(error, result.output))
+        throw new Error(withDiagnosticAndPartialText(error, result))
       }
       return {
         kind: 'foreground',
@@ -357,7 +366,7 @@ export function apply(ctx: Context, config: Config): void {
         render: (_args, value) => [{
           type: 'text',
           text: value.kind === 'background'
-            ? `started background subagent task ${value.jobId}`
+            ? `started background subagent job ${value.jobId}`
             : value.kind === 'continuable'
               ? `started subagent ${value.subagentId}`
               : outputValueText(value.output),

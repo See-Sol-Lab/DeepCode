@@ -24,9 +24,11 @@ import {
 } from './fixtures.ts'
 import {
   COMP_URL_PREFIX,
+  dismissStartupModal,
   ensureCleanStage,
   evalInView,
   shutdownApp,
+  startupModalPresent,
 } from './chrome-driver.ts'
 import { launchPackaged } from './fixtures.ts'
 
@@ -102,7 +104,22 @@ describe.runIf(packagedExists)('S12 — Packaged Windows Workspace picker（打�
     }
   })
 
-  it('选择含中文+空格的目录：官方 picker 真实弹出，create/adopt 成功，能创建 session，目录内容 byte-identical', async () => {
+  // 这一条只能人工验（人工验收清单第 20 条），2026-08-25 手动跑通：对话框
+  // 标题为"选择工作区目录"、工作区出现在列表里、能在它上面新建会话、目录
+  // 内容逐字节未变。产品是好的，能自动化的部分到此为止。
+  //
+  // 为什么夹具做不到：对话框里唯一的 Edit 是 SearchEditBox；真正的文件夹
+  // 输入框（经典控件 id 1152）在 UIAutomation 里呈现为 Pane，设不了值。往
+  // 搜索框里填路径会静默选中"当前正在显示的那个目录"——这正是这条用例长期
+  // 神秘失败的原因：脚本报成功，选中的却根本不是目标。
+  //
+  // 唯一驱动得动它的办法是全局键盘注入（剪贴板 + SendKeys）。而 SendKeys
+  // 发给的是**当时的前台窗口**，不是我们指定的那个：实测按键打进了操作者
+  // 正在用的浏览器，覆盖了她正在写的内容，并把一条测试路径发进了与第三方
+  // 的对话。测试夹具不该具备这种能力，所以这条路彻底关闭。
+  //
+  // 同样理由的还有 p5-final-gate 里的 launcher-state 救援。
+  it.skip('选择含中文+空格的目录：官方 picker 真实弹出，create/adopt 成功，能创建 session，目录内容 byte-identical', async () => {
     const temp = isolationRoot('pick')
     mkdirSync(workspaceDir(temp), { recursive: true })
     writeFileSync(join(workspaceDir(temp), 'keep.txt'), 'workspace sentinel 内容\n', 'utf8')
@@ -111,6 +128,15 @@ describe.runIf(packagedExists)('S12 — Packaged Windows Workspace picker（打�
     const instance = await launchPackaged(temp)
     app = instance
     await stubDialogs(instance)
+    // 全新 home 首启会弹模型配置引导（「稍后配置 / 保存并继续」），它是
+    // aria-modal，挡在「添加工作区」前面。fixtures 只预写按掉了欢迎公告，
+    // 这一个取决于有没有配模型——e2e 环境刻意剔除了一切凭据变量，所以它
+    // 必然出现（2026-08-24 现场：失败时可见文本里就有那两个按钮）。
+    // 这个用例不走设置页，碰不到 openDeepCodeSection 里的识别逻辑。
+    await expect.poll(async () => {
+      await dismissStartupModal(instance)
+      return startupModalPresent(instance)
+    }, { timeout: 30_000, message: '首启引导框关不掉' }).toBe(false)
 
     // 官方入口 → 系统对话框（native IFileOpenDialog）。
     await clickAddWorkspace(instance)

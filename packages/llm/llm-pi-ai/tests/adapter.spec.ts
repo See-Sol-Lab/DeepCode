@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { AttachmentId, AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import { AttachmentId, AttachmentStore, ImageVariantId } from '@deepseek-ai/dsh-attachment'
 import type {
   ImageAttachmentLimits,
   ImageAttachmentRef,
+  ImageRequestPolicy,
+  RequestImageAttachment,
   SaveImageAttachment,
   StoredImageAttachment,
 } from '@deepseek-ai/dsh-attachment'
@@ -12,7 +14,8 @@ import * as LlmPiAi from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
-import { resolveProfiles } from '../src/config.ts'
+import { DEFAULT_MAX_REQUEST_IMAGE_BYTES, resolveProfiles } from '../src/config.ts'
+import { memoryAuth } from './auth-double.ts'
 import { assemble } from './assemble.ts'
 import { closeMockServers, mockServer, textEvents } from './mock-server.ts'
 
@@ -47,6 +50,7 @@ function adapterOf(
   return new PiAiAdapter({
     profiles: () => resolveProfiles(providers),
     resolveApiKey: () => Promise.resolve(apiKey),
+    auth: memoryAuth(),
   })
 }
 
@@ -71,6 +75,30 @@ describe('PiAiAdapter provider routing', () => {
     expect(result.finish).toEqual({ kind: 'stop' })
     expect(result.usage).toEqual({ inputTokens: 3, outputTokens: 1 })
     expect(server.paths).toEqual(['/chat/completions'])
+  })
+
+  it('keeps prepared model metadata and dispatch on one profile snapshot', async () => {
+    const first = await mockServer([{ events: textEvents }])
+    const second = await mockServer([])
+    let providers: Record<string, LlmPiAi.PiAiProviderProfile> = {
+      deepseek: { apiKeyEnv: 'PI_TEST_KEY', baseURL: first.url },
+    }
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    ctx.llm.registerAdapter(['deepseek'], new PiAiAdapter({
+      profiles: () => resolveProfiles(providers),
+      resolveApiKey: () => Promise.resolve('test-key'),
+      auth: memoryAuth(),
+    }))
+
+    const prepared = await ctx.llm.prepareCall({ provider: 'deepseek', model: 'deepseek-v4-flash' })
+    providers = { deepseek: { apiKeyEnv: 'PI_TEST_KEY', baseURL: second.url } }
+    const chunks: unknown[] = []
+    for await (const chunk of prepared.stream({ ...prepared.config, messages: [] })) chunks.push(chunk)
+
+    expect(chunks.length).toBeGreaterThan(0)
+    expect(first.requests).toHaveLength(1)
+    expect(second.requests).toHaveLength(0)
   })
 
   it('merges profile headers with Harness attribution winning', async () => {
@@ -210,6 +238,24 @@ describe('PiAiAdapter provider routing', () => {
     }
     const readImage = vi.fn((_ref: ImageAttachmentRef): Promise<StoredImageAttachment> =>
       Promise.resolve({ ref, data: Uint8Array.of(1) }))
+    const readImageRequest = vi.fn((
+      value: ImageAttachmentRef,
+      _policy: ImageRequestPolicy,
+      _signal?: AbortSignal,
+    ): Promise<RequestImageAttachment> => (
+      Promise.resolve({
+        variantId: ImageVariantId(`sha256:${'b'.repeat(64)}`),
+        attachment: value,
+        data: Uint8Array.of(1),
+        mediaType: value.mediaType,
+        bytes: 1,
+        width: value.width,
+        height: value.height,
+        depth: 'uchar',
+        space: 'srgb',
+        hasAlpha: true,
+      })
+    ))
 
     class LateAttachmentStore extends AttachmentStore {
       readonly imageLimits: ImageAttachmentLimits = {
@@ -217,6 +263,7 @@ describe('PiAiAdapter provider routing', () => {
         maxImagesPerMessage: 1,
         maxMessageImageBytes: 1,
         maxImagePixels: 1,
+        maxImageDimension: 2000,
         mediaTypes: ['image/png'],
       }
 
@@ -230,6 +277,14 @@ describe('PiAiAdapter provider routing', () => {
 
       readImage(value: ImageAttachmentRef): Promise<StoredImageAttachment> {
         return readImage(value)
+      }
+
+      override readImageRequest(
+        value: ImageAttachmentRef,
+        policy: ImageRequestPolicy,
+        signal?: AbortSignal,
+      ): Promise<RequestImageAttachment> {
+        return readImageRequest(value, policy, signal)
       }
     }
 
@@ -250,7 +305,10 @@ describe('PiAiAdapter provider routing', () => {
     })
 
     expect(result.finish.kind).toBe('error')
-    expect(readImage).toHaveBeenCalledWith(ref)
+    expect(readImageRequest).toHaveBeenCalledWith(ref, {
+      maxPixels: 2048 * 2048,
+      maxBytes: 1024 * 1024,
+    }, expect.any(AbortSignal))
     expect(server.paths).toEqual(['/v1/responses'])
   })
 
@@ -391,7 +449,7 @@ describe('provider profile lifecycle', () => {
     })
     expect(ctx.llm.providerRetryPolicy('anthropic')).toMatchObject({
       mode: 'normal',
-      maxRetries: 2,
+      maxRetries: 5,
     })
     await fiber.dispose()
     expect(ctx.llm.listProviders()).toEqual([])
@@ -596,6 +654,46 @@ describe('provider profile lifecycle', () => {
     expect(server.requests[1]).not.toHaveProperty('reasoning_effort')
   })
 
+  it('keeps the system role on a declared route whose gateway rejects the developer one', async () => {
+    vi.stubEnv('PI_TEST_KEY', 'test-key')
+    const server = await mockServer([{ events: textEvents }, { events: textEvents }])
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(LlmPiAi, {
+      providers: {
+        'acme-gateway': {
+          apiKeyEnv: 'PI_TEST_KEY',
+          api: 'openai-completions',
+          baseURL: `${server.url}/v1`,
+          models: [
+            // pi-ai sends the system prompt as `developer` to a reasoning
+            // model whenever its URL detection says the endpoint is OpenAI —
+            // which is what an unrecognized private URL resolves to. Most
+            // OpenAI-compatible gateways reject that role.
+            { id: 'acme-think', reasoningEfforts: { off: null, high: 'high' }, compat: { supportsDeveloperRole: false } },
+            { id: 'acme-guess', reasoningEfforts: { off: null, high: 'high' } },
+          ],
+        },
+      },
+    })
+    const roles = async (model: string): Promise<string[]> => {
+      await assemble(ctx, {
+        provider: 'acme-gateway',
+        model,
+        reasoningEffort: ReasoningEffortId('high'),
+        system: 'you are a harness',
+        messages: [],
+      })
+      const request = server.requests.at(-1) as { messages: { role: string }[] }
+      return request.messages.map(message => message.role)
+    }
+
+    expect(await roles('acme-think')).toEqual(['system'])
+    // The switch is the only thing that changes it: the same route, same
+    // endpoint, same reasoning declaration still gets pi-ai's guess.
+    expect(await roles('acme-guess')).toEqual(['developer'])
+  })
+
   it('sends a declared off value as the effort parameter instead of omitting it', async () => {
     vi.stubEnv('PI_TEST_KEY', 'test-key')
     const server = await mockServer([{ events: textEvents }])
@@ -696,6 +794,7 @@ describe('provider profile lifecycle', () => {
   })
 
   it('validates empty, underspecified, legacy-shaped, and explicitly blank profiles', () => {
+    expect(DEFAULT_MAX_REQUEST_IMAGE_BYTES).toBe(20 * 1024 * 1024)
     // Empty and omitted dicts are the dormant zero-route posture, not errors.
     expect(resolveProfiles({}).size).toBe(0)
     expect(resolveProfiles(undefined).size).toBe(0)
@@ -709,6 +808,11 @@ describe('provider profile lifecycle', () => {
     expect(() => resolveProfiles({ openai: { provider: 'openai' } as never })).toThrow(/moved to the providers dict key/)
     expect(() => resolveProfiles({ openai: { baseURL: '' } })).toThrow(/empty baseURL/)
     expect(() => resolveProfiles({ openai: { apiKeyEnv: 'not-a-var!' } })).toThrow(/must match/)
+    expect(() => resolveProfiles({ openai: { maxRequestImageBytes: 0 } })).toThrow(/maxRequestImageBytes/)
+    expect(resolveProfiles({ openai: {} }).get('openai')?.maxRequestImageBytes)
+      .toBe(DEFAULT_MAX_REQUEST_IMAGE_BYTES)
+    expect(resolveProfiles({ openai: { maxRequestImageBytes: 1024 } }).get('openai')?.maxRequestImageBytes)
+      .toBe(1024)
   })
 
   it.each(['maxRetries', 'maxRetryDelayMs'] as const)(
@@ -730,6 +834,9 @@ describe('provider profile lifecycle', () => {
       { streamIdleTimeoutMs: 0 },
       { streamIdleTimeoutMs: Number.NaN },
       { streamIdleTimeoutMs: MAX_TIMER_DELAY_MS + 1 },
+      { maxRequestImageBytes: 0 },
+      { maxRequestImageBytes: 1.5 },
+      { maxRequestImageBytes: Number.NaN },
     ]
     for (const entry of invalid) {
       const ctx = new Context()

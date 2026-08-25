@@ -11,8 +11,10 @@ import {
   buildBundleManifest,
   buildInfoLines,
   buildInfoText,
+  formatStampLocal,
   isBundleFileAllowed,
   normalizeUserPaths,
+  resolveInstallStamp,
   type BundleManifestEntry,
 } from '../src/diagnostics-service.ts'
 import {
@@ -33,7 +35,7 @@ const VERSION: DeepCodeVersionInfo = {
 }
 
 describe('buildInfoLines / buildInfoText（allowlist 事实）', () => {
-  it('八行事实齐全且全来自受控输入', () => {
+  it('九行事实齐全且全来自受控输入', () => {
     const lines = buildInfoLines({
       version: VERSION,
       homeKind: 'existing',
@@ -41,23 +43,115 @@ describe('buildInfoLines / buildInfoText（allowlist 事实）', () => {
       harnessStatus: '运行中',
       logPath: 'C:\\ud\\dsh-service.log',
       updateChannel: 'unconfigured',
+      lastUpdate: '2026-08-24 19:00',
     })
     const text = buildInfoText(lines)
-    expect(lines).toHaveLength(8)
+    expect(lines).toHaveLength(9)
     expect(text).toContain('DeepCode: 0.1.0-alpha.1')
     expect(text).toContain('Embedded DSH: 0.1.0-rc.5 (source abc123)')
     expect(text).toContain('Harness Home: Existing')
     expect(text).toContain('Active Profile: web')
+    expect(text).toContain('Last Update: 2026-08-24 19:00')
     expect(text).toContain('Update Channel: unconfigured')
     expect(text).not.toContain('C:\\ud\\dsh-service.log'.split('\\').join(''))
+  })
+
+  it('每一行都带界面用的字典键：界面不会露出裸英文标签', () => {
+    const lines = buildInfoLines({
+      version: VERSION, homeKind: 'managed', profile: 'web', harnessStatus: 'idle',
+      logPath: null, updateChannel: 'unconfigured', lastUpdate: 'unknown',
+    })
+    expect(lines.every(line => line.key.startsWith('diag.build.'))).toBe(true)
+    // Managed / Existing 是值不是标签，也要能本地化。
+    expect(lines.find(line => line.key === 'diag.build.home')?.valueKey).toBe('harness.home.managed')
+  })
+
+  it('更新通道只进导出文本，不上界面（住户 2026-08-24 定）', () => {
+    const lines = buildInfoLines({
+      version: VERSION, homeKind: 'managed', profile: 'web', harnessStatus: 'idle',
+      logPath: null, updateChannel: 'https://feed.example.com/manifest.json', lastUpdate: 'unknown',
+    })
+    const channel = lines.find(line => line.key === 'diag.build.channel')
+    expect(channel?.exportOnly).toBe(true)
+    // 界面投影少一行，导出文本一行不少——维护者排查「收不到更新」要靠它。
+    expect(lines.filter(line => line.exportOnly !== true)).toHaveLength(8)
+    expect(buildInfoText(lines)).toContain('Update Channel: https://feed.example.com/manifest.json')
+  })
+
+  it('界面路径打码，导出与悬停仍是原值', () => {
+    const lines = buildInfoLines({
+      version: VERSION, homeKind: 'managed', profile: 'web', harnessStatus: 'idle',
+      logPath: 'C:\\Users\\me\\AppData\\dsh-service.log',
+      updateChannel: 'unconfigured',
+      lastUpdate: 'unknown',
+      maskPath: path => path.split('C:\\Users\\me').join('<用户目录>'),
+    })
+    const log = lines.find(line => line.key === 'diag.build.log')
+    expect(log?.value).toBe('<用户目录>\\AppData\\dsh-service.log')
+    expect(log?.exportValue).toBe('C:\\Users\\me\\AppData\\dsh-service.log')
+    // 导出文本要真路径：它随后才过 normalizeUserPaths 的 <USER_HOME> 归一化。
+    expect(buildInfoText(lines)).toContain('C:\\Users\\me\\AppData\\dsh-service.log')
+  })
+
+  it('source commit 缩到 7 位但保留 dirty 后缀，导出仍是全长', () => {
+    const lines = buildInfoLines({
+      version: { ...VERSION, sourceCommit: '4e897ce924e53b211be91c1d38cc28db419dd163+dirty' },
+      homeKind: 'managed', profile: 'web', harnessStatus: 'idle',
+      logPath: null, updateChannel: 'unconfigured', lastUpdate: 'unknown',
+    })
+    const dsh = lines.find(line => line.key === 'diag.build.dsh')
+    expect(dsh?.value).toContain('(source 4e897ce+dirty)')
+    expect(dsh?.exportValue).toContain('4e897ce924e53b211be91c1d38cc28db419dd163+dirty')
   })
 
   it('logPath 缺失显示 unavailable', () => {
     const lines = buildInfoLines({
       version: VERSION, homeKind: 'managed', profile: 'web', harnessStatus: 'idle',
-      logPath: null, updateChannel: 'https://feed.example.com/manifest.json',
+      logPath: null, updateChannel: 'https://feed.example.com/manifest.json', lastUpdate: 'unknown',
     })
     expect(buildInfoText(lines)).toContain('Diagnostics Log: (unavailable)')
+  })
+})
+
+describe('resolveInstallStamp（上次更新时间）', () => {
+  it('无记录：按现在算，并要求落盘', () => {
+    const { stamp, changed } = resolveInstallStamp(null, '1.0.0', '2026-08-24T11:00:00.000Z')
+    expect(stamp).toEqual({ version: '1.0.0', since: '2026-08-24T11:00:00.000Z' })
+    expect(changed).toBe(true)
+  })
+
+  it('同版本：原样返回旧时刻，不落盘——否则「上次更新」会退化成「上次启动」', () => {
+    const raw = JSON.stringify({ version: '1.0.0', since: '2026-08-20T01:02:03.000Z' })
+    const { stamp, changed } = resolveInstallStamp(raw, '1.0.0', '2026-08-24T11:00:00.000Z')
+    expect(stamp.since).toBe('2026-08-20T01:02:03.000Z')
+    expect(changed).toBe(false)
+  })
+
+  it('版本变了：刷新成这一刻（这就是「更新时间」）', () => {
+    const raw = JSON.stringify({ version: '0.9.0', since: '2026-08-20T01:02:03.000Z' })
+    const { stamp, changed } = resolveInstallStamp(raw, '1.0.0', '2026-08-24T11:00:00.000Z')
+    expect(stamp).toEqual({ version: '1.0.0', since: '2026-08-24T11:00:00.000Z' })
+    expect(changed).toBe(true)
+  })
+
+  it.each(['{ not json', '{}', '{"version":"1.0.0"}', '{"version":"1.0.0","since":""}'])(
+    '记录损坏/残缺（%s）当作这一版刚到，绝不编造过去时刻',
+    (raw) => {
+      const { stamp, changed } = resolveInstallStamp(raw, '1.0.0', '2026-08-24T11:00:00.000Z')
+      expect(stamp.since).toBe('2026-08-24T11:00:00.000Z')
+      expect(changed).toBe(true)
+    },
+  )
+})
+
+describe('formatStampLocal', () => {
+  it('ISO → 本机时区的 YYYY-MM-DD HH:mm', () => {
+    const iso = new Date(2026, 7, 24, 19, 5).toISOString()
+    expect(formatStampLocal(iso)).toBe('2026-08-24 19:05')
+  })
+
+  it('无法解析时返回空串，由调用方回退', () => {
+    expect(formatStampLocal('not-a-time')).toBe('')
   })
 })
 
@@ -246,5 +340,25 @@ describe('planLogRotation', () => {
   it('常量：5 份 / 5MB 单份 / 15MB 总预算', () => {
     expect(LOG_MAX_FILES).toBe(5)
     expect(LOG_TOTAL_BUDGET).toBe(15 * 1024 * 1024)
+  })
+})
+
+describe('损坏的安装时刻要能自愈（否则面板永远显示 unknown）', () => {
+  it.each([
+    ['解析不了的文本', 'not-a-date'],
+    ['空串', ''],
+    ['明显非法的日期', '2026-13-45T99:99:99Z'],
+  ])('%s → 当作这一版刚到，重写一笔', (_label, since) => {
+    const raw = JSON.stringify({ version: '1.0.0', since })
+    const { stamp, changed } = resolveInstallStamp(raw, '1.0.0', '2026-08-25T02:00:00.000Z')
+    expect(changed).toBe(true)
+    expect(stamp.since).toBe('2026-08-25T02:00:00.000Z')
+  })
+
+  it('能解析的时刻原样保留，不因为这次检查就被刷新', () => {
+    const raw = JSON.stringify({ version: '1.0.0', since: '2026-08-01T09:30:00.000Z' })
+    const { stamp, changed } = resolveInstallStamp(raw, '1.0.0', '2026-08-25T02:00:00.000Z')
+    expect(changed).toBe(false)
+    expect(stamp.since).toBe('2026-08-01T09:30:00.000Z')
   })
 })

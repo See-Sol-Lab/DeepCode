@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-08-16-desktop-portable-distribution.md
 2026-08-16-desktop-portable-distribution.md: 174ca40c72cc4beca793ec12c6ac1ea8bb4ce2d8
-2026-08-16-desktop-portable-distribution.zh.md: 3a7333589e76a2be4b73ccc5c965ab6f4b2b672f
+2026-08-16-desktop-portable-distribution.zh.md: f95a7578f2cbd4440e3c96fb3d7127e12f5e7f15

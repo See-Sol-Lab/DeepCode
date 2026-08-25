@@ -28,7 +28,7 @@ function forwardedEventContracts(ctx: Context): void {
     const bare: typeof namespace = 'plain-string'
     void bare; void namespace; void source
   })
-  ctx.remote.$on('credentials/updated', () => {})
+  ctx.remote.$on('credentials/reference-updated', () => {})
   ctx.remote.$on('commands/change', () => {})
   ctx.remote.$on('llm/adapters-updated', () => {})
   ctx.remote.$on('agent-preset/selected', (sessionId, agentPreset) => {
@@ -106,7 +106,7 @@ describe('wire event bridge', () => {
     })
     bench.sinks?.onHostEnvelope?.({
       rpcId: 'r4' as never,
-      payload: { type: 'host/remote-event', event: 'credentials/updated', args: ['OPENAI_API_KEY'] },
+      payload: { type: 'host/remote-event', event: 'credentials/reference-updated', args: ['OPENAI_API_KEY'] },
     })
     // The carrier does not second-guess the name: selecting what a consumer can
     // receive is the allowlist's job, and dropping an unsubscribed name is the
@@ -118,7 +118,7 @@ describe('wire event bridge', () => {
 
     expect(seen).toEqual([
       ['settings/document-updated', 'llm-pi-ai', 7],
-      ['credentials/updated', 'OPENAI_API_KEY'],
+      ['credentials/reference-updated', 'OPENAI_API_KEY'],
       ['nobody/listening', 'ignored'],
     ])
   })
@@ -127,7 +127,7 @@ describe('wire event bridge', () => {
     const bench = await mount()
     let resets = 0
     bench.ctx.on('connection/reset', () => { resets++ })
-    const description = { version: '0', cwd: '/f', attachedSessions: 0, canOpenPath: true }
+    const description = { version: '0', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true }
     bench.sinks?.onConnected?.(description)
     bench.sinks?.onConnected?.(description) // second generation after a reconnect
     expect(resets).toBe(2)

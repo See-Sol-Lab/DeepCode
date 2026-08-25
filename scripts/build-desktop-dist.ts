@@ -36,7 +36,7 @@ import { capture } from './release/process.ts'
 import { packedIdentity, tarballFiles } from './release/tarball.ts'
 // 皮肤 overlay 的文件名与运行时读取端共用同一个常量：两侧一旦不一致，
 // --patch 会指向一个不存在的文件，而官方对此是启动即失败。
-import { THEME_PATCH_FILENAME } from '../apps/desktop/src/dsh-service.ts'
+import { BROWSER_PATCH_FILENAME, PICKER_PATCH_FILENAME, SETTINGS_PATCH_FILENAME, THEME_PATCH_FILENAME } from '../apps/desktop/src/dsh-service.ts'
 import { computeRuntimeClosure, parsePluginNames } from './runtime-closure.ts'
 import { directoryBytes, pruneNonWindowsPlatforms } from './platform-prune.ts'
 import { sanitizeAndVerify } from './leak-scan.ts'
@@ -59,6 +59,8 @@ const WIN_UNPACKED = join(DIST_ROOT, 'win-unpacked')
 const STAGING = join(DIST_ROOT, 'npm-staging')
 /** The committed runtime lockfile pinning every external registry dependency. */
 const COMMITTED_LOCK = join(ROOT, 'apps', 'desktop', 'runtime.package-lock.json')
+/** Electron executable consumed by electron-builder's configured electronDist. */
+const ELECTRON_EXE = join(ROOT, 'node_modules', 'electron', 'dist', 'electron.exe')
 
 /**
  * The pnpm executable this run uses: `npm_execpath` (pnpm injects its own
@@ -117,6 +119,20 @@ function runNpm(args: readonly string[], cwd: string): void {
   })
   if (result.error !== undefined) throw result.error
   if (result.status !== 0) throw new Error(`npm ${args.join(' ')} exited with ${String(result.status)}`)
+}
+
+/** Download Electron when a clean dependency install has not populated its distribution. */
+function ensureElectronDistribution(): void {
+  if (existsSync(ELECTRON_EXE)) return
+  const installer = join(ROOT, 'node_modules', 'electron', 'install.js')
+  if (!existsSync(installer)) {
+    throw new Error('build-desktop-dist: Electron installer is missing; run `pnpm install` first')
+  }
+  console.log('build-desktop-dist: Electron distribution missing; running the packaged installer')
+  runNode([installer])
+  if (!existsSync(ELECTRON_EXE)) {
+    throw new Error(`build-desktop-dist: Electron installer did not produce ${ELECTRON_EXE}`)
+  }
 }
 
 /**
@@ -182,10 +198,47 @@ function requireUnlockedOutput(): void {
   }
 }
 
+/**
+ * Strip the recorded integrity of every locally packed tarball from a seeded
+ * lockfile.
+ *
+ * The lockfile exists to pin external registry dependencies, and for those the
+ * integrity is exactly the point. Our own families are different: they are
+ * repacked from source on every run under an unchanged version, so their
+ * content hash moves while their version does not. npm honours the recorded
+ * integrity, finds a cache entry matching the OLD hash, and installs that —
+ * quietly shipping the previous build of our own code. Every existing gate
+ * passes, because the declared version and the installed version really do
+ * agree; only the bytes are stale.
+ *
+ * Dropping integrity for `file:` specs alone keeps registry pinning intact and
+ * forces our tarballs to be read from disk as they are now.
+ * @param lockPath - the seeded lockfile inside the staging directory.
+ */
+function dropLocalTarballIntegrity(lockPath: string): void {
+  const lock = JSON.parse(readFileSync(lockPath, 'utf8')) as {
+    packages?: Record<string, { resolved?: string; integrity?: string }>
+  }
+  let dropped = 0
+  for (const entry of Object.values(lock.packages ?? {})) {
+    if (entry.resolved?.startsWith('file:') === true && entry.integrity !== undefined) {
+      delete entry.integrity
+      dropped += 1
+    }
+  }
+  if (dropped > 0) {
+    writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}
+`)
+    console.log(`build-desktop-dist: cleared stale integrity for ${String(dropped)} locally packed tarball(s)`)
+  }
+}
+
 /** Pack one release family into `out` with the same per-member checks as release/pack.ts. */
 function packFamily(familyId: string, out: string): void {
   const family = releaseFamily(familyId)
-  const members = family.publishOrder(family.members(ROOT))
+  const members = family.publishOrder(family.members(ROOT)).order
+  // Official npm releases require the official Client build profile. DeepCode
+  // embeds its own attributed Client, so only member versions and payloads apply.
   family.verifyVersions(members)
   rmSync(out, { recursive: true, force: true })
   mkdirSync(out, { recursive: true })
@@ -337,6 +390,125 @@ function shipThemePlugin(runtimeDir: string): void {
   console.log(`build-desktop-dist: DeepCode theme plugin + overlay shipped into ${runtimeDir}`)
 }
 
+/**
+ * Ship DeepCode's directory-picker backend into the DSH runtime tree.
+ *
+ * Same shape and the same reasons as the skin: the harness's Node process
+ * cannot read the Electron asar, so both the package and its overlay must
+ * exist as real files under the runtime directory, and dropping the package
+ * into the runtime's `node_modules` makes it resolvable from every profile
+ * without touching a single profile manifest.
+ *
+ * This one carries more weight than the skin, though: its overlay disables the
+ * official picker row. A packaged app that shipped the overlay but not the
+ * package would have no directory picker at all — so a missing build fails the
+ * build rather than reaching a user who then cannot open a workspace.
+ * @param runtimeDir - assembled DSH runtime directory.
+ */
+/**
+ * Ship DeepCode's settings sections plugin into the DSH runtime tree
+ * (P8-D39). Same shape and reasons as the skin; missing it only removes the
+ * DeepCode sections from the official settings page (the chrome menu keeps
+ * working), but a hollow ship would still fail client boot — so fail loud.
+ * @param runtimeDir - assembled DSH runtime directory.
+ */
+function shipSettingsPlugin(runtimeDir: string): void {
+  const source = join(ROOT, 'apps', 'desktop', 'settings-plugin')
+  const bundle = join(source, 'lib', 'client.js')
+  if (!existsSync(bundle)) {
+    throw new Error(`build-desktop-dist: settings plugin bundle ${bundle} is missing`)
+  }
+  if (!readFileSync(bundle, 'utf8').includes('__ModuleLoader__.load')) {
+    throw new Error(`build-desktop-dist: ${bundle} does not register through __ModuleLoader__ — the client runtime cannot load it`)
+  }
+  const target = join(runtimeDir, 'node_modules', '@see-sol-lab', 'deepcode-settings')
+  mkdirSync(target, { recursive: true })
+  cpSync(join(source, 'lib'), join(target, 'lib'), { recursive: true })
+  cpSync(join(source, 'package.json'), join(target, 'package.json'))
+  const overlay = join(source, SETTINGS_PATCH_FILENAME)
+  if (!existsSync(overlay)) {
+    throw new Error(`build-desktop-dist: settings overlay ${overlay} is missing`)
+  }
+  cpSync(overlay, join(runtimeDir, SETTINGS_PATCH_FILENAME))
+  console.log(`build-desktop-dist: DeepCode settings plugin + overlay shipped into ${runtimeDir}`)
+}
+
+/**
+ * Ship DeepCode's browser capability into the DSH runtime tree (B3-11).
+ *
+ * Unlike the other three, this plugin has a real npm dependency
+ * (`playwright-core`), so the dependency ships beside it — a user who installs
+ * DeepCode gets browser tools without ever running `dsh plugin add`, which is
+ * the whole point for people behind a firewall with no registry to reach.
+ * The browser kernel itself is NOT bundled: playwright drives the system Edge
+ * (`channel: 'msedge'`), so this costs ~12 MB, not ~150.
+ * @param runtimeDir - assembled DSH runtime directory.
+ */
+function shipBrowserPlugin(runtimeDir: string): void {
+  const source = join(ROOT, 'apps', 'desktop', 'browser-plugin')
+  const entry = join(source, 'lib', 'index.js')
+  if (!existsSync(entry)) {
+    throw new Error(`build-desktop-dist: browser plugin entry ${entry} is missing — run the desktop build first`)
+  }
+  const target = join(runtimeDir, 'node_modules', '@see-sol-lab', 'deepcode-browser')
+  mkdirSync(target, { recursive: true })
+  cpSync(join(source, 'lib'), join(target, 'lib'), { recursive: true })
+  cpSync(join(source, 'package.json'), join(target, 'package.json'))
+  // playwright-core beside it: the plugin is loaded by the harness's own Node
+  // process, which resolves from this very node_modules tree. Shipping the
+  // plugin without its dependency would fail at the first tool call, not at
+  // boot — the worst possible time to find out. `dereference` matters here:
+  // pnpm's tree is symlinks into .pnpm, and a copied symlink would point at a
+  // path that does not exist on the user's machine.
+  const pwSource = join(ROOT, 'node_modules', 'playwright-core')
+  if (!existsSync(join(pwSource, 'package.json'))) {
+    throw new Error(`build-desktop-dist: ${pwSource} is missing — install dependencies before packaging`)
+  }
+  const pwTarget = join(runtimeDir, 'node_modules', 'playwright-core')
+  mkdirSync(dirname(pwTarget), { recursive: true })
+  cpSync(pwSource, pwTarget, { recursive: true, dereference: true })
+  const overlay = join(source, 'cordis.patch.yml')
+  if (!existsSync(overlay)) {
+    throw new Error(`build-desktop-dist: browser overlay ${overlay} is missing`)
+  }
+  cpSync(overlay, join(runtimeDir, BROWSER_PATCH_FILENAME))
+  // The same overlay also stays INSIDE the package, under its original name.
+  // The plugin's package.json declares `dsh.bundle.patch: ./cordis.patch.yml`,
+  // so a profile that lists this package in its bundle layer (anyone who ran
+  // the plugin manager's install once) makes app-boot read it from here. Ship
+  // the package without it and that profile dies at boot with ENOENT before
+  // any UI exists — the app just says "DSH 服务启动失败" (2026-08-24, caught
+  // on the resident's machine: she had installed the plugin during B3-10).
+  cpSync(overlay, join(target, 'cordis.patch.yml'))
+  console.log(`build-desktop-dist: DeepCode browser plugin + playwright-core + overlay shipped into ${runtimeDir}`)
+}
+
+function shipPickerPlugin(runtimeDir: string): void {
+  const source = join(ROOT, 'apps', 'desktop', 'picker-plugin')
+  const entry = join(source, 'lib', 'index.js')
+  if (!existsSync(entry)) {
+    throw new Error(`build-desktop-dist: directory-picker plugin entry ${entry} is missing`)
+  }
+  // The backend extends the official service class, so that package has to be
+  // in the runtime closure next to it. It is (the official auto-picker pulls
+  // it in), but assert rather than assume: the failure mode without it is the
+  // harness refusing to boot with our overlay applied.
+  const base = join(runtimeDir, 'node_modules', '@deepseek-ai', 'dsh-host-directory-picker')
+  if (!existsSync(base)) {
+    throw new Error(`build-desktop-dist: ${base} is missing — the DeepCode picker cannot resolve its base class`)
+  }
+  const target = join(runtimeDir, 'node_modules', '@see-sol-lab', 'deepcode-directory-picker')
+  mkdirSync(target, { recursive: true })
+  cpSync(join(source, 'lib'), join(target, 'lib'), { recursive: true })
+  cpSync(join(source, 'package.json'), join(target, 'package.json'))
+  const overlay = join(source, PICKER_PATCH_FILENAME)
+  if (!existsSync(overlay)) {
+    throw new Error(`build-desktop-dist: directory-picker overlay ${overlay} is missing`)
+  }
+  cpSync(overlay, join(runtimeDir, PICKER_PATCH_FILENAME))
+  console.log(`build-desktop-dist: DeepCode directory picker + overlay shipped into ${runtimeDir}`)
+}
+
 function assembleRuntime(): void {
   rmSync(STAGING, { recursive: true, force: true })
   mkdirSync(STAGING, { recursive: true })
@@ -378,7 +550,10 @@ function assembleRuntime(): void {
     // Reproducibility: seed the committed lockfile so npm resolves every
     // external registry dependency at its locked version; the result is
     // written back below, so external drift is visible as a git diff.
-    if (existsSync(COMMITTED_LOCK)) cpSync(COMMITTED_LOCK, join(STAGING, 'package-lock.json'))
+    if (existsSync(COMMITTED_LOCK)) {
+      cpSync(COMMITTED_LOCK, join(STAGING, 'package-lock.json'))
+      dropLocalTarballIntegrity(join(STAGING, 'package-lock.json'))
+    }
     // No --omit=optional: koffi (Windows ACL sandbox) and the Landlock
     // platform packages ship prebuilt binaries as optionalDependencies, and
     // skipping them makes koffi's install script attempt a source build.
@@ -425,6 +600,9 @@ function assembleRuntime(): void {
     // finding.
     rmSync(join(RUNTIME_DIR, 'node_modules', '.package-lock.json'), { force: true })
     shipThemePlugin(RUNTIME_DIR)
+    shipPickerPlugin(RUNTIME_DIR)
+    shipSettingsPlugin(RUNTIME_DIR)
+    shipBrowserPlugin(RUNTIME_DIR)
     const pruned = pruneNonWindowsPlatforms(RUNTIME_DIR)
     console.log(`build-desktop-dist: platform prune removed ${pruned.length} artifacts (${formatBytes(directoryBytes(RUNTIME_DIR))} runtime after prune)`)
     console.log(`build-desktop-dist: DSH runtime assembled at ${RUNTIME_DIR}`)
@@ -471,6 +649,7 @@ function formatBytes(bytes: number): string {
 if (import.meta.main) {
   requirePrerequisites()
   requireUnlockedOutput()
+  ensureElectronDistribution()
   packFamily('dsh', PACK_DHS)
   packFamily('vendor', PACK_VENDOR)
   assembleRuntime()
@@ -514,6 +693,42 @@ if (import.meta.main) {
     throw new Error(`build-desktop-dist: distribution leaked sensitive content:\n${findings.join('\n')}`)
   }
   console.log('build-desktop-dist: sanitize and leak scan passed')
+  // DeepCode 自带插件必须以**文件级**存在于即将打包的 payload 里。
+  // 2026-08-23 实机灾难：win-unpacked 里这两个目录被清空（清空者未查明——
+  // 目录还在、内容没了，overlay yml 无恙，目录级检查全部通过），打出的
+  // 安装包带着空插件，用户装完首启必崩 page-load，现场没有任何线索指向
+  // 这里。装配段的 shipThemePlugin/shipPickerPlugin 检查的是装配时刻；
+  // 这里是打包时刻，中间的空窗期发生过什么没人担保。断言放在离打包最近处。
+  for (const [plugin, entry] of [
+    ['deepcode-theme', join('lib', 'client.js')],
+    ['deepcode-directory-picker', join('lib', 'index.js')],
+    ['deepcode-settings', join('lib', 'client.js')],
+    ['deepcode-browser', join('lib', 'index.js')],
+  ] as const) {
+    const file = join(WIN_UNPACKED, 'resources', 'dsh', 'node_modules', '@see-sol-lab', plugin, entry)
+    if (!existsSync(file) || statSync(file).size === 0) {
+      throw new Error(`build-desktop-dist: ${file} is missing or empty — the payload would ship a hollow plugin and every install would fail page-load on first boot`)
+    }
+  }
+  // The browser plugin is the only bundled one with an npm dependency: without
+  // playwright-core beside it the tools register fine and then fail at the
+  // first call. Assert the dependency at packaging time, where the evidence is
+  // still on this machine (B3-11 built-in browser).
+  const shippedPlaywright = join(WIN_UNPACKED, 'resources', 'dsh', 'node_modules', 'playwright-core', 'package.json')
+  if (!existsSync(shippedPlaywright)) {
+    throw new Error(`build-desktop-dist: ${shippedPlaywright} is missing — the bundled browser plugin would ship without its runtime dependency`)
+  }
+  // It is also the only bundled plugin that declares `dsh.bundle.patch`, so
+  // its own overlay must stay inside the package: a profile that lists this
+  // package in its bundle layer (any machine where the plugin manager
+  // installed it once) reads the overlay from there, and its absence kills
+  // boot with ENOENT before any window exists. Assert the file the manifest
+  // promises (2026-08-24 field failure).
+  const shippedBundlePatch = join(WIN_UNPACKED, 'resources', 'dsh', 'node_modules', '@see-sol-lab', 'deepcode-browser', 'cordis.patch.yml')
+  if (!existsSync(shippedBundlePatch) || statSync(shippedBundlePatch).size === 0) {
+    throw new Error(`build-desktop-dist: ${shippedBundlePatch} is missing — a profile carrying this package in its bundle layer would fail to boot`)
+  }
+  console.log('build-desktop-dist: bundled plugin payload verified (file-level, browser dependency included)')
   // The NSIS installer is built from the sanitized win-unpacked
   // (--prepackaged), so resources/dsh and the checked payload are exactly
   // what ships.

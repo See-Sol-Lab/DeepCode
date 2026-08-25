@@ -32,14 +32,17 @@ import {
 } from './fixtures.ts'
 import {
   CHROME_URL_PREFIX,
-  clickChromeButton,
+  COMP_URL_PREFIX,
+  clickDeepCodeButton,
   dumpChromeButtons,
   ensureCleanStage,
   evalInView,
-  openHarnessPanel,
+  fillDeepCodeInput,
+  openDeepCodeSection,
+  readDeepCodeText,
   shutdownApp,
-  waitForChromeElement,
   waitForCompMount,
+  waitForDeepCodeElement,
   waitForWindow,
 } from './chrome-driver.ts'
 
@@ -162,23 +165,16 @@ async function waitHarnessRunning(app: ElectronApplication, timeoutMs = 120_000)
  * @param profile - 目标 profile。
  */
 async function openPluginManager(app: ElectronApplication, profile: string): Promise<void> {
-  const exists = async (id: string): Promise<boolean> => {
-    try {
-      return await evalInView<boolean>(
-        app,
-        CHROME_URL_PREFIX,
-        `document.getElementById(${JSON.stringify(id)}) !== null`,
-      )
-    } catch {
-      return false
-    }
-  }
-  if (!await exists(`plugin-target-${profile}`)) {
-    if (!await exists('harness-refresh')) await openHarnessPanel(app)
-    await clickChromeButton(app, 'harness-plugin-manager')
-    await waitForChromeElement(app, `plugin-target-${profile}`)
-  }
-  await clickChromeButton(app, `plugin-target-${profile}`)
+  // P8-D39：插件管理是官方设置页里的 DeepCode 分区。openDeepCodeSection 自身
+  // 幂等（面板已开/分区已选就不重复点），所以每次操作前直接调即可——不再需要
+  // 旧 chrome 面板那套「可见性判据」（那时重启会顺手 closeMenu，驱动会对着
+  // 隐藏的树空点）。
+  //
+  // 目标 profile 不再需要选：单 profile 现状下目标区整块不显示，写操作固定
+  // 落在 active profile（settings-plugin 的 effectiveTarget）。参数保留是为了
+  // 让用例读起来仍然说得清它在操作谁，并在这里断言它就是 active。
+  await openDeepCodeSection(app, 'plugins')
+  await waitForDeepCodeElement(app, `plugin-inventory-${profile}`)
 }
 
 /** 选动作 + 填 spec（真实 input 事件）+ 点执行。 */
@@ -187,39 +183,33 @@ async function runPluginOperation(
   action: 'add' | 'remove' | 'install',
   spec: string | null,
 ): Promise<void> {
-  await clickChromeButton(app, `plugin-action-${action}`)
+  await clickDeepCodeButton(app, `plugin-action-${action}`)
   if (spec !== null) {
-    await waitForChromeElement(app, 'plugin-spec')
-    const filled = await evalInView<boolean>(app, CHROME_URL_PREFIX, `(() => {
-      const input = document.getElementById('plugin-spec')
-      if (input === null) return false
-      input.value = ${JSON.stringify(spec)}
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-      return true
-    })()`)
-    expect(filled).toBe(true)
+    await waitForDeepCodeElement(app, 'plugin-spec')
+    await fillDeepCodeInput(app, 'plugin-spec', spec)
     // 输入后"执行"必须变为可用：渲染期算出的 disabled 由输入事件就地
     // 同步（否则用户只能靠回车执行——打包验收抓获过这个真实 bug）。
+    //
+    // 10s → 60s：canRun 除了 spec 还看 busy 与 pm.operation，上一次操作刚
+    // 结算、Harness 刚重启时这两者都可能还没落停，10 秒不够（2026-08-24
+    // 六套件跑齐时 remove 那步就卡在这里）。这条断言守的仍是「输入事件
+    // 就地同步 disabled」，只是别把正常的忙碌期算成 bug。
     await expect.poll(
       () => evalInView<boolean>(
         app,
-        CHROME_URL_PREFIX,
-        "document.getElementById('plugin-run')?.disabled === false",
+        COMP_URL_PREFIX,
+        "document.querySelector('[data-deepcode=\"plugin-run\"]')?.disabled === false",
       ),
-      { timeout: 10_000 },
+      { timeout: 60_000 },
     ).toBe(true)
   }
-  await clickChromeButton(app, 'plugin-run')
+  await clickDeepCodeButton(app, 'plugin-run')
 }
 
 /** 轮询插件操作视图的 step 文本（done/failed/cancelled 由 UI 呈现）。 */
 async function pluginOperationText(app: ElectronApplication): Promise<string> {
   try {
-    return await evalInView<string>(
-      app,
-      CHROME_URL_PREFIX,
-      "document.getElementById('plugin-operation')?.textContent ?? ''",
-    )
+    return await readDeepCodeText(app, 'plugin-operation')
   } catch {
     return ''
   }
@@ -230,15 +220,17 @@ async function pluginOperationText(app: ElectronApplication): Promise<string> {
  * 先被 vitest 中断，拿不到任何现场（第一次跑就是这么瞎的）。超时时带上
  * 当前 UI 文本作为证据。
  * @param app - 打包应用。
- * @param expected - 期望出现的片段（如 'add 已验证'）。
+ * @param expected - 期望出现的片段；给数组表示任一命中即可（同一状态的
+ * zh/en 两种文案），操作行的文案随界面语言变，写死一种会在另一种下假红。
  * @param timeoutMs - 轮询上限。
  */
-async function waitPluginOperation(app: ElectronApplication, expected: string, timeoutMs = 150_000): Promise<void> {
+async function waitPluginOperation(app: ElectronApplication, expected: string | string[], timeoutMs = 150_000): Promise<void> {
+  const wanted = Array.isArray(expected) ? expected : [expected]
   const deadline = Date.now() + timeoutMs
   let last = ''
   for (;;) {
     last = await pluginOperationText(app)
-    if (last.includes(expected)) return
+    if (wanted.some(fragment => last.includes(fragment))) return
     if (Date.now() >= deadline) {
       const dialogs = (await dialogLog(app)).join(' ⁄ ')
       throw new Error(`插件操作未在 ${String(timeoutMs)}ms 内出现 ${JSON.stringify(expected)}；当前 UI 文本：
@@ -279,6 +271,19 @@ describe.runIf(packagedExists)('Packaged Plugin Manager（P3）', () => {
         await waitForWindow(app)
         await waitForCompMount(app)
         await sharedStubDialogs(app)
+        // main 进程的未捕获错误捕获器：requestPluginOperation 只有 try/finally
+        // 而没有 catch，所以它里面抛出的异常既不弹失败框也不改视图，
+        // 在任何产品表面上都看不见。这里把它接住。
+        await app.evaluate(() => {
+          const box = globalThis as { __deepcodeErrors?: string[] }
+          box.__deepcodeErrors = []
+          process.on('unhandledRejection', (reason) => {
+            box.__deepcodeErrors?.push('unhandledRejection: ' + String(reason instanceof Error ? reason.stack : reason))
+          })
+          process.on('uncaughtException', (error: Error) => {
+            box.__deepcodeErrors?.push('uncaughtException: ' + String(error.stack ?? error.message))
+          })
+        })
         // 启动时 web-one 尚未含 fixture：composition marker 必须不存在。
         expect(existsSync(markerPath)).toBe(false)
 
@@ -289,8 +294,10 @@ describe.runIf(packagedExists)('Packaged Plugin Manager（P3）', () => {
           throw new Error(`${String(error)}\n--- Chrome 按钮 dump ---\n${await dumpChromeButtons(app)}`)
         }
 
-        // post-check 通过：UI 报告 add 已验证，磁盘 manifest 与 bundles 同时变化。
-        await waitPluginOperation(app, 'add 已验证')
+        // post-check 通过：操作行走到「完成」，磁盘 manifest 与 bundles 同时变化。
+        // 旧断言找的是 'add 已验证'——那是 D39 之前 chrome 面板的措辞，现在
+        // 整个 apps/desktop 里只剩这个用例自己在提它。等价语义是 step=done。
+        await waitPluginOperation(app, ['完成', 'Done'])
         // 目标透明度确认：Existing Home 必须明确告知会修改用户现有 Profile。
         const confirmations = await dialogLog(app)
         expect(confirmations.join(' ⁄ ')).toContain('这次操作会修改你选择的现有 Harness Profile。')
@@ -299,8 +306,8 @@ describe.runIf(packagedExists)('Packaged Plugin Manager（P3）', () => {
         expect(manifest.dsh?.profile?.bundles).toContain(FIXTURE_PACKAGE)
 
         // handoff：Later 只关提示，绝不重启——composition 因此仍未生效。
-        await waitForChromeElement(app, 'plugin-handoff-later')
-        await clickChromeButton(app, 'plugin-handoff-later')
+        await waitForDeepCodeElement(app, 'plugin-handoff-later')
+        await clickDeepCodeButton(app, 'plugin-handoff-later')
         expect(existsSync(markerPath)).toBe(false)
 
         // Restart Now：真正重启 Harness，新 composition 生效（fixture 挂载写
@@ -309,22 +316,11 @@ describe.runIf(packagedExists)('Packaged Plugin Manager（P3）', () => {
         // Transaction）——产品行为正确，用例改走面板的 Restart Harness：
         // boot 成功后 settle 把 journal verified，随后 remove 才被放行。
         await openPluginManager(app, 'web-one')
-        // 插件子视图接管面板内容区时 harness-restart 不在 DOM：经汉堡菜单的
-        // Harness 入口把 harnessView 重置回主面板（关面板 → 开主菜单 → 点
-        // Harness 面板项），production 控制入口不动。
-        const resetPanel = await evalInView<boolean>(app, CHROME_URL_PREFIX, `(() => {
-          const ham = document.getElementById('hamburger')
-          if (ham === null) return false
-          ham.click()
-          ham.click()
-          const entry = Array.from(document.querySelectorAll('[data-open="harness"]')).at(-1)
-          if (entry === undefined) return false
-          entry.click()
-          return true
-        })()`)
-        expect(resetPanel, '无法从汉堡菜单重置 Harness 面板').toBe(true)
-        await waitForChromeElement(app, 'harness-restart')
-        await clickChromeButton(app, 'harness-restart')
+        // 重启按钮住在 Harness 分区（P8-D39）：切过去即可，不再需要旧两级
+        // 面板那套「关面板→开菜单→点 Harness」的重置动作。
+        await openDeepCodeSection(app, 'harness')
+        await waitForDeepCodeElement(app, 'harness-restart')
+        await clickDeepCodeButton(app, 'harness-restart')
         await expect.poll(() => existsSync(markerPath), { timeout: 150_000 }).toBe(true)
         // marker 是 fixture apply 在 boot 早期写的；settle 的 verified（删
         // journal）发生在 boot 完成之后——remove 之前必须等这个真实相位，
@@ -350,21 +346,40 @@ describe.runIf(packagedExists)('Packaged Plugin Manager（P3）', () => {
         } catch (error) {
           throw new Error(`${String(error)}\n--- Chrome 按钮 dump ---\n${await dumpChromeButtons(app)}`)
         }
+        // 采样读的是 m.pluginManager.operation：顶层没有 operation，早先写成
+        // m.operation 时每次都拿到 undefined，而那个 undefined 被当成了「工具
+        // 读不出来」，于是转去从 DOM 反推——推出来的正是「main 从未设置」这个
+        // 错误结论。读错字段不会报错，只会安静地伪装成没有状态。
+        // 点下 remove 后立即密集采样操作区块：main 设置 pluginOperationView 时
+        // 紧跟一次 broadcast，所以「视图有没有短暂变成 remove」能一刀分开两种
+        // 完全不同的故障：从未设置（请求没走到那一行），还是设置后被覆盖回旧值。
+        const samples: string[] = []
+        for (let i = 0; i < 30; i += 1) {
+          const modelOp = String(await evalInView<string>(app, CHROME_URL_PREFIX,
+            'window.deepCodeDesktop.getControlModel().then(m => JSON.stringify(m.pluginManager.operation))')
+            .catch((cause: unknown) => `<unreadable: ${String(cause)}>`) ?? '<undefined>')
+          samples.push(`${String(i * 200)}ms model=${modelOp.slice(0, 120)} dom=${JSON.stringify((await pluginOperationText(app)).slice(0, 40))}`)
+          await new Promise(resolve => setTimeout(resolve, 200))
+        }
         try {
-          await waitPluginOperation(app, 'remove 已验证')
+          await waitPluginOperation(app, ['完成', 'Done'])
         } catch (error) {
           // 诊断：区分「remove 根本没跑」与「跑了但操作视图没更新」。前者
           // manifest 里 fixture 还在，后者已经不在——这一条就能定性，不必
           // 从 UI 文本反推。
           const manifestNow = JSON.stringify(readProfileManifest(home, 'web-one'))
           const journalNow = existsSync(join(userDataDir(temp), 'plugin-recovery', 'journal.json'))
-          const chromeText = await evalInView<string>(app, CHROME_URL_PREFIX,
-            'document.body.innerText').catch(() => '<chrome unreachable>')
+          const chromeText = await evalInView<string>(app, COMP_URL_PREFIX,
+            'document.body.innerText').catch(() => '<settings unreachable>')
           throw new Error(`${String(error)}
 --- DIAG manifest（fixture 还在 = remove 没跑）---
 ${manifestNow}
 --- DIAG journal.json 存在 ---
 ${String(journalNow)}
+--- DIAG main 未捕获错误 ---
+${(await app.evaluate(() => (globalThis as { __deepcodeErrors?: string[] }).__deepcodeErrors ?? []).catch(() => ['<main unreachable>'])).join(String.fromCharCode(10))}
+--- DIAG remove 后前 6 秒采样 ---
+${samples.join(String.fromCharCode(10))}
 --- DIAG chrome 全文 ---
 ${chromeText}
 --- Chrome 按钮 dump ---
@@ -419,15 +434,18 @@ ${await dumpChromeButtons(app)}`)
         await openPluginManager(app, 'web-one')
         await runPluginOperation(app, 'add', fixture)
         // 尽快取消（按钮只在 running 期间出现；已完成则跳过取消）。
-        const cancelClicked = await evalInView<boolean>(app, CHROME_URL_PREFIX, `(() => {
-          const button = document.getElementById('plugin-op-cancel')
+        const cancelClicked = await evalInView<boolean>(app, COMP_URL_PREFIX, `(() => {
+          const button = document.querySelector('[data-deepcode="plugin-op-cancel"]')
           if (button === null || button.disabled) return false
           button.click()
           return true
         })()`)
         await expect.poll(async () => {
           const text = await pluginOperationText(app)
-          return text.includes('已取消') || text.includes('已验证') || text.includes('未改变')
+          // 终态词随 locale 变，两种都认（'已验证'/'未改变' 是 D39 之前的
+          // 措辞，现在的终态是 step=done / cancelled）。
+          return ['已取消', 'Cancelled', '完成', 'Done', '失败', 'Failed']
+            .some(fragment => text.includes(fragment))
         }, { timeout: 120_000 }).toBe(true)
         // 不论竞速结果：launcher selection 一字未改，且没留下半个切换。
         expect(launcherSelection(temp)).toBe(selectionBefore)

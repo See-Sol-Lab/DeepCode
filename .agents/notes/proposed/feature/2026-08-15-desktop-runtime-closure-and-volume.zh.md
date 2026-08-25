@@ -6,7 +6,7 @@ Status: proposed
 
 ## Problem
 
-[可移植发行目录](2026-08-16-desktop-portable-distribution.md)把两个 release family 的全部 tarball 都作为 staging 的直接依赖安装，npm 无法区分 Web profile 的真实运行时与仓库的其他能力、构建工具和测试工具。实测 win-unpacked 载荷约 950MB，其中 `resources/dsh` 约 603MB：仅 `@anthropic-ai/claude-agent-sdk-win32-x64/claude.exe` 就约 253MB，另有 node-pty 约 63MB、typescript 约 23MB、rolldown 约 20MB、sharp 约 18MB、esbuild 约 11MB 与测试依赖。
+[可移植发行目录](2026-08-16-desktop-portable-distribution.zh.md)把两个 release family 的全部 tarball 都作为 staging 的直接依赖安装，npm 无法区分 Web profile 的真实运行时与仓库的其他能力、构建工具和测试工具。实测 win-unpacked 载荷约 950MB，其中 `resources/dsh` 约 603MB：仅 `@anthropic-ai/claude-agent-sdk-win32-x64/claude.exe` 就约 253MB，另有 node-pty 约 63MB、typescript 约 23MB、rolldown 约 20MB、sharp 约 18MB、esbuild 约 11MB 与测试依赖。
 
 ## Proposal
 

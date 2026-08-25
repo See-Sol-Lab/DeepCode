@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN" data-theme="dark" data-boot="starting">
 <head>
 <meta charset="utf-8">
 <title>DeepCode</title>
@@ -16,7 +16,12 @@
 -->
 <style>
   :root {
-    --veil-dark: linear-gradient(rgba(10, 10, 10, 0.18), rgba(10, 10, 10, 0.34));
+    /* 深色遮罩（P8-D24）：深海图的纹理对比度高，长对话时直接垫在正文后面读久了累。
+       这一层把它压下去而不是抹掉——上浅下深保留原有的向下沉的观感，正文最常落在
+       的中下部压得更多。浅色不动，D24 只谈深色。
+       P8-D42（住户三次确认）：0.30/0.52 的白字对比仍费眼，再暗约 20% 起步
+       （0.42/0.68，试值实机调）。「别再加深」的旧上限被 D42 实测推翻。 */
+    --veil-dark: linear-gradient(rgba(10, 10, 10, 0.42), rgba(10, 10, 10, 0.68));
     --veil-light: linear-gradient(rgba(249, 248, 248, 0.42), rgba(249, 248, 248, 0.58));
   }
   html, body {
@@ -46,10 +51,125 @@
 
   html[data-theme='dark'] .sea-dark { opacity: 1; }
   html[data-theme='light'] .sea-light { opacity: 1; }
+
+  /* 顶栏下缘的柔光（P8-D10）：常驻，不再跟着菜单开合闪。
+     原先它是 chrome 层的 `#topbar::after`，画在 47px 顶栏的下方，而那一层平时
+     只有 47px 高，于是被裁掉、只在菜单展开时露脸。这一层是全窗且常驻的，把它
+     放这儿就不必为了 14 像素去加高 chrome 层——加高一行就吃掉一行官方页面的
+     点击（D6 的老坑）。
+     47px 是 style.css 的 --chrome-height，两处各写一份是因为两个页面不共享
+     变量；改顶栏高度时这里要跟着改。
+     ⚠ 代价说在前面：这一层在 Compatibility View 之下，官方内容区背景透明时
+     柔光透得上来，官方若在那一段画了实心元素就会盖住它。 */
+  #chrome-glow {
+    position: fixed;
+    left: 0; right: 0;
+    top: 47px;
+    height: 14px;
+    background: linear-gradient(#0a0a0a, rgba(10, 10, 10, 0));
+  }
+  html[data-theme='light'] #chrome-glow {
+    background: linear-gradient(#f9f8f8, rgba(249, 248, 248, 0));
+  }
+
+  /* 启动态（P8-D5）。
+     首次启动要创建 Managed Home 并用 pnpm 装依赖，几十秒到一分钟是真实耗时——
+     但那段时间里内容区完全空白，而用户的注意力就在中间。一个知情的开发者都以为
+     坏了，真实新用户会直接关掉。
+
+     为什么画在这一层：上面三个 WebContentsView 里，chrome 平时只有顶栏那 47px
+     高，feedback 是个浮钮，compat 正是还没有内容的那一个。这张背景页是全窗的，
+     也是官方页面空着时唯一能说话的地方。
+
+     html 上默认就带 data-boot="starting"：首帧必须已经在说话，等第一次状态广播
+     再显示就又白了一段。main 每次 broadcast 同步真实相位（见 loadWindowBootNotice），
+     running / idle 等相位下这块自然消失。 */
+  #boot {
+    position: fixed;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    /* 顶栏占 47px，往下让开半个身位，视觉重心才落在内容区中间。 */
+    padding: 47px 32px 0;
+    box-sizing: border-box;
+    text-align: center;
+    font-family: system-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    color: rgba(255, 255, 255, 0.92);
+    /* 纯展示层，绝不吃点击：底下的 compat view 一旦有内容就得能点。 */
+    pointer-events: none;
+    user-select: none;
+  }
+  html[data-theme='light'] #boot { color: rgba(20, 20, 20, 0.88); }
+  html[data-boot='starting'] #boot,
+  html[data-boot='switching'] #boot,
+  html[data-boot='recovering'] #boot { display: flex; }
+
+  /* 极慢的呼吸：完全静止会被读成「卡死」，转圈又只是「在转」而不说明什么。
+     这里要的是「活着」这一个信息，其余交给文字。 */
+  #boot-mark {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 22px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, rgba(120, 190, 230, 0.55), rgba(120, 190, 230, 0) 70%);
+    animation: boot-breathe 2400ms ease-in-out infinite;
+  }
+  @keyframes boot-breathe {
+    0%, 100% { opacity: 0.35; transform: scale(0.92); }
+    50% { opacity: 1; transform: scale(1.06); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #boot-mark { animation: none; opacity: 0.8; }
+  }
+
+  .boot-locale { display: none; }
+  html[data-locale='en'] .boot-locale[data-locale='en'] { display: block; }
+  /* 中文兜底：locale 还没同步过来时按中文显示，别先闪一下英文。 */
+  html:not([data-locale='en']) .boot-locale[data-locale='zh'] { display: block; }
+
+  .boot-locale > * { display: none; margin: 0; }
+  html[data-boot='starting'] .boot-locale > [data-phase='starting'],
+  html[data-boot='switching'] .boot-locale > [data-phase='switching'],
+  html[data-boot='recovering'] .boot-locale > [data-phase='recovering'] { display: block; }
+
+  .boot-title { font-size: 17px; font-weight: 600; letter-spacing: 0.01em; }
+  .boot-sub {
+    margin-top: 10px;
+    font-size: 13px;
+    line-height: 1.7;
+    max-width: 30em;
+    opacity: 0.72;
+  }
 </style>
 </head>
 <body>
   <div class="sea sea-dark"></div>
   <div class="sea sea-light"></div>
+  <div id="chrome-glow" aria-hidden="true"></div>
+
+  <!-- 启动态（P8-D5）：两种语言各写一份静态文案，main 只设 data-boot 与
+       data-locale 两个属性，这一层不跑任何脚本。文案刻意说满两件事——「在做
+       什么」和「大概多久 / 是不是每次都这样」——只写「加载中」等于没说。 -->
+  <div id="boot" role="status" aria-live="polite">
+    <div id="boot-mark" aria-hidden="true"></div>
+    <div class="boot-locale" data-locale="zh">
+      <p class="boot-title" data-phase="starting">正在准备运行环境</p>
+      <p class="boot-sub" data-phase="starting">首次启动要为 Harness 安装依赖，通常需要几十秒到一分钟。这一步只在第一次发生，以后启动会快很多。</p>
+      <p class="boot-title" data-phase="switching">正在切换 Profile</p>
+      <p class="boot-sub" data-phase="switching">正在停止当前 Harness 并按新的配置重新启动。</p>
+      <p class="boot-title" data-phase="recovering">正在恢复上一个可用配置</p>
+      <p class="boot-sub" data-phase="recovering">刚才那次启动没成功，正在退回到上一次能正常工作的配置。</p>
+    </div>
+    <div class="boot-locale" data-locale="en">
+      <p class="boot-title" data-phase="starting">Preparing the runtime</p>
+      <p class="boot-sub" data-phase="starting">The first launch installs Harness dependencies, which usually takes half a minute to a minute. It happens only once — later launches are much faster.</p>
+      <p class="boot-title" data-phase="switching">Switching profile</p>
+      <p class="boot-sub" data-phase="switching">Stopping the current Harness and starting it again with the new configuration.</p>
+      <p class="boot-title" data-phase="recovering">Restoring the last working configuration</p>
+      <p class="boot-sub" data-phase="recovering">That launch did not succeed. Falling back to the configuration that last worked.</p>
+    </div>
+  </div>
 </body>
 </html>
