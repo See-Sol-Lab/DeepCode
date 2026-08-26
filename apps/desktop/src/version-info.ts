@@ -61,16 +61,20 @@ export class VersionInfoError extends Error {
  * @param what - 该 manifest 对应的事实名称（用于错误消息）。
  * @returns version 字符串。
  */
-export function readManifestVersion(path: string, what: string): string {
+export function readManifestVersion(path: string, what: string, zh = true): string {
   let raw: unknown
   try {
     raw = JSON.parse(readFileSync(path, 'utf8'))
   } catch (error) {
-    throw new VersionInfoError(`无法读取 ${what}（${path}）: ${String(error instanceof Error ? error.message : error)}`)
+    throw new VersionInfoError(zh
+      ? `无法读取 ${what}（${path}）: ${String(error instanceof Error ? error.message : error)}`
+      : `Could not read ${what} (${path}): ${String(error instanceof Error ? error.message : error)}`)
   }
   const version = (raw as Record<string, unknown>).version
   if (typeof version !== 'string' || version.length === 0) {
-    throw new VersionInfoError(`${what}（${path}）缺少有效的 version 字段`)
+    throw new VersionInfoError(zh
+      ? `${what}（${path}）缺少有效的 version 字段`
+      : `${what} (${path}) does not contain a valid version field`)
   }
   return version
 }
@@ -80,8 +84,8 @@ export function readManifestVersion(path: string, what: string): string {
  * @param root - 仓库根目录。
  * @returns version 字符串。
  */
-export function readDevAppVersion(root: string): string {
-  return readManifestVersion(join(root, DEV_APP_MANIFEST), 'DeepCode app manifest')
+export function readDevAppVersion(root: string, zh = true): string {
+  return readManifestVersion(join(root, DEV_APP_MANIFEST), 'DeepCode app manifest', zh)
 }
 
 /**
@@ -89,8 +93,8 @@ export function readDevAppVersion(root: string): string {
  * @param resourcesPath - process.resourcesPath。
  * @returns version 字符串。
  */
-export function readEmbeddedDshVersion(resourcesPath: string): string {
-  return readManifestVersion(join(resourcesPath, EMBEDDED_DSH_MANIFEST), 'embedded DSH runtime manifest')
+export function readEmbeddedDshVersion(resourcesPath: string, zh = true): string {
+  return readManifestVersion(join(resourcesPath, EMBEDDED_DSH_MANIFEST), 'embedded DSH runtime manifest', zh)
 }
 
 /**
@@ -98,8 +102,8 @@ export function readEmbeddedDshVersion(resourcesPath: string): string {
  * @param root - 仓库根目录。
  * @returns version 字符串。
  */
-export function readDevDshVersion(root: string): string {
-  return readManifestVersion(join(root, DEV_DSH_MANIFEST), 'DSH CLI manifest')
+export function readDevDshVersion(root: string, zh = true): string {
+  return readManifestVersion(join(root, DEV_DSH_MANIFEST), 'DSH CLI manifest', zh)
 }
 
 /**
@@ -108,14 +112,16 @@ export function readDevDshVersion(root: string): string {
  * @param resourcesPath - process.resourcesPath。
  * @returns commit 标识字符串。
  */
-export function readSourceCommitFile(resourcesPath: string): string {
+export function readSourceCommitFile(resourcesPath: string, zh = true): string {
   const path = join(resourcesPath, SOURCE_COMMIT_FILENAME)
   try {
     const content = readFileSync(path, 'utf8').trim()
-    if (content.length === 0) throw new Error('文件为空')
+    if (content.length === 0) throw new Error(zh ? '文件为空' : 'the file is empty')
     return content
   } catch (error) {
-    throw new VersionInfoError(`无法读取 embedded DSH source/commit 标识（${path}）: ${String(error instanceof Error ? error.message : error)}`)
+    throw new VersionInfoError(zh
+      ? `无法读取 embedded DSH source/commit 标识（${path}）: ${String(error instanceof Error ? error.message : error)}`
+      : `Could not read the embedded DSH source/commit identifier (${path}): ${String(error instanceof Error ? error.message : error)}`)
   }
 }
 
@@ -147,6 +153,8 @@ export interface VersionInfoInput {
   platform: string
   /** 运行架构（process.arch）。 */
   arch: string
+  /** 是否使用中文错误文案。 */
+  zh?: boolean
 }
 
 /**
@@ -157,13 +165,14 @@ export interface VersionInfoInput {
  * @returns 完整版本事实。
  */
 export function buildVersionInfo(input: VersionInfoInput): DeepCodeVersionInfo {
+  const zh = input.zh ?? true
   return {
     appVersion: input.appVersion,
     embeddedDshVersion: input.packaged
-      ? readEmbeddedDshVersion(input.root)
-      : readDevDshVersion(input.root),
+      ? readEmbeddedDshVersion(input.root, zh)
+      : readDevDshVersion(input.root, zh),
     sourceCommit: input.packaged
-      ? readSourceCommitFile(input.root)
+      ? readSourceCommitFile(input.root, zh)
       : readDevSourceCommit(input.root),
     electronVersion: input.electronVersion,
     platform: input.platform,

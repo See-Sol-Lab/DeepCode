@@ -77,6 +77,7 @@ describe('信息行与专家详情', () => {
     effectiveTheme: 'dark',
     highContrast: false,
     recoveryNotice: null,
+    sessionPressure: null,
     pluginManager: { profiles: [], error: null, operation: null, handoffPending: false, recovery: null },
     update: {
       channel: null, state: 'idle', result: null, latestVersion: null, releaseNotes: null,

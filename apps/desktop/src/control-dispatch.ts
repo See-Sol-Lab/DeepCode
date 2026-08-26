@@ -31,6 +31,8 @@ export interface ControlStateHolder {
 
 /** 调度器依赖注入面。 */
 export interface ControlDispatchDeps {
+  /** 读取当前界面是否使用中文。 */
+  zh?: () => boolean
   controller: DispatchControllerPort
   /** 读取 launcher state（磁盘权威）。 */
   readState: () => LauncherStateV1
@@ -40,6 +42,14 @@ export interface ControlDispatchDeps {
   discover: (dshHome: string) => Promise<ProfileDiscoveryV1>
   /** 原生目录选择；取消返回 null。 */
   pickDirectory: () => Promise<string | null>
+  /**
+   * 记录接管的 Existing Home 与自带 DSH runtime 之间的版本差异。
+   *
+   * 只在目标 Profile 真正晋升成功后调用一次——切换失败会回退到旧 Home，
+   * 那时记录的是一个并没有在跑的 Home，只会误导读它的人。可选：调度器
+   * 的测试关心的是切换语义，不该被迫提供一个诊断出口。
+   */
+  recordRuntimeSkew?: (homePath: string, profile: string) => void
   /**
    * 会打断运行中会话的动作的确认出口（切换 Profile / 重启 Harness /
    * 切回托管 Home）。只有 Harness 真的在跑、真的有东西会丢时才会被问
@@ -161,10 +171,12 @@ export function createControlDispatcher(deps: ControlDispatchDeps): (command: De
       }
       case 'choose-existing-profile': {
         const candidate = deps.holder.existingHomeCandidate
-        if (candidate === null) throw new Error('没有待确认的 Existing Home 候选')
+        if (candidate === null) throw new Error((deps.zh?.() ?? true) ? '没有待确认的 Existing Home 候选' : 'There is no pending Existing Home candidate')
         const target = candidate.discovery.profiles.find(profile => profile.name === command.profile)
         if (target === undefined || (target.staticStatus !== 'web-capable' && target.staticStatus !== 'candidate')) {
-          throw new Error(`候选 Home 中没有可启动的 profile ${JSON.stringify(command.profile)}`)
+          throw new Error((deps.zh?.() ?? true)
+            ? `候选 Home 中没有可启动的 profile ${JSON.stringify(command.profile)}`
+            : `The candidate Home has no startable profile named ${JSON.stringify(command.profile)}`)
         }
         const selection: HarnessSelection = {
           home: { kind: 'existing', path: candidate.path },
@@ -191,6 +203,7 @@ export function createControlDispatcher(deps: ControlDispatchDeps): (command: De
           && !status.recovered
           && sameHarnessSelection(deps.readState().active, selection)
         ) {
+          deps.recordRuntimeSkew?.(candidate.path, command.profile)
           deps.holder.discovery = candidate.discovery
           deps.holder.discoveryError = null
           deps.broadcast()

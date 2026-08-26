@@ -53,39 +53,41 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** 拒绝记录里的一切未知字段：未知键意味着 schema 无效，失败要明确。 */
-function rejectUnknownKeys(record: Record<string, unknown>, allowed: readonly string[], where: string): void {
+function rejectUnknownKeys(record: Record<string, unknown>, allowed: readonly string[], where: string, zh: boolean): void {
   for (const key of Object.keys(record)) {
     if (!allowed.includes(key)) {
-      throw new ProfileDiscoveryError(`${where}: 未知字段 "${key}"（允许: ${allowed.join(', ')}）`)
+      throw new ProfileDiscoveryError(zh
+        ? `${where}: 未知字段 "${key}"（允许: ${allowed.join(', ')}）`
+        : `${where}: unknown field "${key}" (allowed: ${allowed.join(', ')})`)
     }
   }
 }
 
 /** 校验单个 profile 条目。 */
-function parseDiscoveredProfile(raw: unknown, where: string): DiscoveredProfile {
-  if (!isRecord(raw)) throw new ProfileDiscoveryError(`${where}: 必须是对象`)
-  rejectUnknownKeys(raw, ['name', 'dir', 'bundles', 'staticStatus', 'evidence', 'error'], where)
+function parseDiscoveredProfile(raw: unknown, where: string, zh: boolean): DiscoveredProfile {
+  if (!isRecord(raw)) throw new ProfileDiscoveryError(zh ? `${where}: 必须是对象` : `${where}: must be an object`)
+  rejectUnknownKeys(raw, ['name', 'dir', 'bundles', 'staticStatus', 'evidence', 'error'], where, zh)
   const { name, dir } = raw
-  if (typeof name !== 'string' || name.length === 0) throw new ProfileDiscoveryError(`${where}.name: 必须是非空字符串`)
-  if (typeof dir !== 'string' || dir.length === 0) throw new ProfileDiscoveryError(`${where}.dir: 必须是非空字符串`)
+  if (typeof name !== 'string' || name.length === 0) throw new ProfileDiscoveryError(zh ? `${where}.name: 必须是非空字符串` : `${where}.name: must be a non-empty string`)
+  if (typeof dir !== 'string' || dir.length === 0) throw new ProfileDiscoveryError(zh ? `${where}.dir: 必须是非空字符串` : `${where}.dir: must be a non-empty string`)
   if (!Array.isArray(raw.bundles) || raw.bundles.some(bundle => typeof bundle !== 'string')) {
-    throw new ProfileDiscoveryError(`${where}.bundles: 必须是字符串数组`)
+    throw new ProfileDiscoveryError(zh ? `${where}.bundles: 必须是字符串数组` : `${where}.bundles: must be an array of strings`)
   }
   const status = raw.staticStatus
   if (status !== 'web-capable' && status !== 'headless' && status !== 'candidate' && status !== 'malformed') {
-    throw new ProfileDiscoveryError(`${where}.staticStatus: 未知值 ${JSON.stringify(status)}`)
+    throw new ProfileDiscoveryError(zh ? `${where}.staticStatus: 未知值 ${JSON.stringify(status)}` : `${where}.staticStatus: unknown value ${JSON.stringify(status)}`)
   }
   if (!Array.isArray(raw.evidence) || raw.evidence.some(line => typeof line !== 'string')) {
-    throw new ProfileDiscoveryError(`${where}.evidence: 必须是字符串数组`)
+    throw new ProfileDiscoveryError(zh ? `${where}.evidence: 必须是字符串数组` : `${where}.evidence: must be an array of strings`)
   }
   if (raw.error !== undefined && (typeof raw.error !== 'string' || raw.error.length === 0)) {
-    throw new ProfileDiscoveryError(`${where}.error: 必须是非空字符串`)
+    throw new ProfileDiscoveryError(zh ? `${where}.error: 必须是非空字符串` : `${where}.error: must be a non-empty string`)
   }
   if (status === 'malformed' && raw.error === undefined) {
-    throw new ProfileDiscoveryError(`${where}.error: malformed 必须携带非空 error`)
+    throw new ProfileDiscoveryError(zh ? `${where}.error: malformed 必须携带非空 error` : `${where}.error: malformed entries must include a non-empty error`)
   }
   if (status !== 'malformed' && raw.error !== undefined) {
-    throw new ProfileDiscoveryError(`${where}.error: 非 malformed 状态不得携带 error`)
+    throw new ProfileDiscoveryError(zh ? `${where}.error: 非 malformed 状态不得携带 error` : `${where}.error: only malformed entries may include an error`)
   }
   return {
     name,
@@ -105,26 +107,30 @@ function parseDiscoveredProfile(raw: unknown, where: string): DiscoveredProfile 
  * @param content - 子进程 stdout 的原始文本。
  * @returns 校验通过的 discovery 文档。
  */
-export function parseProfileDiscovery(content: string): ProfileDiscoveryV1 {
+export function parseProfileDiscovery(content: string, zh = true): ProfileDiscoveryV1 {
   let raw: unknown
   try {
     raw = JSON.parse(content)
   } catch (error) {
-    throw new ProfileDiscoveryError(`dsh profiles --json 输出不是有效 JSON: ${String(error instanceof Error ? error.message : error)}`)
+    throw new ProfileDiscoveryError(zh
+      ? `dsh profiles --json 输出不是有效 JSON: ${String(error instanceof Error ? error.message : error)}`
+      : `The output from dsh profiles --json is not valid JSON: ${String(error instanceof Error ? error.message : error)}`)
   }
-  if (!isRecord(raw)) throw new ProfileDiscoveryError('顶层: 必须是对象')
-  rejectUnknownKeys(raw, ['schemaVersion', 'dshHome', 'profiles'], '顶层')
+  if (!isRecord(raw)) throw new ProfileDiscoveryError(zh ? '顶层: 必须是对象' : 'top level: must be an object')
+  rejectUnknownKeys(raw, ['schemaVersion', 'dshHome', 'profiles'], zh ? '顶层' : 'top level', zh)
   if (raw.schemaVersion !== DISCOVERY_SCHEMA_VERSION) {
-    throw new ProfileDiscoveryError(`schemaVersion: 未知版本 ${JSON.stringify(raw.schemaVersion)}（当前支持: ${DISCOVERY_SCHEMA_VERSION}）`)
+    throw new ProfileDiscoveryError(zh
+      ? `schemaVersion: 未知版本 ${JSON.stringify(raw.schemaVersion)}（当前支持: ${DISCOVERY_SCHEMA_VERSION}）`
+      : `schemaVersion: unknown version ${JSON.stringify(raw.schemaVersion)} (supported: ${DISCOVERY_SCHEMA_VERSION})`)
   }
   if (typeof raw.dshHome !== 'string' || raw.dshHome.length === 0) {
-    throw new ProfileDiscoveryError('dshHome: 必须是非空字符串')
+    throw new ProfileDiscoveryError(zh ? 'dshHome: 必须是非空字符串' : 'dshHome: must be a non-empty string')
   }
-  if (!Array.isArray(raw.profiles)) throw new ProfileDiscoveryError('profiles: 必须是数组')
+  if (!Array.isArray(raw.profiles)) throw new ProfileDiscoveryError(zh ? 'profiles: 必须是数组' : 'profiles: must be an array')
   return {
     schemaVersion: 1,
     dshHome: raw.dshHome,
-    profiles: raw.profiles.map((profile, index) => parseDiscoveredProfile(profile, `profiles[${index}]`)),
+    profiles: raw.profiles.map((profile, index) => parseDiscoveredProfile(profile, `profiles[${index}]`, zh)),
   }
 }
 
@@ -156,7 +162,7 @@ export const DISCOVERY_STDOUT_LIMIT = 4 * 1024 * 1024
 /** stderr 只留尾部：诊断要的是最后那几行，不是全部。 */
 export const DISCOVERY_STDERR_TAIL = 64 * 1024
 
-export function runDshProfilesDiscovery(launch: DshLaunch, timeoutMs: number): Promise<ProfileDiscoveryV1> {
+export function runDshProfilesDiscovery(launch: DshLaunch, timeoutMs: number, zh = true): Promise<ProfileDiscoveryV1> {
   return new Promise((resolve, reject) => {
     const child = spawn(launch.command, launch.args, {
       cwd: launch.cwd,
@@ -177,7 +183,9 @@ export function runDshProfilesDiscovery(launch: DshLaunch, timeoutMs: number): P
     const timer = setTimeout(() => {
       child.kill()
       settle(() => {
-        reject(new ProfileDiscoveryError(redactSecrets(`dsh profiles --json 在 ${timeoutMs}ms 内未完成`)))
+        reject(new ProfileDiscoveryError(redactSecrets(zh
+          ? `dsh profiles --json 在 ${timeoutMs}ms 内未完成`
+          : `dsh profiles --json did not finish within ${timeoutMs}ms`)))
       })
     }, timeoutMs)
     child.stdout.on('data', (chunk: string) => {
@@ -185,7 +193,9 @@ export function runDshProfilesDiscovery(launch: DshLaunch, timeoutMs: number): P
         child.kill()
         settle(() => {
           reject(new ProfileDiscoveryError(
-            `dsh profiles --json 的输出超过 ${String(DISCOVERY_STDOUT_LIMIT)} 字符上限，已中止`,
+            zh
+              ? `dsh profiles --json 的输出超过 ${String(DISCOVERY_STDOUT_LIMIT)} 字符上限，已中止`
+              : `The output from dsh profiles --json exceeded the ${String(DISCOVERY_STDOUT_LIMIT)}-character limit and was stopped`,
           ))
         })
         return
@@ -198,17 +208,19 @@ export function runDshProfilesDiscovery(launch: DshLaunch, timeoutMs: number): P
     })
     child.once('error', (error) => {
       settle(() => {
-        reject(new ProfileDiscoveryError(redactSecrets(`无法启动 dsh profiles --json: ${error.message}`)))
+        reject(new ProfileDiscoveryError(redactSecrets(zh ? `无法启动 dsh profiles --json: ${error.message}` : `Could not start dsh profiles --json: ${error.message}`)))
       })
     })
     child.once('close', (code) => {
       settle(() => {
         if (code !== 0) {
-          reject(new ProfileDiscoveryError(redactSecrets(`dsh profiles --json 以退出码 ${String(code)} 结束：${stderr.trim()}`)))
+          reject(new ProfileDiscoveryError(redactSecrets(zh
+            ? `dsh profiles --json 以退出码 ${String(code)} 结束：${stderr.trim()}`
+            : `dsh profiles --json exited with code ${String(code)}: ${stderr.trim()}`)))
           return
         }
         try {
-          resolve(parseProfileDiscovery(stdout))
+          resolve(parseProfileDiscovery(stdout, zh))
         } catch (error) {
           reject(new ProfileDiscoveryError(redactSecrets(String(error instanceof Error ? error.message : error))))
         }
@@ -241,6 +253,8 @@ export function discoverProfiles(options: {
   nodeExecutable?: string
   /** 超时上限。 */
   timeoutMs?: number
+  /** 是否使用中文错误文案。 */
+  zh?: boolean
 }): Promise<ProfileDiscoveryV1> {
   const launch = resolveDshCommand({
     packaged: options.packaged,
@@ -252,5 +266,5 @@ export function discoverProfiles(options: {
     dshHome: options.dshHome,
     args: ['profiles', '--json'],
   })
-  return runDshProfilesDiscovery(launch, options.timeoutMs ?? DISCOVERY_TIMEOUT_MS)
+  return runDshProfilesDiscovery(launch, options.timeoutMs ?? DISCOVERY_TIMEOUT_MS, options.zh ?? true)
 }

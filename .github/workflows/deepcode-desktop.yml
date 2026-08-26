@@ -3,8 +3,8 @@
 # DeepCode-owned, desktop-focused verification. The upstream full matrix stays
 # in ci.yml; a desktop pull request must never pay for the whole repository,
 # and this lane must never turn green while skipping every DeepCode job:
-# pull requests always run the PR lane, and main pushes / manual dispatches
-# always run the Windows native packaged job.
+# pull requests always run the PR lane, and manual dispatches always run the
+# Windows native packaged job.
 #
 # Remote triggering of this workflow (real runs and deliberate-failure proofs)
 # happens only after an authorized push; locally, the structure and every
@@ -13,12 +13,13 @@
 name: DeepCode Desktop
 
 on:
+  # No main-push trigger: this fork pushes to main directly, and a lane that
+  # runs on every commit costs a Windows runner and a failure mail each time.
+  # The packaged Windows job is now reached by manual dispatch.
   pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 
-# Cancel superseded runs so stale pull requests and main pushes do not retain runner capacity.
+# Cancel superseded runs so stale pull requests do not retain runner capacity.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -87,9 +88,9 @@ jobs:
         run: git diff --check
 
   # ---- Windows native job: packaged distribution and acceptance -------------
-  # main pushes and manual dispatches only. Rebuilds everything from the
-  # current source, builds the sanitized distribution, runs the packaged
-  # parity + acceptance suite (Case A–F) against the real DeepCode.exe, and
+  # Manual dispatches only. Rebuilds everything from the current source,
+  # builds the sanitized distribution, runs the packaged parity + acceptance
+  # suite (Case A–F) against the real DeepCode.exe, and
   # uploads the installer (sanitized: no user data, credentials, or logs)
   # plus an acceptance report.
   desktop-windows-native:

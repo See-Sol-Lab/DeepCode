@@ -54,11 +54,13 @@ function prereleaseKey(identifier: string): number | string {
  * @returns -1（a < b）/ 0 / 1（a > b）。
  * @throws UpdateVersionError - 任一形态非法时。
  */
-export function compareVersions(a: string, b: string): VersionOrder {
+export function compareVersions(a: string, b: string, zh = true): VersionOrder {
   const left = VERSION_SHAPE.exec(a)
   const right = VERSION_SHAPE.exec(b)
   if (left === null || right === null) {
-    throw new UpdateVersionError(`非法的版本形态（${JSON.stringify(a)} vs ${JSON.stringify(b)}）`)
+    throw new UpdateVersionError(zh
+      ? `非法的版本形态（${JSON.stringify(a)} vs ${JSON.stringify(b)}）`
+      : `Invalid version format (${JSON.stringify(a)} vs ${JSON.stringify(b)})`)
   }
   const leftCore = [Number(left[1]), Number(left[2]), Number(left[3])]
   const rightCore = [Number(right[1]), Number(right[2]), Number(right[3])]
@@ -94,10 +96,10 @@ export function compareVersions(a: string, b: string): VersionOrder {
  * @param current - 当前 DeepCode app version。
  * @returns 是否应提示更新。
  */
-export function isNewerStable(latest: string, current: string): boolean {
+export function isNewerStable(latest: string, current: string, zh = true): boolean {
   if (!isVersionShape(latest) || !isVersionShape(current)) return false
   if (latest.includes('-')) return false
-  return compareVersions(latest, current) > 0
+  return compareVersions(latest, current, zh) > 0
 }
 
 // ---- provider contract：manifest 严格解析 ----
@@ -180,19 +182,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** 校验单个资产条目：https URL、64 位 hex digest、正数 size、合法文件名。 */
-export function parseUpdateAsset(raw: unknown, where: string): UpdateAsset {
-  if (!isRecord(raw)) throw new UpdateManifestError(`${where}: 必须是对象`)
+export function parseUpdateAsset(raw: unknown, where: string, zh = true): UpdateAsset {
+  if (!isRecord(raw)) throw new UpdateManifestError(zh ? `${where}: 必须是对象` : `${where}: must be an object`)
   const { url, sha256, size, filename } = raw
-  if (typeof url !== 'string' || url.length === 0) throw new UpdateManifestError(`${where}.url: 必须是非空字符串`)
-  if (!isSafeAssetUrl(url)) throw new UpdateManifestError(`${where}.url: 只接受 HTTPS URL（${url}）`)
+  if (typeof url !== 'string' || url.length === 0) {
+    throw new UpdateManifestError(zh ? `${where}.url: 必须是非空字符串` : `${where}.url: must be a non-empty string`)
+  }
+  if (!isSafeAssetUrl(url)) {
+    throw new UpdateManifestError(zh ? `${where}.url: 只接受 HTTPS URL（${url}）` : `${where}.url: only HTTPS URLs are accepted (${url})`)
+  }
   if (typeof sha256 !== 'string' || !SHA256_SHAPE.test(sha256)) {
-    throw new UpdateManifestError(`${where}.sha256: 必须是 64 位小写 hex`)
+    throw new UpdateManifestError(zh ? `${where}.sha256: 必须是 64 位小写 hex` : `${where}.sha256: must be 64 lowercase hexadecimal characters`)
   }
   if (typeof size !== 'number' || !Number.isFinite(size) || size <= 0) {
-    throw new UpdateManifestError(`${where}.size: 必须是正数`)
+    throw new UpdateManifestError(zh ? `${where}.size: 必须是正数` : `${where}.size: must be a positive number`)
   }
   if (typeof filename !== 'string' || !/^[A-Za-z0-9._-]+$/.test(filename)) {
-    throw new UpdateManifestError(`${where}.filename: 非法文件名（只允许安全字符，不得含目录成分）`)
+    throw new UpdateManifestError(zh
+      ? `${where}.filename: 非法文件名（只允许安全字符，不得含目录成分）`
+      : `${where}.filename: invalid filename (use safe characters only, with no path components)`)
   }
   return { url, sha256, size, filename }
 }
@@ -203,29 +211,31 @@ export function parseUpdateAsset(raw: unknown, where: string): UpdateAsset {
  * @param text - provider 返回的原始文本。
  * @returns 校验通过的 manifest。
  */
-export function parseUpdateManifest(text: string): UpdateManifest {
+export function parseUpdateManifest(text: string, zh = true): UpdateManifest {
   let raw: unknown
   try {
     raw = JSON.parse(text)
   } catch (error) {
-    throw new UpdateManifestError(`update manifest 不是有效 JSON: ${String(error instanceof Error ? error.message : error)}`)
+    throw new UpdateManifestError(zh
+      ? `update manifest 不是有效 JSON: ${String(error instanceof Error ? error.message : error)}`
+      : `The update manifest is not valid JSON: ${String(error instanceof Error ? error.message : error)}`)
   }
-  if (!isRecord(raw)) throw new UpdateManifestError('update manifest 顶层必须是对象')
+  if (!isRecord(raw)) throw new UpdateManifestError(zh ? 'update manifest 顶层必须是对象' : 'The top level of the update manifest must be an object')
   const { latestVersion, releaseNotes, assets } = raw
   if (typeof latestVersion !== 'string' || !isVersionShape(latestVersion)) {
-    throw new UpdateManifestError(`latestVersion 非法：${JSON.stringify(latestVersion)}`)
+    throw new UpdateManifestError(zh ? `latestVersion 非法：${JSON.stringify(latestVersion)}` : `latestVersion is invalid: ${JSON.stringify(latestVersion)}`)
   }
   if (latestVersion.includes('-')) {
-    throw new UpdateManifestError(`latestVersion 不能是 prerelease：${latestVersion}`)
+    throw new UpdateManifestError(zh ? `latestVersion 不能是 prerelease：${latestVersion}` : `latestVersion cannot be a prerelease: ${latestVersion}`)
   }
-  if (typeof releaseNotes !== 'string') throw new UpdateManifestError('releaseNotes 必须是字符串')
+  if (typeof releaseNotes !== 'string') throw new UpdateManifestError(zh ? 'releaseNotes 必须是字符串' : 'releaseNotes must be a string')
   if (!Array.isArray(assets) || assets.length === 0) {
-    throw new UpdateManifestError('assets 必须是非空数组')
+    throw new UpdateManifestError(zh ? 'assets 必须是非空数组' : 'assets must be a non-empty array')
   }
   return {
     latestVersion,
     releaseNotes,
-    assets: assets.map((asset, index) => parseUpdateAsset(asset, `assets[${index}]`)),
+    assets: assets.map((asset, index) => parseUpdateAsset(asset, `assets[${index}]`, zh)),
   }
 }
 
@@ -339,21 +349,23 @@ function pickLocation(headers: Record<string, unknown> | undefined): unknown {
  * @returns 绝对 HTTPS 目标地址。
  * @throws {UpdateDownloadError} Location 缺失、无法解析、非 HTTPS 或带凭据。
  */
-export function resolveRedirectTarget(current: string, location: unknown): string {
+export function resolveRedirectTarget(current: string, location: unknown, zh = true): string {
   if (typeof location !== 'string' || location.trim() === '') {
-    throw new UpdateDownloadError('更新服务器要求跳转，但没有给出目标地址')
+    throw new UpdateDownloadError(zh ? '更新服务器要求跳转，但没有给出目标地址' : 'The update server requested a redirect without providing a destination')
   }
   let next: URL
   try {
     next = new URL(location, current)
   } catch {
-    throw new UpdateDownloadError('更新服务器给出的跳转地址无法解析，已停止')
+    throw new UpdateDownloadError(zh ? '更新服务器给出的跳转地址无法解析，已停止' : 'The update server returned an invalid redirect URL; the download was stopped')
   }
   if (next.protocol !== 'https:') {
-    throw new UpdateDownloadError(`更新地址跳转到了非 HTTPS 地址（${next.protocol}//），已拒绝`)
+    throw new UpdateDownloadError(zh
+      ? `更新地址跳转到了非 HTTPS 地址（${next.protocol}//），已拒绝`
+      : `The update URL redirected to a non-HTTPS address (${next.protocol}//); the redirect was rejected`)
   }
   if (next.username !== '' || next.password !== '') {
-    throw new UpdateDownloadError('更新地址跳转到了带账号密码的地址，已拒绝')
+    throw new UpdateDownloadError(zh ? '更新地址跳转到了带账号密码的地址，已拒绝' : 'The update URL redirected to an address containing credentials; the redirect was rejected')
   }
   return next.toString()
 }
@@ -378,6 +390,7 @@ async function attemptDownload(
   signal: AbortSignal,
   onProgress: (bytes: number) => void,
   get: HttpGet,
+  zh = true,
 ): Promise<DownloadAttempt> {
   return new Promise((resolve, reject) => {
     let total = 0
@@ -406,7 +419,7 @@ async function attemptDownload(
       resolve(outcome)
     }
     const onAbort = (): void => {
-      fail(new UpdateDownloadError('下载已取消'))
+      fail(new UpdateDownloadError(zh ? '下载已取消' : 'The download was cancelled'))
     }
     requestRef.current = get(url, (response) => {
       const status = response.statusCode ?? 0
@@ -417,7 +430,13 @@ async function attemptDownload(
         return
       }
       if (status < 200 || status >= 300) {
-        fail(new UpdateDownloadError(`下载失败：HTTP ${String(status)}`))
+        // 404 与「出错了」是两回事：`releases/latest/download/<asset>` 在还没有
+        // 任何 release 时就是 404，那是「暂时没有可用更新」的事实，不是故障。
+        // 人工验收实测：V1 发布前点检查更新，用户看到的是「下载失败：HTTP 404」，
+        // 只会以为程序坏了。原始状态码留给诊断包，界面上说人话。
+        fail(new UpdateDownloadError(status === 404
+          ? (zh ? '当前没有可用的更新（服务器上还没有发布清单）' : 'No update is currently available (the server has no published manifest)')
+          : (zh ? `下载失败：HTTP ${String(status)}` : `Download failed: HTTP ${String(status)}`)))
         return
       }
       response.on('data', (chunk: unknown) => {
@@ -425,26 +444,34 @@ async function attemptDownload(
         const bytes = chunk as Uint8Array
         total += bytes.length
         if (total > maxBytes) {
-          fail(new UpdateDownloadError(`下载超过大小上限 ${String(maxBytes)} 字节，已中止`))
+          fail(new UpdateDownloadError(zh
+            ? `下载超过大小上限 ${String(maxBytes)} 字节，已中止`
+            : `The download exceeded the ${String(maxBytes)}-byte size limit and was stopped`))
           return
         }
         try {
           write(bytes)
           onProgress(total)
         } catch (error) {
-          fail(new UpdateDownloadError(`写入失败: ${String(error instanceof Error ? error.message : error)}`))
+          fail(new UpdateDownloadError(zh
+            ? `写入失败: ${String(error instanceof Error ? error.message : error)}`
+            : `Writing the download failed: ${String(error instanceof Error ? error.message : error)}`))
         }
       })
       response.on('end', () => {
         finish({ kind: 'done', bytes: total })
       })
       response.on('error', (error: unknown) => {
-        fail(new UpdateDownloadError(`下载中断: ${String(error instanceof Error ? error.message : error)}`))
+        fail(new UpdateDownloadError(zh
+          ? `下载中断: ${String(error instanceof Error ? error.message : error)}`
+          : `The download was interrupted: ${String(error instanceof Error ? error.message : error)}`))
       })
     })
     const request = requestRef.current
     request.on('error', (error: unknown) => {
-      fail(new UpdateDownloadError(`无法连接更新服务器: ${String(error instanceof Error ? error.message : error)}`))
+      fail(new UpdateDownloadError(zh
+        ? `无法连接更新服务器: ${String(error instanceof Error ? error.message : error)}`
+        : `Could not connect to the update server: ${String(error instanceof Error ? error.message : error)}`))
     })
     signal.addEventListener('abort', onAbort, { once: true })
   })
@@ -457,18 +484,23 @@ export async function streamDownload(
   signal: AbortSignal,
   onProgress: (bytes: number) => void,
   get: HttpGet,
+  zh = true,
 ): Promise<{ bytes: number }> {
-  if (signal.aborted) throw new UpdateDownloadError('下载已取消')
+  if (signal.aborted) throw new UpdateDownloadError(zh ? '下载已取消' : 'The download was cancelled')
   let target = url
   const visited = new Set<string>([url])
   for (let hop = 0; ; hop++) {
-    const attempt = await attemptDownload(target, write, maxBytes, signal, onProgress, get)
+    const attempt = await attemptDownload(target, write, maxBytes, signal, onProgress, get, zh)
     if (attempt.kind === 'done') return { bytes: attempt.bytes }
     if (hop >= MAX_UPDATE_REDIRECTS) {
-      throw new UpdateDownloadError(`更新地址跳转超过 ${String(MAX_UPDATE_REDIRECTS)} 次，已停止`)
+      throw new UpdateDownloadError(zh
+        ? `更新地址跳转超过 ${String(MAX_UPDATE_REDIRECTS)} 次，已停止`
+        : `The update URL redirected more than ${String(MAX_UPDATE_REDIRECTS)} times; the download was stopped`)
     }
-    target = resolveRedirectTarget(target, attempt.location)
-    if (visited.has(target)) throw new UpdateDownloadError('更新地址跳转绕回了走过的地址，已停止')
+    target = resolveRedirectTarget(target, attempt.location, zh)
+    if (visited.has(target)) {
+      throw new UpdateDownloadError(zh ? '更新地址跳转绕回了走过的地址，已停止' : 'The update URL redirected back to an address already visited; the download was stopped')
+    }
     visited.add(target)
   }
 }
@@ -492,6 +524,7 @@ export async function fetchManifestText(
   url: string,
   get: HttpGet,
   signal: AbortSignal,
+  zh = true,
   maxBytes = MANIFEST_MAX_BYTES,
 ): Promise<string> {
   const decoder = new StringDecoder('utf8')
@@ -505,6 +538,7 @@ export async function fetchManifestText(
     signal,
     () => {},
     get,
+    zh,
   )
   body += decoder.end()
   return body

@@ -79,6 +79,13 @@ function parsePatchList(
   } catch (error) {
     throw new Error(`${binName}: failed to parse ${label} ${file}: ${String(error)}`)
   }
+  // An empty file is "no patches", not a broken file. `yaml.load('')` yields
+  // undefined and a document that is only comments or `---` yields null;
+  // treating either as a parse failure turns one stray editor save into an
+  // app that never boots again, with nothing on screen pointing at this file.
+  // A file that genuinely holds the wrong shape (a mapping, a scalar) still
+  // fails below — that is a real mistake worth reporting.
+  if (parsed === undefined || parsed === null) return []
   if (!Array.isArray(parsed)) {
     throw new Error(`${binName}: ${label} ${file} must be a top-level YAML array of loader patch entries`)
   }

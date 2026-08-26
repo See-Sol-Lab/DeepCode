@@ -103,10 +103,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** 拒绝记录里的一切未知字段：未知键意味着 schema 越界，失败要明确。 */
-function rejectUnknownKeys(record: Record<string, unknown>, allowed: readonly string[], where: string): void {
+function rejectUnknownKeys(record: Record<string, unknown>, allowed: readonly string[], where: string, zh: boolean): void {
   for (const key of Object.keys(record)) {
     if (!allowed.includes(key)) {
-      throw new UiStateError(`${where}: 未知字段 "${key}"（允许: ${allowed.join(', ')}）`)
+      throw new UiStateError(zh
+        ? `${where}: 未知字段 "${key}"（允许: ${allowed.join(', ')}）`
+        : `${where}: unknown field "${key}" (allowed: ${allowed.join(', ')})`)
     }
   }
 }
@@ -117,32 +119,36 @@ function isFiniteNumber(raw: unknown): raw is number {
 }
 
 /** 严格校验并转换窗口几何。 */
-function parseWindowBounds(raw: unknown, where: string): WindowBoundsV1 {
-  if (!isRecord(raw)) throw new UiStateError(`${where}: 必须是对象或 null`)
-  rejectUnknownKeys(raw, ['x', 'y', 'width', 'height'], where)
+function parseWindowBounds(raw: unknown, where: string, zh: boolean): WindowBoundsV1 {
+  if (!isRecord(raw)) throw new UiStateError(zh ? `${where}: 必须是对象或 null` : `${where}: must be an object or null`)
+  rejectUnknownKeys(raw, ['x', 'y', 'width', 'height'], where, zh)
   const { x, y, width, height } = raw
   if (!isFiniteNumber(x) || !isFiniteNumber(y)) {
-    throw new UiStateError(`${where}: x/y 必须是有限数字`)
+    throw new UiStateError(zh ? `${where}: x/y 必须是有限数字` : `${where}: x/y must be finite numbers`)
   }
   if (!isFiniteNumber(width) || !isFiniteNumber(height) || width <= 0 || height <= 0) {
-    throw new UiStateError(`${where}: width/height 必须是正有限数字`)
+    throw new UiStateError(zh ? `${where}: width/height 必须是正有限数字` : `${where}: width/height must be positive finite numbers`)
   }
   return { x, y, width, height }
 }
 
 /** 严格校验并转换主题偏好。 */
-function parseThemePreference(raw: unknown, where: string): ThemePreference {
+function parseThemePreference(raw: unknown, where: string, zh: boolean): ThemePreference {
   if (typeof raw !== 'string' || !(THEME_PREFERENCES as readonly string[]).includes(raw)) {
-    throw new UiStateError(`${where}: 未知值 ${JSON.stringify(raw)}（允许: ${THEME_PREFERENCES.join(', ')}）`)
+    throw new UiStateError(zh
+      ? `${where}: 未知值 ${JSON.stringify(raw)}（允许: ${THEME_PREFERENCES.join(', ')}）`
+      : `${where}: unknown value ${JSON.stringify(raw)} (allowed: ${THEME_PREFERENCES.join(', ')})`)
   }
   return raw as ThemePreference
 }
 
 /** 严格校验并转换已确认恢复提示标识。 */
-function parseRecoveryHash(raw: unknown, where: string): string | null {
+function parseRecoveryHash(raw: unknown, where: string, zh: boolean): string | null {
   if (raw === null) return null
   if (typeof raw !== 'string' || raw.length === 0 || raw.length > RECOVERY_HASH_MAX) {
-    throw new UiStateError(`${where}: 必须是非空字符串（最长 ${RECOVERY_HASH_MAX} 字符）或 null`)
+    throw new UiStateError(zh
+      ? `${where}: 必须是非空字符串（最长 ${RECOVERY_HASH_MAX} 字符）或 null`
+      : `${where}: must be a non-empty string of at most ${RECOVERY_HASH_MAX} characters or null`)
   }
   return raw
 }
@@ -154,37 +160,42 @@ function parseRecoveryHash(raw: unknown, where: string): string | null {
  * @param content - 状态文件的原始文本。
  * @returns 校验通过的状态。
  */
-export function parseUiState(content: string): DesktopUiStateV1 {
+export function parseUiState(content: string, zh = true): DesktopUiStateV1 {
   let raw: unknown
   try {
     raw = JSON.parse(content)
   } catch (error) {
-    throw new UiStateError(`不是有效 JSON: ${String(error instanceof Error ? error.message : error)}`)
+    throw new UiStateError(zh
+      ? `不是有效 JSON: ${String(error instanceof Error ? error.message : error)}`
+      : `Not valid JSON: ${String(error instanceof Error ? error.message : error)}`)
   }
-  if (!isRecord(raw)) throw new UiStateError('顶层: 必须是对象')
+  if (!isRecord(raw)) throw new UiStateError(zh ? '顶层: 必须是对象' : 'top level: must be an object')
   rejectUnknownKeys(
     raw,
     ['schemaVersion', 'windowBounds', 'maximized', 'themePreference', 'acknowledgedRecoveryHash', 'expertDetailsExpanded', 'closeToTrayNoticeAcknowledged', 'terminalBounds'],
-    '顶层',
+    zh ? '顶层' : 'top level',
+    zh,
   )
   if (raw.schemaVersion !== UI_STATE_VERSION) {
-    throw new UiStateError(`schemaVersion: 未知版本 ${JSON.stringify(raw.schemaVersion)}（当前支持: ${UI_STATE_VERSION}）`)
+    throw new UiStateError(zh
+      ? `schemaVersion: 未知版本 ${JSON.stringify(raw.schemaVersion)}（当前支持: ${UI_STATE_VERSION}）`
+      : `schemaVersion: unknown version ${JSON.stringify(raw.schemaVersion)} (supported: ${UI_STATE_VERSION})`)
   }
-  if (raw.windowBounds === undefined) throw new UiStateError('windowBounds: 缺失')
-  if (raw.maximized === undefined) throw new UiStateError('maximized: 缺失')
-  if (raw.themePreference === undefined) throw new UiStateError('themePreference: 缺失')
-  if (raw.acknowledgedRecoveryHash === undefined) throw new UiStateError('acknowledgedRecoveryHash: 缺失')
-  if (raw.expertDetailsExpanded === undefined) throw new UiStateError('expertDetailsExpanded: 缺失')
-  if (raw.closeToTrayNoticeAcknowledged === undefined) throw new UiStateError('closeToTrayNoticeAcknowledged: 缺失')
-  if (typeof raw.maximized !== 'boolean') throw new UiStateError('maximized: 必须是布尔值')
-  if (typeof raw.expertDetailsExpanded !== 'boolean') throw new UiStateError('expertDetailsExpanded: 必须是布尔值')
-  if (typeof raw.closeToTrayNoticeAcknowledged !== 'boolean') throw new UiStateError('closeToTrayNoticeAcknowledged: 必须是布尔值')
+  if (raw.windowBounds === undefined) throw new UiStateError(zh ? 'windowBounds: 缺失' : 'windowBounds: is missing')
+  if (raw.maximized === undefined) throw new UiStateError(zh ? 'maximized: 缺失' : 'maximized: is missing')
+  if (raw.themePreference === undefined) throw new UiStateError(zh ? 'themePreference: 缺失' : 'themePreference: is missing')
+  if (raw.acknowledgedRecoveryHash === undefined) throw new UiStateError(zh ? 'acknowledgedRecoveryHash: 缺失' : 'acknowledgedRecoveryHash: is missing')
+  if (raw.expertDetailsExpanded === undefined) throw new UiStateError(zh ? 'expertDetailsExpanded: 缺失' : 'expertDetailsExpanded: is missing')
+  if (raw.closeToTrayNoticeAcknowledged === undefined) throw new UiStateError(zh ? 'closeToTrayNoticeAcknowledged: 缺失' : 'closeToTrayNoticeAcknowledged: is missing')
+  if (typeof raw.maximized !== 'boolean') throw new UiStateError(zh ? 'maximized: 必须是布尔值' : 'maximized: must be a boolean')
+  if (typeof raw.expertDetailsExpanded !== 'boolean') throw new UiStateError(zh ? 'expertDetailsExpanded: 必须是布尔值' : 'expertDetailsExpanded: must be a boolean')
+  if (typeof raw.closeToTrayNoticeAcknowledged !== 'boolean') throw new UiStateError(zh ? 'closeToTrayNoticeAcknowledged: 必须是布尔值' : 'closeToTrayNoticeAcknowledged: must be a boolean')
   return {
     schemaVersion: 2,
-    windowBounds: raw.windowBounds === null ? null : parseWindowBounds(raw.windowBounds, 'windowBounds'),
+    windowBounds: raw.windowBounds === null ? null : parseWindowBounds(raw.windowBounds, 'windowBounds', zh),
     maximized: raw.maximized,
-    themePreference: parseThemePreference(raw.themePreference, 'themePreference'),
-    acknowledgedRecoveryHash: parseRecoveryHash(raw.acknowledgedRecoveryHash, 'acknowledgedRecoveryHash'),
+    themePreference: parseThemePreference(raw.themePreference, 'themePreference', zh),
+    acknowledgedRecoveryHash: parseRecoveryHash(raw.acknowledgedRecoveryHash, 'acknowledgedRecoveryHash', zh),
     expertDetailsExpanded: raw.expertDetailsExpanded,
     closeToTrayNoticeAcknowledged: raw.closeToTrayNoticeAcknowledged,
     // terminalBounds 是版本 2 存续期内后加的字段（P8-D28），对缺失宽容一次：
@@ -192,7 +203,7 @@ export function parseUiState(content: string): DesktopUiStateV1 {
     // 白丢主窗几何。未知字段仍然严格拒绝，schema 的边界没有放松。
     terminalBounds: raw.terminalBounds === undefined || raw.terminalBounds === null
       ? null
-      : parseWindowBounds(raw.terminalBounds, 'terminalBounds'),
+      : parseWindowBounds(raw.terminalBounds, 'terminalBounds', zh),
   }
 }
 
@@ -225,8 +236,8 @@ export function serializeUiState(state: DesktopUiStateV1): string {
  * 任何非法字段值都会抛出 UiStateError。
  * @param state - 待写盘的状态。
  */
-export function assertUiState(state: DesktopUiStateV1): void {
-  parseUiState(JSON.stringify(state))
+export function assertUiState(state: DesktopUiStateV1, zh = true): void {
+  parseUiState(JSON.stringify(state), zh)
 }
 
 /** UI 状态存取器：读（损坏回退默认）、写（校验 + 原子替换）。 */
@@ -252,7 +263,7 @@ export interface UiStateStore {
  * @param userDataDir - Electron userData 目录的绝对路径。
  * @returns 状态存取器。
  */
-export function createUiStateStore(userDataDir: string): UiStateStore {
+export function createUiStateStore(userDataDir: string, zh: () => boolean = () => true): UiStateStore {
   const filePath = join(userDataDir, UI_STATE_FILENAME)
   return {
     filePath,
@@ -262,20 +273,25 @@ export function createUiStateStore(userDataDir: string): UiStateStore {
         content = readFileSync(filePath, 'utf8')
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { state: defaultUiState(), error: null }
-        return { state: defaultUiState(), error: `读取失败: ${String(error instanceof Error ? error.message : error)}` }
+        return {
+          state: defaultUiState(),
+          error: zh()
+            ? `读取失败: ${String(error instanceof Error ? error.message : error)}`
+            : `Read failed: ${String(error instanceof Error ? error.message : error)}`,
+        }
       }
       try {
-        return { state: parseUiState(content), error: null }
+        return { state: parseUiState(content, zh()), error: null }
       } catch (error) {
         return { state: defaultUiState(), error: String(error instanceof Error ? error.message : error) }
       }
     },
     write(state) {
-      assertUiState(state)
+      assertUiState(state, zh())
       atomicWriteFile(
         filePath,
         serializeUiState(state),
-        message => new UiStateError(`写入失败: ${message}`),
+        message => new UiStateError(zh() ? `写入失败: ${message}` : `Write failed: ${message}`),
       )
     },
   }

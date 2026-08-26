@@ -28,6 +28,7 @@ function model(overrides: Partial<DesktopControlModel> = {}): DesktopControlMode
     effectiveTheme: 'dark',
     highContrast: false,
     recoveryNotice: null,
+    sessionPressure: null,
     pluginManager: { profiles: [], error: null, operation: null, handoffPending: false, recovery: null },
     update: {
       channel: null, state: 'idle', result: null, latestVersion: null, releaseNotes: null,
@@ -52,7 +53,7 @@ describe('trayMenuTemplate', () => {
       '打开 DeepCode',
       '当前 Profile：web（托管模式）',
       'Harness 状态：运行中 · web',
-      'Profiles',
+      '切换 Profile',
       '重启 Harness',
       '打开 DSH Terminal',
       '检查更新',
@@ -76,7 +77,7 @@ describe('trayMenuTemplate', () => {
 
   it('Profiles submenu：radio 勾选 active、web-capable/candidate 可选、headless/malformed 禁用', () => {
     const items = trayMenuTemplate({ model: model(), locale: 'zh' })
-    const profiles = items.find(item => item.label === 'Profiles')!.submenu!
+    const profiles = items.find(item => item.label === '切换 Profile')!.submenu!
     expect(profiles.map(item => item.label)).toEqual(['web', 'custom — 尚未验证，可以尝试启动', 'tui', 'broken'])
     expect(profiles[0]).toMatchObject({ checked: true, enabled: true, action: { kind: 'switch-profile', profile: 'web' } })
     expect(profiles[1]).toMatchObject({ enabled: true, action: { kind: 'switch-profile', profile: 'custom' } })
@@ -88,7 +89,7 @@ describe('trayMenuTemplate', () => {
 
   it('discovery 尚未完成时 submenu 只有禁用占位', () => {
     const items = trayMenuTemplate({ model: model({ profiles: null }), locale: 'zh' })
-    const profiles = items.find(item => item.label === 'Profiles')!.submenu!
+    const profiles = items.find(item => item.label === '切换 Profile')!.submenu!
     expect(profiles).toEqual([{ label: '（尚未发现，点击"刷新 Profiles"）', enabled: false }])
   })
 

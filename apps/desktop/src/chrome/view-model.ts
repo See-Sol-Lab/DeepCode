@@ -26,6 +26,8 @@ const ZH: ChromeStrings = {
   // B3-15（住户 2026-08-24 批准）：Harness 崩掉时，设置页随官方 web UI 一起
   // 不可达（它就住在 3080 里），主窗口原本一个重启入口都没有，只剩系统托盘。
   // 故障态恰恰最需要它，而 chrome 层是我们自己的 renderer，DSH 死了它还活着。
+  'menu.plugin-recovery.restore': '恢复上次插件变更',
+  'menu.plugin-recovery.open-profile': '打开 Profile 文件夹',
   'menu.restart-harness': '重启 Harness',
   'menu.terminal': 'DSH 终端',
   'menu.browser.show': '显示浏览器面板',
@@ -166,6 +168,8 @@ const ZH: ChromeStrings = {
 
 const EN: ChromeStrings = {
   'menu.about': 'About DeepCode',
+  'menu.plugin-recovery.restore': 'Undo Last Plugin Change',
+  'menu.plugin-recovery.open-profile': 'Open Profile Folder',
   'menu.restart-harness': 'Restart Harness',
   'menu.terminal': 'DSH Terminal',
   'menu.browser.show': 'Show Browser Panel',

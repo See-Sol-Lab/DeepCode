@@ -48,10 +48,10 @@ export interface DesktopEvent {
  * @param event - 事件。
  * @returns Markdown 文本（以标题开始，以空行结束）。
  */
-export function renderDesktopEvent(event: DesktopEvent): string {
+export function renderDesktopEvent(event: DesktopEvent, zh = true): string {
   const lines = [`## ${event.at} ${event.title}`, '']
   for (const [heading, body] of event.sections) {
-    lines.push(`**${heading}**：${body}`, '')
+    lines.push(`**${heading}**${zh ? '：' : ': '}${body}`, '')
   }
   return lines.join('\n')
 }
@@ -65,15 +65,23 @@ export function renderDesktopEvent(event: DesktopEvent): string {
  * @param maxBytes - 容量上限。
  * @returns 新的文件内容。
  */
-export function foldDesktopEvent(existing: string, entry: string, maxBytes = EVENTS_MAX_BYTES): string {
-  const header = [
-    '# DeepCode 桌面端事件',
-    '',
-    '这个文件记录 DeepCode 桌面端发生的、你可能需要知道的事：最新的在最上面。',
-    '如果用户问起某次失败，这里的事实就是答案，照实说即可。',
-    '',
-  ].join('\n')
-  const body = existing.startsWith('# DeepCode 桌面端事件')
+export function foldDesktopEvent(existing: string, entry: string, maxBytes = EVENTS_MAX_BYTES, zh = true): string {
+  const header = (zh
+    ? [
+      '# DeepCode 桌面端事件',
+      '',
+      '这个文件记录 DeepCode 桌面端发生的、你可能需要知道的事：最新的在最上面。',
+      '如果用户问起某次失败，这里的事实就是答案，照实说即可。',
+      '',
+    ]
+    : [
+      '# DeepCode Desktop Events',
+      '',
+      'This file records DeepCode Desktop events that may matter to you, with the newest event first.',
+      'If the user asks about a failure, explain the facts recorded here accurately.',
+      '',
+    ]).join('\n')
+  const body = existing.startsWith('# DeepCode ')
     ? existing.slice(existing.indexOf('\n## ') + 1)
     : existing
   let merged = `${entry}${body.startsWith('##') ? body : ''}`
@@ -94,7 +102,7 @@ export function foldDesktopEvent(existing: string, entry: string, maxBytes = EVE
  * @param event - 事件。
  * @returns 事件文件的完整路径；写失败返回 null。
  */
-export function appendDesktopEvent(homePath: string, event: DesktopEvent): string | null {
+export function appendDesktopEvent(homePath: string, event: DesktopEvent, zh = true): string | null {
   if (homePath === '') return null
   const dir = join(homePath, EVENTS_DIRNAME)
   const file = join(dir, EVENTS_FILENAME)
@@ -107,10 +115,12 @@ export function appendDesktopEvent(homePath: string, event: DesktopEvent): strin
       // 首次写入：没有旧文件是正常情况。
       existing = ''
     }
-    atomicWriteFile(file, foldDesktopEvent(existing, renderDesktopEvent(event)), message => new Error(message))
+    atomicWriteFile(file, foldDesktopEvent(existing, renderDesktopEvent(event, zh), EVENTS_MAX_BYTES, zh), message => new Error(message))
     return file
   } catch (error) {
-    console.error(`[deepcode] 事件日志写入失败: ${String(error instanceof Error ? error.message : error)}`)
+    console.error(zh
+      ? `[deepcode] 事件日志写入失败: ${String(error instanceof Error ? error.message : error)}`
+      : `[deepcode] Writing the event log failed: ${String(error instanceof Error ? error.message : error)}`)
     return null
   }
 }

@@ -33,13 +33,14 @@ import {
 /** Update runner 的依赖注入面（main 与测试各自提供）。 */
 export interface UpdateRunnerDeps {
   /** 抓取 manifest 文本（HTTP 客户端注入面；main 用 https.get）。 */
-  fetchText: (url: string, signal: AbortSignal) => Promise<string>
+  fetchText: (url: string, signal: AbortSignal, zh?: boolean) => Promise<string>
   /** 下载资产到 destPath，返回实际字节数与 SHA-256（可取消、限长）。 */
   downloadAsset: (
     asset: UpdateAsset,
     destPath: string,
     signal: AbortSignal,
     onProgress: (bytes: number) => void,
+    zh?: boolean,
   ) => Promise<{ bytes: number; sha256: string }>
   /** 启动已验证 installer（main 用 spawn + settleSpawn；失败抛错）。 */
   spawnInstaller: (path: string) => Promise<void>
@@ -58,8 +59,8 @@ export function createUpdateRunnerDeps(
   spawnInstaller: UpdateRunnerDeps['spawnInstaller'],
 ): UpdateRunnerDeps {
   return {
-    fetchText: async (url, signal) => fetchManifestText(url, httpGet, signal),
-    downloadAsset: async (asset, destPath, signal, onProgress) => {
+    fetchText: async (url, signal, zh = true) => fetchManifestText(url, httpGet, signal, zh),
+    downloadAsset: async (asset, destPath, signal, onProgress, zh = true) => {
       const fd = openSync(destPath, 'w')
       const hash = createHash('sha256')
       try {
@@ -74,6 +75,7 @@ export function createUpdateRunnerDeps(
           signal,
           onProgress,
           httpGet,
+          zh,
         )
         return { bytes, sha256: hash.digest('hex') }
       } finally {
@@ -104,12 +106,13 @@ export async function runUpdateCheck(
   deps: UpdateRunnerDeps,
   feedUrl: string | null,
   currentVersion: string,
+  zh = true,
 ): Promise<CheckOutcome> {
   if (feedUrl === null) return { kind: 'unconfigured' }
   try {
-    const text = await deps.fetchText(feedUrl, new AbortController().signal)
-    const manifest = parseUpdateManifest(text)
-    if (isNewerStable(manifest.latestVersion, currentVersion)) {
+    const text = await deps.fetchText(feedUrl, new AbortController().signal, zh)
+    const manifest = parseUpdateManifest(text, zh)
+    if (isNewerStable(manifest.latestVersion, currentVersion, zh)) {
       return { kind: 'available', manifest }
     }
     return { kind: 'current' }
@@ -142,19 +145,32 @@ export async function runUpdateDownload(
   destPath: string,
   signal: AbortSignal,
   onProgress: (bytes: number) => void,
+  zh = true,
 ): Promise<DownloadOutcome> {
   const asset = manifest.assets[0]
-  if (asset === undefined) return { kind: 'failed', message: 'manifest 没有可下载的资产' }
+  if (asset === undefined) {
+    return { kind: 'failed', message: zh ? 'manifest 没有可下载的资产' : 'The manifest has no downloadable assets' }
+  }
   try {
-    const { bytes, sha256 } = await deps.downloadAsset(asset, destPath, signal, onProgress)
+    const { bytes, sha256 } = await deps.downloadAsset(asset, destPath, signal, onProgress, zh)
     if (bytes !== asset.size) {
       cleanupPartial(destPath)
-      return { kind: 'failed', message: `下载字节数与 manifest 不符（expected ${String(asset.size)}, got ${String(bytes)}）——绝不执行` }
+      return {
+        kind: 'failed',
+        message: zh
+          ? `下载字节数与 manifest 不符（expected ${String(asset.size)}, got ${String(bytes)}）——绝不执行`
+          : `The downloaded byte count does not match the manifest (expected ${String(asset.size)}, got ${String(bytes)}); the installer will not run`,
+      }
     }
     const verdict = verifyDigest(asset.sha256, sha256)
     if (!verdict.ok) {
       cleanupPartial(destPath)
-      return { kind: 'failed', message: `SHA-256 不匹配（expected ${verdict.expected.slice(0, 12)}…）——绝不执行` }
+      return {
+        kind: 'failed',
+        message: zh
+          ? `SHA-256 不匹配（expected ${verdict.expected.slice(0, 12)}…）——绝不执行`
+          : `The SHA-256 digest does not match (expected ${verdict.expected.slice(0, 12)}…); the installer will not run`,
+      }
     }
     return {
       kind: 'verified',

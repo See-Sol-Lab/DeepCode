@@ -52,6 +52,7 @@ window.__ModuleLoader__.load({
         'status.running': '运行中',
         'status.recovered': '已恢复',
         'status.failed': '启动失败',
+        'sessions.warn': '你的对话数量已经超过 5 万个，程序内存可能会被撑爆，建议清理一些不再需要的对话。',
         'profiles.title': 'Profiles',
         'profiles.none': '（该 Home 下没有 profile）',
         'profiles.not-discovered': '（尚未发现，点击「刷新 Profiles」）',
@@ -78,7 +79,9 @@ window.__ModuleLoader__.load({
         'plugins.action.update': '更新插件',
         'plugins.action.install': '安装 / 修复依赖',
         'plugins.spec.hint': '在下面输入插件包名，点「执行」即可安装：',
-        'plugins.spec.placeholder': 'my-plugin、@scope/pkg@^1.0.0、./local/dir',
+        'plugins.spec.market': '建议优先安装插件市场 dsh-plugin，装好后就能在图形界面里浏览全部插件，不必再手打包名。',
+        'plugins.spec.limits': '也可以填本地插件文件夹的完整路径。不支持 ^1.0.0 这类范围写法；本地路径不能带空格。',
+        'plugins.spec.placeholder': '插件包名，如 dsh-plugin',
         'plugins.run': '执行',
         'plugins.cancel': '取消',
         'plugins.verify-note': '写入前会弹出目标确认；发现、浏览与刷新不写入任何内容。',
@@ -164,6 +167,7 @@ window.__ModuleLoader__.load({
         'status.running': 'Running',
         'status.recovered': 'Recovered',
         'status.failed': 'Boot failed',
+        'sessions.warn': 'You have more than 50,000 conversations. This can grow large enough to exhaust the app memory. Consider clearing out ones you no longer need.',
         'profiles.title': 'Profiles',
         'profiles.none': '(no profiles under this home)',
         'profiles.not-discovered': '(not discovered yet — click "Refresh Profiles")',
@@ -190,7 +194,9 @@ window.__ModuleLoader__.load({
         'plugins.action.update': 'Update plugin',
         'plugins.action.install': 'Install / repair dependencies',
         'plugins.spec.hint': 'Enter the plugin package name below, then click Run:',
-        'plugins.spec.placeholder': 'my-plugin, @scope/pkg@^1.0.0, ./local/dir',
+        'plugins.spec.market': 'Tip: install the plugin marketplace dsh-plugin first, then browse every plugin from its UI instead of typing package names.',
+        'plugins.spec.limits': 'A full path to a local plugin folder also works. Range specs such as ^1.0.0 are not supported, and local paths must not contain spaces.',
+        'plugins.spec.placeholder': 'package name, e.g. dsh-plugin',
         'plugins.run': 'Run',
         'plugins.cancel': 'Cancel',
         'plugins.verify-note': 'A target confirmation is shown before any write. Discovery and browsing never write.',
@@ -298,6 +304,13 @@ window.__ModuleLoader__.load({
         color: 'var(--dsw-alias-label-primary)', fontSize: '13px', lineHeight: '20px',
       },
       note: { fontSize: '12px', lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary)' },
+      warnBox: {
+        display: 'flex', flexDirection: 'column', gap: '6px',
+        padding: '10px 12px', borderRadius: '10px',
+        border: '1px solid var(--dsw-alias-state-error-primary)',
+        color: 'var(--dsw-alias-state-error-primary)',
+        fontSize: '13px', lineHeight: '20px',
+      },
       error: { fontSize: '13px', lineHeight: '20px', color: 'var(--dsw-alias-state-error-primary)', overflowWrap: 'anywhere' },
       output: {
         maxHeight: '220px', overflow: 'auto', margin: 0, padding: '10px 12px',
@@ -463,6 +476,12 @@ window.__ModuleLoader__.load({
         }
 
         return h('div', { style: S.section },
+          // 越线才出现，出现就在最上面：这是打开设置第一眼要看到的东西。
+          // 只陈述事实与后果，不提供"一键清理"——删的是用户自己的对话，
+          // 该由他在官方界面里逐个决定，而不是我们代劳。
+          m.sessionPressure !== null
+            ? h('div', { style: S.warnBox, 'data-deepcode': 'session-pressure' }, t('sessions.warn'))
+            : null,
           d.error !== null ? h('div', { style: S.error }, t('bridge.error'), d.error) : null,
           busy ? h('div', { style: S.note }, t('busy')) : null,
           line(t('harness.status'), statusText, undefined, t('format.colon'), 'harness-status'),
@@ -597,7 +616,12 @@ window.__ModuleLoader__.load({
               h('input', {
                 style: S.input, 'data-deepcode': 'plugin-spec', value: spec, placeholder: t('plugins.spec.placeholder'),
                 onChange: function (event) { setSpec(event.target.value) },
-              }))
+              }),
+              // 住户 2026-08-27 定的「矛盾转移」：与其在这里教用户 pnpm 的写法，
+              // 不如引导他装一次插件市场——装完既学会了这个输入框，也从此有了
+              // 图形化的插件浏览界面，不用再回来手打包名。
+              action === 'add' ? h('div', { style: S.note }, t('plugins.spec.market')) : null,
+              h('div', { style: S.note }, t('plugins.spec.limits')))
             : null,
           h('div', { style: S.row },
             btn({ testId: 'plugin-run', disabled: !canRun, onClick: function () {

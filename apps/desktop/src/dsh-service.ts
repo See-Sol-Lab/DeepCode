@@ -836,7 +836,7 @@ export function portInUse(host: string, port: number, timeoutMs = 1_000): Promis
  * @param timeoutMs - 总超时。
  * @returns 就绪时 resolve；超时后 reject。
  */
-export function waitForServer(host: string, port: number, timeoutMs = READY_TIMEOUT_MS): Promise<void> {
+export function waitForServer(host: string, port: number, timeoutMs = READY_TIMEOUT_MS, zh = true): Promise<void> {
   const startedAt = Date.now()
   return new Promise((resolve, reject) => {
     let settled = false
@@ -850,7 +850,9 @@ export function waitForServer(host: string, port: number, timeoutMs = READY_TIME
       settled = true
       inFlight?.abort()
       if (retryTimer !== undefined) clearTimeout(retryTimer)
-      reject(new Error(`DSH 服务在 ${String(timeoutMs)}ms 内未就绪（${host}:${port}）`))
+      reject(new Error(zh
+        ? `DSH 服务在 ${String(timeoutMs)}ms 内未就绪（${host}:${port}）`
+        : `The DSH service was not ready within ${String(timeoutMs)}ms (${host}:${port})`))
     }, timeoutMs)
     const succeed = (): void => {
       if (settled) return
@@ -905,6 +907,7 @@ export function stopProcess(
   // 终止都闪一个黑框。
   spawnTreeKill: (pid: number) => ChildProcess = pid => spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }),
   hardTimeoutMs = STOP_HARD_TIMEOUT_MS,
+  zh = true,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     if (child.exitCode !== null || child.signalCode !== null) {
@@ -921,9 +924,9 @@ export function stopProcess(
       if (settled) return
       settled = true
       clearTimeout(timer)
-      reject(new ProcessStopError(
-        `子进程（pid ${String(child.pid ?? 'unknown')}）在 ${String(hardTimeoutMs)}ms 内没有退出`,
-      ))
+      reject(new ProcessStopError(zh
+        ? `子进程（pid ${String(child.pid ?? 'unknown')}）在 ${String(hardTimeoutMs)}ms 内没有退出`
+        : `The child process (pid ${String(child.pid ?? 'unknown')}) did not exit within ${String(hardTimeoutMs)}ms`))
     }, hardTimeoutMs)
     child.once('exit', () => {
       if (settled) return

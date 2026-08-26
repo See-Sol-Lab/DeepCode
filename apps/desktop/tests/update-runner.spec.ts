@@ -138,7 +138,7 @@ describe('runUpdateCheck（本机 mock server 真链路）', () => {
     }
   })
 
-  it('current：同版本 → current；HTTP 404 页面报 HTTP 状态而非"不是有效 JSON"', async () => {
+  it('current：同版本 → current；404 说成「没有可用更新」而非"不是有效 JSON"', async () => {
     const current = await startMock(new Map([['/manifest.json', {
       status: 200,
       body: Buffer.from(JSON.stringify(manifestFor('0.1.0', {
@@ -155,7 +155,8 @@ describe('runUpdateCheck（本机 mock server 真链路）', () => {
     try {
       const outcome = await runUpdateCheck(makeDeps(async () => {}), `${notFound.url}/manifest.json`, '0.1.0')
       expect(outcome.kind).toBe('error')
-      if (outcome.kind === 'error') expect(outcome.message).toContain('HTTP 404')
+      // 404 是「还没发布过」的事实，不是解析失败，也不该说成下载出错（2026-08-27）。
+      if (outcome.kind === 'error') expect(outcome.message).toContain('没有可用的更新')
     } finally {
       notFound.close()
     }

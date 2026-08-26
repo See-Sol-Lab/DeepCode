@@ -592,7 +592,15 @@ function assembleRuntime(): void {
     }
     rmSync(RUNTIME_DIR, { recursive: true, force: true })
     mkdirSync(RUNTIME_DIR, { recursive: true })
-    cpSync(join(STAGING, 'node_modules'), join(RUNTIME_DIR, 'node_modules'), { recursive: true })
+    // sourcemap 不随产物出厂：打包态从不读它——我们没装 source-map-support，
+    // 启动 DSH 的 argv 也没有 --enable-source-maps（见 dsh-service.ts 的
+    // resolveDshCommand）。而它们是 3,863 个文件、21.4 MB：安装时要逐个写盘，
+    // 之后每次 require 都被杀软实时扫描碰一遍。符号本身没丢，留在 npm 包与
+    // CI 产物里，需要回溯堆栈时随时取得到。
+    cpSync(join(STAGING, 'node_modules'), join(RUNTIME_DIR, 'node_modules'), {
+      recursive: true,
+      filter: source => !source.endsWith('.map'),
+    })
     // npm's hidden lockfile records every tarball's `resolved` as a file: URL
     // relative to the staging directory — a path through the build user's home
     // and repository location. The packaged app never runs npm, so the file
@@ -640,6 +648,200 @@ function summarize(): void {
   if (installers.length === 0) throw new Error('build-desktop-dist: no NSIS installer produced')
 }
 
+/** Windows' classic path limit; the ceiling every shipped file has to fit under. */
+const MAX_PATH = 260
+
+/**
+ * Install directory length that must still work after this build.
+ *
+ * The per-user default is `%LOCALAPPDATA%\Programs\DeepCode`, which lands
+ * around 54 characters for an ordinary account name. 60 is that with a little
+ * air: below it, a normal install is already at risk and the build has no
+ * business producing an installer.
+ */
+const MIN_INSTALL_BUDGET = 60
+
+/** The installer's own ceiling on `$INSTDIR`, declared in `installer.nsh`. */
+function installerGateLength(): number {
+  const nsh = join(ROOT, 'apps', 'desktop', 'build', 'installer.nsh')
+  const declaration = /!define\s+DEEPCODE_MAX_INSTDIR_LEN\s+(\d+)/.exec(readFileSync(nsh, 'utf8'))
+  if (declaration === null) {
+    throw new Error(`build-desktop-dist: ${nsh} no longer declares DEEPCODE_MAX_INSTDIR_LEN; the installer would stop refusing over-long install directories`)
+  }
+  return Number(declaration[1])
+}
+
+/**
+ * Fail the build when the payload leaves no room for an install directory.
+ *
+ * Windows refuses paths past 260 characters, and the failure does not surface
+ * as "path too long" — upstream has six reports of the NSIS uninstaller
+ * aborting on a deep install and telling the user "DSH Desktop cannot be
+ * closed, please close it and retry". Users then close the app, kill the
+ * process, reboot, and none of it helps, because closing was never the
+ * problem. The install succeeds and the *uninstall* is what breaks, so the
+ * damage shows up months later during an upgrade.
+ *
+ * Nothing here is ours: the longest paths come from third-party packages that
+ * nest their own node_modules and ship several build variants of one file. We
+ * cannot shorten them, so the least we can do is know our own margin, print it
+ * every build, and refuse to ship once it is gone.
+ * @param unpackedDir - the win-unpacked directory to measure.
+ * @throws when the remaining budget cannot hold an ordinary install path.
+ */
+function requirePathLengthHeadroom(unpackedDir: string): void {
+  let longest = ''
+  const walk = (directory: string, prefix: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const relative = prefix === '' ? entry.name : prefix + String.fromCharCode(92) + entry.name
+      if (entry.isDirectory()) {
+        walk(join(directory, entry.name), relative)
+        continue
+      }
+      if (relative.length > longest.length) longest = relative
+    }
+  }
+  walk(unpackedDir, '')
+  // +1 for the separator between the install directory and the relative path.
+  const budget = MAX_PATH - longest.length - 1
+  console.log(
+    `build-desktop-dist: longest shipped path is ${String(longest.length)} chars,`
+    + ` leaving ${String(budget)} for the install directory (need >= ${String(MIN_INSTALL_BUDGET)})`,
+  )
+  const gate = installerGateLength()
+  if (gate > budget) {
+    throw new Error(
+      `build-desktop-dist: installer.nsh admits install directories up to ${String(gate)} characters, but this`
+      + ` payload only leaves ${String(budget)}. Lower DEEPCODE_MAX_INSTDIR_LEN in`
+      + ' apps/desktop/build/installer.nsh to match, or the installer will accept a directory it cannot install into.',
+    )
+  }
+  if (budget < MIN_INSTALL_BUDGET) {
+    throw new Error(
+      `build-desktop-dist: the payload leaves only ${String(budget)} characters for an install directory,`
+      + ` under the ${String(MIN_INSTALL_BUDGET)} an ordinary per-user install needs. Windows will refuse the`
+      + ' resulting paths, and the uninstaller reports it as "cannot be closed" rather than as a path problem.'
+      + `${String.fromCharCode(10)}  longest: ${longest}`,
+    )
+  }
+}
+/**
+ * Files that exist in the runtime tree but never run.
+ *
+ * Installing DeepCode is slow, and the cost is dominated by file *count*, not
+ * bytes: NSIS unpacks single-threaded and Defender scans every write. The DSH
+ * runtime ships 23771 files, and nearly half of them cannot execute — 8897
+ * `.d.ts` declarations exist for a compiler that is not present, plus package
+ * READMEs, changelogs and test suites.
+ *
+ * Verified before deleting (2026-08-27): all 532 package.json manifests in the
+ * tree were scanned, and no runtime entry — main, module, bin, or any exports
+ * condition other than `types`/`typings` — resolves to a declaration file.
+ * Hand-written `.ts` sources are deliberately kept: 34 of them are referenced
+ * by `browser` fields and `.source` export conditions, and 2122 files are not
+ * worth the risk.
+ *
+ * LICENSE files always stay: shipping them is a licensing obligation, not a
+ * convenience.
+ */
+const RUNTIME_DEAD_WEIGHT_DIRS = new Set([
+  'test', 'tests', '__tests__', 'example', 'examples',
+  'benchmark', 'benchmarks', 'coverage', '.github',
+])
+
+/** Doc files with no runtime role. `LICENSE*` is never matched here. */
+const RUNTIME_DEAD_WEIGHT_DOCS = /^(readme|changelog|history|contributing|authors|code_of_conduct|security|governance)/i
+
+/**
+ * Drop what cannot run from the shipped DSH runtime.
+ * @param runtimeDir - resources/dsh inside win-unpacked.
+ * @returns how many files were removed and how many bytes they held.
+ */
+function trimRuntimeDeadWeight(runtimeDir: string): { files: number; bytes: number } {
+  let files = 0
+  let bytes = 0
+  const walk = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const full = join(directory, entry.name)
+      if (entry.isDirectory()) {
+        if (RUNTIME_DEAD_WEIGHT_DIRS.has(entry.name.toLowerCase())) {
+          for (const inner of countTree(full)) {
+            files += 1
+            bytes += inner
+          }
+          rmSync(full, { recursive: true, force: true })
+          continue
+        }
+        walk(full)
+        continue
+      }
+      const lower = entry.name.toLowerCase()
+      const declaration = lower.endsWith('.d.ts') || lower.endsWith('.d.mts') || lower.endsWith('.d.cts')
+      if (!declaration && !RUNTIME_DEAD_WEIGHT_DOCS.test(lower)) continue
+      files += 1
+      bytes += statSync(full).size
+      rmSync(full, { force: true })
+    }
+  }
+  walk(runtimeDir)
+  return { files, bytes }
+}
+
+/** Sizes of every file under a directory (used to account for what a delete removed). */
+function* countTree(directory: string): Generator<number> {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const full = join(directory, entry.name)
+    if (entry.isDirectory()) {
+      yield* countTree(full)
+      continue
+    }
+    yield statSync(full).size
+  }
+}
+
+/** Chromium locale packs kept in the distribution: the two languages DeepCode ships. */
+const SHIPPED_LOCALES = new Set(['en-US.pak', 'zh-CN.pak'])
+
+/**
+ * Drop the Chromium locale packs DeepCode never displays.
+ *
+ * Electron ships all 55 locales (47 MB); DeepCode's own chrome is zh/en only
+ * and the official web surface carries its own i18n, so the rest is dead
+ * weight in every installer and on every user's disk. Chromium falls back to
+ * en-US for any system language whose pack is absent, which is exactly the
+ * behaviour an unshipped language should get.
+ *
+ * Done here rather than through electron-builder's `electronLanguages`
+ * because this build drives electron-builder with `--dir` and assembles the
+ * rest of the payload itself: keeping the trim in one place makes what ships
+ * a property of this script, not of a config key whose Windows semantics
+ * differ across electron-builder versions.
+ * @param unpackedDir - the win-unpacked directory electron-builder produced.
+ */
+function trimElectronLocales(unpackedDir: string): void {
+  const localesDir = join(unpackedDir, 'locales')
+  if (!existsSync(localesDir)) {
+    throw new Error(`build-desktop-dist: ${localesDir} is missing — electron-builder did not produce a locales directory`)
+  }
+  let removed = 0
+  let freed = 0
+  for (const name of readdirSync(localesDir)) {
+    if (SHIPPED_LOCALES.has(name)) continue
+    const target = join(localesDir, name)
+    freed += statSync(target).size
+    rmSync(target, { force: true })
+    removed += 1
+  }
+  // A locales directory that lost en-US would leave Chromium with no strings
+  // at all; fail loud rather than ship a mute build.
+  for (const kept of SHIPPED_LOCALES) {
+    if (!existsSync(join(localesDir, kept))) {
+      throw new Error(`build-desktop-dist: locale pack ${kept} is missing after the trim`)
+    }
+  }
+  console.log(`build-desktop-dist: trimmed ${String(removed)} Chromium locale packs (${formatBytes(freed)} freed)`)
+}
+
 /** Format a byte count for the summary. */
 function formatBytes(bytes: number): string {
   const mb = bytes / 1024 / 1024
@@ -669,12 +871,15 @@ if (import.meta.main) {
   // The DSH runtime lands in resources/dsh, where the main process launches it
   // via ELECTRON_RUN_AS_NODE. Copied here (not via extraResources) so the
   // distribution build owns the copy and its timing.
+  trimElectronLocales(WIN_UNPACKED)
   const resourcesDsh = join(WIN_UNPACKED, 'resources', 'dsh')
   cpSync(RUNTIME_DIR, resourcesDsh, { recursive: true })
   // The staging copy has served its purpose; dropping it halves disk use and
   // keeps the final release-set scan scoped to what actually ships.
   rmSync(RUNTIME_DIR, { recursive: true, force: true })
   console.log(`build-desktop-dist: DSH runtime copied to ${resourcesDsh}`)
+  const trimmed = trimRuntimeDeadWeight(resourcesDsh)
+  console.log(`build-desktop-dist: dropped ${String(trimmed.files)} files that never run (${String(Math.round(trimmed.bytes / 1024 / 1024))} MB) from the runtime`)
   // 交付身份：embedded DSH source/commit 标识与 Runtime 一起出厂。
   // About 面板据此展示产物可溯源事实；git 不可用时打包直接失败
   // （打包必须发生在 git checkout 里，产物必须可溯源）。
@@ -688,6 +893,7 @@ if (import.meta.main) {
   // exact executable，见 apps/desktop/src/terminal-service.ts。）
   // Sanitize and verify BEFORE building the installer: any finding fails the
   // build here, so the NSIS package can only ever wrap a sanitized payload.
+  requirePathLengthHeadroom(WIN_UNPACKED)
   const findings = sanitizeAndVerify(WIN_UNPACKED, ROOT, homedir())
   if (findings.length > 0) {
     throw new Error(`build-desktop-dist: distribution leaked sensitive content:\n${findings.join('\n')}`)

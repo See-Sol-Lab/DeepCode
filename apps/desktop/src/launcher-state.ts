@@ -147,33 +147,37 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** 拒绝记录里的一切未知字段：未知键意味着 schema 无效，失败要明确。 */
-function rejectUnknownKeys(record: Record<string, unknown>, allowed: readonly string[], where: string): void {
+function rejectUnknownKeys(record: Record<string, unknown>, allowed: readonly string[], where: string, zh: boolean): void {
   for (const key of Object.keys(record)) {
     if (!allowed.includes(key)) {
-      throw new LauncherStateError(`${where}: 未知字段 "${key}"（允许: ${allowed.join(', ')}）`)
+      throw new LauncherStateError(zh
+        ? `${where}: 未知字段 "${key}"（允许: ${allowed.join(', ')}）`
+        : `${where}: unknown field "${key}" (allowed: ${allowed.join(', ')})`)
     }
   }
 }
 
 /** 严格校验并转换 home 引用。 */
-function parseHomeRef(raw: unknown, where: string): HarnessHomeRef {
-  if (!isRecord(raw)) throw new LauncherStateError(`${where}: 必须是对象`)
+function parseHomeRef(raw: unknown, where: string, zh: boolean): HarnessHomeRef {
+  if (!isRecord(raw)) throw new LauncherStateError(zh ? `${where}: 必须是对象` : `${where}: must be an object`)
   if (raw.kind === 'managed') {
-    rejectUnknownKeys(raw, ['kind'], where)
+    rejectUnknownKeys(raw, ['kind'], where, zh)
     return { kind: 'managed' }
   }
   if (raw.kind === 'existing') {
-    rejectUnknownKeys(raw, ['kind', 'path'], where)
+    rejectUnknownKeys(raw, ['kind', 'path'], where, zh)
     const path = raw.path
     if (typeof path !== 'string' || path.length === 0) {
-      throw new LauncherStateError(`${where}.path: 必须是非空字符串`)
+      throw new LauncherStateError(zh ? `${where}.path: 必须是非空字符串` : `${where}.path: must be a non-empty string`)
     }
     if (!isAbsolute(path)) {
-      throw new LauncherStateError(`${where}.path: 必须是绝对路径，收到 "${path}"`)
+      throw new LauncherStateError(zh ? `${where}.path: 必须是绝对路径，收到 "${path}"` : `${where}.path: must be an absolute path; received "${path}"`)
     }
     return { kind: 'existing', path }
   }
-  throw new LauncherStateError(`${where}.kind: 未知值 ${JSON.stringify(raw.kind)}（允许: managed, existing）`)
+  throw new LauncherStateError(zh
+    ? `${where}.kind: 未知值 ${JSON.stringify(raw.kind)}（允许: managed, existing）`
+    : `${where}.kind: unknown value ${JSON.stringify(raw.kind)} (allowed: managed, existing)`)
 }
 
 /**
@@ -185,9 +189,11 @@ function parseHomeRef(raw: unknown, where: string): HarnessHomeRef {
  * @param where - 字段路径（用于错误消息）。
  * @returns 校验通过的 profile 名称。
  */
-function assertProfileName(raw: unknown, where: string): string {
+function assertProfileName(raw: unknown, where: string, zh: boolean): string {
   if (!isValidProfileName(raw)) {
-    throw new LauncherStateError(`${where}: 非法 profile 名称 ${JSON.stringify(raw)}（须为非空字符串，不含 / 或 \\，不得为 . / .. / node_modules）`)
+    throw new LauncherStateError(zh
+      ? `${where}: 非法 profile 名称 ${JSON.stringify(raw)}（须为非空字符串，不含 / 或 \\，不得为 . / .. / node_modules）`
+      : `${where}: invalid profile name ${JSON.stringify(raw)} (must be a non-empty string without / or \\, and cannot be . / .. / node_modules)`)
   }
   return raw
 }
@@ -204,36 +210,40 @@ export function isValidProfileName(raw: unknown): raw is string {
 }
 
 /** 严格校验并转换一条启动选择。 */
-function parseSelection(raw: unknown, where: string): HarnessSelection {
-  if (!isRecord(raw)) throw new LauncherStateError(`${where}: 必须是对象`)
-  rejectUnknownKeys(raw, ['home', 'profile'], where)
-  const home = parseHomeRef(raw.home, `${where}.home`)
-  return { home, profile: assertProfileName(raw.profile, `${where}.profile`) }
+function parseSelection(raw: unknown, where: string, zh: boolean): HarnessSelection {
+  if (!isRecord(raw)) throw new LauncherStateError(zh ? `${where}: 必须是对象` : `${where}: must be an object`)
+  rejectUnknownKeys(raw, ['home', 'profile'], where, zh)
+  const home = parseHomeRef(raw.home, `${where}.home`, zh)
+  return { home, profile: assertProfileName(raw.profile, `${where}.profile`, zh) }
 }
 
 /** 严格校验并转换可空的一条启动选择。 */
-function parseOptionalSelection(raw: unknown, where: string): HarnessSelection | null {
-  return raw === null ? null : parseSelection(raw, where)
+function parseOptionalSelection(raw: unknown, where: string, zh: boolean): HarnessSelection | null {
+  return raw === null ? null : parseSelection(raw, where, zh)
 }
 
 /** 严格校验并转换一次启动失败记录。 */
-function parseBootFailure(raw: unknown, where: string): BootFailure {
-  if (!isRecord(raw)) throw new LauncherStateError(`${where}: 必须是对象或 null`)
-  rejectUnknownKeys(raw, ['stage', 'message', 'selection'], where)
+function parseBootFailure(raw: unknown, where: string, zh: boolean): BootFailure {
+  if (!isRecord(raw)) throw new LauncherStateError(zh ? `${where}: 必须是对象或 null` : `${where}: must be an object or null`)
+  rejectUnknownKeys(raw, ['stage', 'message', 'selection'], where, zh)
   const stage = raw.stage
   if (stage !== 'spawn' && stage !== 'readiness' && stage !== 'page-load') {
-    throw new LauncherStateError(`${where}.stage: 未知值 ${JSON.stringify(stage)}（允许: spawn, readiness, page-load）`)
+    throw new LauncherStateError(zh
+      ? `${where}.stage: 未知值 ${JSON.stringify(stage)}（允许: spawn, readiness, page-load）`
+      : `${where}.stage: unknown value ${JSON.stringify(stage)} (allowed: spawn, readiness, page-load)`)
   }
   if (typeof raw.message !== 'string' || raw.message.length === 0) {
-    throw new LauncherStateError(`${where}.message: 必须是非空字符串`)
+    throw new LauncherStateError(zh ? `${where}.message: 必须是非空字符串` : `${where}.message: must be a non-empty string`)
   }
   if (raw.message.length > BOOT_FAILURE_MAX_MESSAGE) {
-    throw new LauncherStateError(`${where}.message: 超过长度上限 ${BOOT_FAILURE_MAX_MESSAGE}，收到 ${raw.message.length}`)
+    throw new LauncherStateError(zh
+      ? `${where}.message: 超过长度上限 ${BOOT_FAILURE_MAX_MESSAGE}，收到 ${raw.message.length}`
+      : `${where}.message: exceeds the ${BOOT_FAILURE_MAX_MESSAGE}-character limit; received ${raw.message.length}`)
   }
   return {
     stage,
     message: raw.message,
-    ...raw.selection === undefined ? {} : { selection: parseSelection(raw.selection, `${where}.selection`) },
+    ...raw.selection === undefined ? {} : { selection: parseSelection(raw.selection, `${where}.selection`, zh) },
   }
 }
 
@@ -244,36 +254,41 @@ function parseBootFailure(raw: unknown, where: string): BootFailure {
  * @param content - 状态文件的原始文本。
  * @returns 校验通过的状态。
  */
-export function parseLauncherState(content: string): LauncherStateV1 {
+export function parseLauncherState(content: string, zh = true): LauncherStateV1 {
   let raw: unknown
   try {
     raw = JSON.parse(content)
   } catch (error) {
-    throw new LauncherStateError(`不是有效 JSON: ${String(error instanceof Error ? error.message : error)}`)
+    throw new LauncherStateError(zh
+      ? `不是有效 JSON: ${String(error instanceof Error ? error.message : error)}`
+      : `Not valid JSON: ${String(error instanceof Error ? error.message : error)}`)
   }
-  if (!isRecord(raw)) throw new LauncherStateError('顶层: 必须是对象')
+  if (!isRecord(raw)) throw new LauncherStateError(zh ? '顶层: 必须是对象' : 'top level: must be an object')
   rejectUnknownKeys(
     raw,
     ['schemaVersion', 'active', 'pending', 'lastKnownGood', 'lastBootFailure', 'interruptedSwitch'],
-    '顶层',
+    zh ? '顶层' : 'top level',
+    zh,
   )
   if (raw.schemaVersion !== LAUNCHER_STATE_VERSION) {
-    throw new LauncherStateError(`schemaVersion: 未知版本 ${JSON.stringify(raw.schemaVersion)}（当前支持: ${LAUNCHER_STATE_VERSION}）`)
+    throw new LauncherStateError(zh
+      ? `schemaVersion: 未知版本 ${JSON.stringify(raw.schemaVersion)}（当前支持: ${LAUNCHER_STATE_VERSION}）`
+      : `schemaVersion: unknown version ${JSON.stringify(raw.schemaVersion)} (supported: ${LAUNCHER_STATE_VERSION})`)
   }
-  if (raw.active === undefined) throw new LauncherStateError('active: 缺失')
-  if (raw.pending === undefined) throw new LauncherStateError('pending: 缺失')
-  if (raw.lastKnownGood === undefined) throw new LauncherStateError('lastKnownGood: 缺失')
-  if (raw.lastBootFailure === undefined) throw new LauncherStateError('lastBootFailure: 缺失')
+  if (raw.active === undefined) throw new LauncherStateError(zh ? 'active: 缺失' : 'active: is missing')
+  if (raw.pending === undefined) throw new LauncherStateError(zh ? 'pending: 缺失' : 'pending: is missing')
+  if (raw.lastKnownGood === undefined) throw new LauncherStateError(zh ? 'lastKnownGood: 缺失' : 'lastKnownGood: is missing')
+  if (raw.lastBootFailure === undefined) throw new LauncherStateError(zh ? 'lastBootFailure: 缺失' : 'lastBootFailure: is missing')
   return {
     schemaVersion: 1,
-    active: parseSelection(raw.active, 'active'),
-    pending: parseOptionalSelection(raw.pending, 'pending'),
-    lastKnownGood: parseOptionalSelection(raw.lastKnownGood, 'lastKnownGood'),
-    lastBootFailure: raw.lastBootFailure === null ? null : parseBootFailure(raw.lastBootFailure, 'lastBootFailure'),
+    active: parseSelection(raw.active, 'active', zh),
+    pending: parseOptionalSelection(raw.pending, 'pending', zh),
+    lastKnownGood: parseOptionalSelection(raw.lastKnownGood, 'lastKnownGood', zh),
+    lastBootFailure: raw.lastBootFailure === null ? null : parseBootFailure(raw.lastBootFailure, 'lastBootFailure', zh),
     // P7 之前写入的状态文件没有这个键：缺失按 null（没有未完成的切换）。
     interruptedSwitch: raw.interruptedSwitch === undefined
       ? null
-      : parseOptionalSelection(raw.interruptedSwitch, 'interruptedSwitch'),
+      : parseOptionalSelection(raw.interruptedSwitch, 'interruptedSwitch', zh),
   }
 }
 
@@ -318,8 +333,8 @@ export function serializeLauncherState(state: LauncherStateV1): string {
  * 消失，会以缺失字段被拒绝）。
  * @param state - 待写盘的状态。
  */
-export function assertLauncherState(state: LauncherStateV1): void {
-  parseLauncherState(JSON.stringify(state))
+export function assertLauncherState(state: LauncherStateV1, zh = true): void {
+  parseLauncherState(JSON.stringify(state), zh)
 }
 
 /** launcher 状态存取器：读（缺文件回退默认）、写（校验 + 原子替换）。 */
@@ -351,12 +366,14 @@ export interface LauncherStateStore {
  * @param now - 时间戳来源（测试注入）；默认 Date.now()（epoch 毫秒）。
  * @returns 备份文件的绝对路径。
  */
-export function backupInvalidLauncherState(filePath: string, now: () => number = Date.now): string {
+export function backupInvalidLauncherState(filePath: string, now: () => number = Date.now, zh = true): string {
   const backupPath = `${filePath}.invalid-${now()}`
   try {
     copyFileSync(filePath, backupPath)
   } catch (error) {
-    throw new LauncherStateError(`备份失败（原文件未改动）: ${String(error instanceof Error ? error.message : error)}`)
+    throw new LauncherStateError(zh
+      ? `备份失败（原文件未改动）: ${String(error instanceof Error ? error.message : error)}`
+      : `Backup failed (the original file was not changed): ${String(error instanceof Error ? error.message : error)}`)
   }
   return backupPath
 }
@@ -375,8 +392,9 @@ export function restoreDefaultLauncher(
   filePath: string,
   store: Pick<LauncherStateStore, 'write'>,
   now: () => number = Date.now,
+  zh = true,
 ): string {
-  const backupPath = backupInvalidLauncherState(filePath, now)
+  const backupPath = backupInvalidLauncherState(filePath, now, zh)
   store.write(defaultLauncherState())
   return backupPath
 }
@@ -386,7 +404,7 @@ export function restoreDefaultLauncher(
  * @param userDataDir - Electron userData 目录的绝对路径。
  * @returns 状态存取器。
  */
-export function createLauncherStateStore(userDataDir: string): LauncherStateStore {
+export function createLauncherStateStore(userDataDir: string, zh: () => boolean = () => true): LauncherStateStore {
   const filePath = join(userDataDir, LAUNCHER_STATE_FILENAME)
   return {
     filePath,
@@ -397,16 +415,18 @@ export function createLauncherStateStore(userDataDir: string): LauncherStateStor
       } catch (error) {
         // 文件缺失是首次启动的正常路径：返回默认值，不创建文件。
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') return defaultLauncherState()
-        throw new LauncherStateError(`读取失败: ${String(error instanceof Error ? error.message : error)}`)
+        throw new LauncherStateError(zh()
+          ? `读取失败: ${String(error instanceof Error ? error.message : error)}`
+          : `Read failed: ${String(error instanceof Error ? error.message : error)}`)
       }
-      return parseLauncherState(content)
+      return parseLauncherState(content, zh())
     },
     write(state) {
-      assertLauncherState(state)
+      assertLauncherState(state, zh())
       atomicWriteFile(
         filePath,
         serializeLauncherState(state),
-        message => new LauncherStateError(`写入失败: ${message}`),
+        message => new LauncherStateError(zh() ? `写入失败: ${message}` : `Write failed: ${message}`),
       )
     },
   }

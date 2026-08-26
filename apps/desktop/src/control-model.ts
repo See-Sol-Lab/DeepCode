@@ -22,6 +22,7 @@ import type { DiscoveredProfile, ProfileDiscoveryV1 } from './profile-discovery.
 import { isPluginAction, type PluginAction, type PluginInventory } from './plugin-service.ts'
 import type { PermissionsView } from './permission-view.ts'
 import type { RecoveryJournalState } from './plugin-recovery.ts'
+import type { SessionPressure } from './session-pressure.ts'
 
 /** 把 home 引用渲染成可读文本。 */
 export function homeKindLabel(home: HarnessSelection['home']): string {
@@ -136,6 +137,14 @@ export interface DesktopControlModel {
    * 不再出现。kind 决定 renderer 用哪条横幅文案。
    */
   recoveryNotice: { profile: string; kind: 'boot-failure' | 'interrupted-switch' } | null
+  /**
+   * 会话数量已越过警戒线时的读数；null = 没到线，不显示任何东西。
+   *
+   * 投影缓存每个会话一行且从不删除（删掉的会话也留着行），所以文件只增
+   * 不减。几千行时毫无感觉，几万行时上游有人被它撑到每次启动都 V8 OOM。
+   * DeepCode 不替用户清理——那是他自己的对话；只把数字摆出来。
+   */
+  sessionPressure: SessionPressure | null
   /** Plugin Manager 面板事实（inventory 三分类 + 操作 + handoff）。 */
   pluginManager: PluginManagerView
   /** Update service 面板事实（比较对象只能是 DeepCode app version）。 */
@@ -416,6 +425,8 @@ export interface ControlModelInput {
   highContrast: boolean
   /** 待显示的一次性恢复提示；null = 无提示（kind 选文案，见模型注释）。 */
   recoveryNotice: { profile: string; kind: 'boot-failure' | 'interrupted-switch' } | null
+  /** 会话数量警戒读数；缺省视作未越线（main 单处计算）。 */
+  sessionPressure?: SessionPressure | null
   /** Plugin Manager 面板事实（main 单处持有）。 */
   pluginManager: PluginManagerView
   /** Update service 面板事实（main 单处持有）。 */
@@ -471,6 +482,7 @@ export function buildControlModel(input: ControlModelInput): DesktopControlModel
     effectiveTheme: input.effectiveTheme,
     highContrast: input.highContrast,
     recoveryNotice: input.recoveryNotice,
+    sessionPressure: input.sessionPressure ?? null,
     pluginManager: input.pluginManager,
     update: input.update,
     diagnostics: input.diagnostics,

@@ -52,6 +52,14 @@
            随官方 web UI 一起不可达（控制面就住在 3080 里），此前主窗口没有
            任何重启入口、只剩系统托盘——而故障态正是最需要它的时刻。chrome
            层是我们自己的 renderer，DSH 死了它照样在。 -->
+      <!-- 插件恢复入口（2026-08-27 人工验收暴露的发布阻断项）：B3-15 当时只补了
+           上面那个「重启 Harness」，而插件把 Harness 搞坏之后，重启只会再失败一次
+           ——真正需要的「恢复上次插件变更」按钮住在官方设置页里，那页随 3080 一起
+           死了。会敲命令的人还能靠 DSH 终端自救（实测走得通），不会敲的人一条路
+           都没有。这个按钮由 renderer 按 model.pluginManager.recovery 显隐：
+           recovery-needed 时给恢复，drift（文件被外部改过、绝不覆盖）时改为打开
+           Profile 文件夹让用户自己处置。 -->
+      <button class="menu-item" role="menuitem" id="menu-plugin-recovery" hidden>恢复上次插件变更</button>
       <button class="menu-item" role="menuitem" id="menu-restart-harness" data-command="restart-harness" data-i18n="menu.restart-harness">重启 Harness</button>
       <button class="menu-item" role="menuitem" id="menu-terminal" data-command="terminal" data-i18n="menu.terminal">DSH 终端</button>
       <!-- 内置浏览器 pane 开合（B3-11）：只在插件创建过 pane 后出现（hidden 由

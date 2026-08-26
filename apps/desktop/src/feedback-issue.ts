@@ -17,6 +17,8 @@ export const ISSUE_USER_TEXT_MAX = 20_000
 
 /** Feedback issue 组装的事实输入。 */
 export interface FeedbackIssueInput {
+  /** 是否使用中文文案。 */
+  zh?: boolean
   /** DeepCode app version。 */
   appVersion: string
   /** embedded DSH version。 */
@@ -46,10 +48,12 @@ function truncate(text: string, max: number): string {
  * @param userText - 用户自由文本。
  * @returns 标题（≤ {@link ISSUE_TITLE_MAX} 字符）。
  */
-export function issueTitle(reply: string | null, userText: string): string {
+export function issueTitle(reply: string | null, userText: string, zh = true): string {
   if (reply !== null) {
     // 只匹配同一行内的标题：空白限定 [ \t]，绝不吃换行（换行后是正文）。
-    const match = /^[ \t]*\*\*标题[：:]\*\*[ \t]*(.+)$/m.exec(reply)
+    const match = (zh
+      ? /^[ \t]*\*\*标题[：:]\*\*[ \t]*(.+)$/m
+      : /^[ \t]*\*\*Title:\*\*[ \t]*(.+)$/mi).exec(reply)
     const candidate = match?.[1]?.trim()
     if (candidate !== undefined && candidate !== '') return truncate(candidate, ISSUE_TITLE_MAX)
   }
@@ -65,6 +69,7 @@ export function issueTitle(reply: string | null, userText: string): string {
  * @returns 完整正文（markdown）。
  */
 export function buildIssueBody(input: FeedbackIssueInput): string {
+  const zh = input.zh ?? true
   const homeLabel = input.homeKind === 'managed' ? 'Managed' : 'Existing'
   const sections = [
     '## Bug Report',
@@ -80,7 +85,7 @@ export function buildIssueBody(input: FeedbackIssueInput): string {
   if (input.reply !== null) {
     sections.push(
       '',
-      '### AI 排查摘要',
+      zh ? '### AI 排查摘要' : '### AI troubleshooting summary',
       input.reply.trim(),
     )
   }
@@ -116,7 +121,7 @@ export function buildIssueBody(input: FeedbackIssueInput): string {
  * @param body - issue 正文；空串或省略时回落模板。
  * @returns 完整 URL。
  */
-export function githubNewIssueUrl(title: string, body = ''): string {
+export function githubNewIssueUrl(title: string, body = '', zh = true): string {
   const base = 'https://github.com/See-Sol-Lab/DeepCode/issues/new'
   if (body === '') {
     return `${base}?template=bug_report.md&labels=user-feedback&title=${encodeURIComponent(title)}`
@@ -127,7 +132,9 @@ export function githubNewIssueUrl(title: string, body = ''): string {
     let cut = body
     while (encoded.length > 6000 && cut.length > 0) {
       cut = cut.slice(0, Math.max(0, cut.length - 200))
-      encoded = encodeURIComponent(`${cut}\n\n…（正文过长已截断，完整内容在剪贴板里，粘贴覆盖即可）`)
+      encoded = encodeURIComponent(zh
+        ? `${cut}\n\n…（正文过长已截断，完整内容在剪贴板里，粘贴覆盖即可）`
+        : `${cut}\n\n… (The body was truncated for the URL. Paste the complete content from the clipboard to replace it.)`)
     }
   }
   return `${base}?labels=user-feedback&title=${encodeURIComponent(title)}&body=${encoded}`

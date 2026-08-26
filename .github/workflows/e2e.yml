@@ -25,19 +25,18 @@ name: E2E (real DeepSeek API)
 # The fork/secret model and its public-repo implications are recorded in
 # .agents/notes/implemented/testing/2026-06-19-real-api-e2e-ci.md.
 #
-# Note: scheduled triggers are auto-disabled after 60 days of repo inactivity;
-# push/pull_request/workflow_dispatch act as backstops.
+# TRIGGERS — manual only. This suite spends real DeepSeek API credit on every
+# run, and it used to run on each main push plus a nightly schedule, which for
+# a fork that pushes straight to main meant paid runs nobody asked for and a
+# failure mail per commit. It is now started deliberately, from the Actions tab
+# or `gh workflow run`. The fork/secret rules above stay written down because
+# they govern any future restoration of the pull_request trigger, and the
+# job-level guard below still enforces them if that happens.
 on:
   workflow_dispatch:
-  push:
-    branches: [main, master]
-  pull_request:
-  schedule:
-    # 00:17 UTC nightly = 08:17 Asia/Shanghai — off the top-of-hour cron stampede.
-    - cron: '17 0 * * *'
 
-# Cancel a superseded PR run (it is on a stale commit); never cancel a
-# push/schedule run — it is already producing the post-merge/nightly signal.
+# Manual runs are never cancelled: each one was started on purpose, and a
+# later dispatch does not make an earlier one stale.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

@@ -91,6 +91,18 @@ describe('loadOptionalPatches', () => {
     expect(() => loadOptionalPatches(NAME, join(dir, PROFILE_PATCH_FILENAME)))
       .toThrow(`${NAME}: patches entry 1 in`)
   })
+
+  it('treats an empty or comment-only patch file as "no patches", not a boot-breaking error', () => {
+    const dir = tmp()
+    const file = join(dir, PROFILE_PATCH_FILENAME)
+    // One stray editor save that empties this file must not cost the user a
+    // bootable app: yaml.load('') is undefined and a comments-only or bare
+    // `---` document is null, none of which mean "this file is broken".
+    for (const content of ['', '\n', '# only a comment\n', '---\n']) {
+      writeFileSync(file, content)
+      expect(loadOptionalPatches(NAME, file), JSON.stringify(content)).toEqual([])
+    }
+  })
 })
 
 function writeTree(dir: string): string {

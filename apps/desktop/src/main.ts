@@ -21,7 +21,7 @@ import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { hostname, release, version as osVersion } from 'node:os'
+import { homedir, hostname, release, version as osVersion } from 'node:os'
 import { createServer } from 'node:http'
 import https from 'node:https'
 import { app, BrowserWindow, clipboard, crashReporter, dialog, ipcMain, Menu, nativeImage, nativeTheme, screen, shell, Tray, WebContentsView } from 'electron'
@@ -46,6 +46,9 @@ import {
 import { discoverProfiles, type DiscoveredProfile, type ProfileDiscoveryV1 } from './profile-discovery.ts'
 import { atomicWriteFile } from './atomic-write.ts'
 import { appendDesktopEvent } from './desktop-events.ts'
+import { describeLegacyCredentialsLayout, describeRuntimeVersionSkew, detectRuntimeVersionSkew, hasLegacyCredentialsLayout } from './runtime-skew.ts'
+import { readSessionPressure } from './session-pressure.ts'
+import { importSessions, markImportOffered, shouldOfferImport, surveyImportableSessions } from './session-import.ts'
 import { maskWindowsLiteral, redactSecrets } from './redact.ts'
 import { aboutDetailText, pnpmVersionFromExecpath } from './about.ts'
 import { computeRecoveryNotice, type RecoveryNotice } from './recovery-notice.ts'
@@ -186,7 +189,10 @@ const MIN_WINDOW_HEIGHT = 520
 // 它可诊断——插件连不上时给的是"端口可能被占用，重启会换一个"，而不是
 // 一句 ECONNREFUSED（见 browser.ts 的 cdpConnectFailure）。
 const BROWSER_PANE_CDP_PORT = 20000 + Math.floor(Math.random() * 20000)
-app.commandLine.appendSwitch('remote-debugging-port', String(BROWSER_PANE_CDP_PORT))
+// headless 诊断导出（--export-diagnostics）不建窗口、更不会有浏览器 pane，却照样 开了这个端口，还往终端吐一行 `DevTools listening on ws://…`——用户跑取证命令时看到 它只会困惑（2026-08-26 人工验收发现）。这里直接读 argv：EXPORT_DIAGNOSTICS 常量 声明在几百行之后，而这一句必须跑在 app ready 之前。
+if (!process.argv.includes('--export-diagnostics')) {
+  app.commandLine.appendSwitch('remote-debugging-port', String(BROWSER_PANE_CDP_PORT))
+}
 
 /** pane 宽度占内容区比例（Codex 同款右侧分栏）。 */
 const BROWSER_PANE_RATIO = 0.45
@@ -311,7 +317,7 @@ async function rescueLauncherState(store: LauncherStateStore, userDataDir: strin
     try {
       // 先原样备份坏文件，备份成功后才原子写默认；备份失败会在这里
       // 抛出且原文件保持原样（绝不带着未备份的坏文件继续覆盖）。
-      restoreDefaultLauncher(store.filePath, store)
+      restoreDefaultLauncher(store.filePath, store, Date.now, desktopLocaleZh())
     } catch (error) {
       await dialog.showMessageBox({
         type: 'error',
@@ -765,7 +771,7 @@ async function stopService(): Promise<void> {
   if (child === undefined) return
   service.stopped = true
   try {
-    await stopProcess(child)
+    await stopProcess(child, undefined, undefined, undefined, desktopLocaleZh())
   } catch (error) {
     // 没能停下来就不能假装停了：保留 child 引用，让后续状态如实反映进程
     // 还活着，并把失败抛给调用方决定怎么办（提示用户，还是强制退出）。
@@ -898,7 +904,7 @@ function createRuntimeAdapter(packaged: boolean, root: string): HarnessRuntimeAd
     },
     async waitReady() {
       const child = service.child
-      if (child === undefined) throw new Error('DSH 子进程不存在，无法等待就绪')
+      if (child === undefined) throw new Error(desktopLocaleZh() ? 'DSH 子进程不存在，无法等待就绪' : 'The DSH child process does not exist, so readiness cannot be checked')
       // 就绪前子进程退出：立即以明确的 readiness 失败进入 recovery，
       // 而不是等满 60 秒超时。
       await new Promise<void>((resolvePromise, reject) => {
@@ -911,11 +917,13 @@ function createRuntimeAdapter(packaged: boolean, root: string): HarnessRuntimeAd
         }
         const onExit = (code: number | null, signal: NodeJS.Signals | null): void => {
           settle(() => {
-            reject(new Error(`DSH 服务在就绪前退出（code=${String(code)} signal=${String(signal)}）`))
+            reject(new Error(desktopLocaleZh()
+              ? `DSH 服务在就绪前退出（code=${String(code)} signal=${String(signal)}）`
+              : `The DSH service exited before it became ready (code=${String(code)} signal=${String(signal)})`))
           })
         }
         child.once('exit', onExit)
-        void waitForServer(DEFAULT_HOST, DEFAULT_PORT, READY_TIMEOUT_MS).then(
+        void waitForServer(DEFAULT_HOST, DEFAULT_PORT, READY_TIMEOUT_MS, desktopLocaleZh()).then(
           () =>{  settle(resolvePromise) },
           (error: unknown) =>{  settle(() => { reject(error instanceof Error ? error : new Error(String(error))) }) },
         )
@@ -923,7 +931,7 @@ function createRuntimeAdapter(packaged: boolean, root: string): HarnessRuntimeAd
     },
     async loadPage() {
       const view = compatView
-      if (view === undefined) throw new Error('Compatibility View 不存在，无法加载页面')
+      if (view === undefined) throw new Error(desktopLocaleZh() ? 'Compatibility View 不存在，无法加载页面' : 'The Compatibility View does not exist, so the page cannot be loaded')
       // D39：控制桥参数只随 DeepCode 自己加载的页面下发（见 controlBridgeParam）。
       const controlQuery = controlBridgeParam === undefined ? '' : `?deepcode-control=${encodeURIComponent(controlBridgeParam)}`
       await view.webContents.loadURL(`http://${DEFAULT_HOST}:${DEFAULT_PORT}/${controlQuery}`)
@@ -1670,11 +1678,12 @@ function readVersionInfo(packaged: boolean, root: string): DeepCodeVersionInfo {
   try {
     return buildVersionInfo({
       packaged,
-      appVersion: packaged ? app.getVersion() : readDevAppVersion(root),
+      appVersion: packaged ? app.getVersion() : readDevAppVersion(root, desktopLocaleZh()),
       root: packaged ? process.resourcesPath : root,
       electronVersion: process.versions.electron,
       platform: process.platform,
       arch: process.arch,
+      zh: desktopLocaleZh(),
     })
   } catch (error) {
     console.error(`[deepcode] 版本事实读取失败，About 降级显示: ${String(error instanceof Error ? error.message : error)}`)
@@ -1714,7 +1723,7 @@ function runHeadlessDiagnosticsExport(): void {
     let homeKind: 'managed' | 'existing' = 'managed'
     let profile = 'unknown'
     try {
-      const state = createLauncherStateStore(userDataDir).read()
+      const state = createLauncherStateStore(userDataDir, desktopLocaleZh).read()
       homeKind = state.active.home.kind
       profile = state.active.profile
     } catch {
@@ -1855,6 +1864,122 @@ async function startDirectoryPickerBridge(): Promise<void> {
   server.unref()
 }
 
+/**
+ * 首次启动时，问用户要不要把他自己那套 DSH 的对话搬进来。
+ *
+ * 很多人装 DeepCode 之前机器上已经跑着官方 DSH。两者本来互不相干——我们自带
+ * runtime、用自己的 Home——但他的历史都在那边，而新装的 DeepCode 是空的。
+ *
+ * 无论他选哪个，都把权责说清楚：原件我们只读不删、留着不卸也没事、真正危险
+ * 的是让两个程序写同一份数据，而那件事不是 DeepCode 造成的。凭据一律不搬，
+ * 让他自己重填一次——省他一次粘贴不值得我们去碰他的密钥文件。
+ * @param targetHome - DeepCode 当前的 Home。
+ */
+async function offerSessionImport(targetHome: string): Promise<void> {
+  if (!shouldOfferImport(targetHome)) return
+  const source = join(homedir(), '.dsh')
+  // 用户本来就把 DeepCode 指向了这个目录：没有"两套"，也没什么可搬的。
+  if (resolve(source) === resolve(targetHome)) return
+  const survey = surveyImportableSessions(source)
+  if (survey === null) return
+
+  const zh = desktopLocaleZh()
+  const shared = zh
+    ? [
+      '注意：',
+      '• 电脑原本的 DSH 数据保持不变——导入只是复制。',
+      '• 请自行选择是否卸载原本的 DSH，如不卸载也没关系，两个程序互不干扰。',
+      '• 但请不要让两个程序同时用同一份数据（比如在 DeepCode 里把目录切到 DSH 的文件，或者在 DSH 打开 DeepCode 的工作区），两边会互相覆盖、出问题，该风险不是 DeepCode 带来的。',
+      '• API key 不会导入，请在 DeepCode 里重新填写。',
+    ]
+    : [
+      'Note:',
+      '• The existing DSH data is unchanged — importing only copies it.',
+      '• Whether to uninstall the existing DSH is up to you. Keeping both is fine; the two do not interfere.',
+      '• Do not point both programs at the same data (for example switching DeepCode to the DSH directory, or opening the DeepCode workspace in DSH). They will overwrite each other. This risk is not introduced by DeepCode.',
+      '• API keys are not imported. Please enter yours again in DeepCode.',
+    ]
+
+  if (!survey.importable) {
+    // 格式对不上就别搬：Harness 会直接拒绝打开，搬过来只是一堆点不开的对话。
+    await dialog.showMessageBox({
+      type: 'info',
+      title: zh ? '检测到你电脑上已有 DSH' : 'An existing DSH was found',
+      message: zh ? '找到已有对话，但本次无法导入' : 'Conversations found, but they cannot be imported',
+      detail: [
+        zh
+          ? `在 ${source} 找到 ${String(survey.count)} 个对话，但其存储格式（v${String(survey.formatVersion ?? -1)}）与 DeepCode 使用的（v${String(survey.supportedVersion)}）不一致，导入后无法打开，因此本次不导入。`
+          : `Found ${String(survey.count)} conversations in ${source}, but their storage format (v${String(survey.formatVersion ?? -1)}) does not match the one DeepCode uses (v${String(survey.supportedVersion)}). They would not open, so nothing is imported.`,
+        '',
+        ...shared,
+      ].join('\n'),
+      buttons: [zh ? '知道了' : 'OK'],
+      defaultId: 0,
+      noLink: true,
+    })
+    markImportOffered(targetHome)
+    return
+  }
+
+  const choice = await dialog.showMessageBox({
+    type: 'question',
+    title: zh ? '检测到你电脑上已有 DSH' : 'An existing DSH was found',
+    message: zh
+      ? `在 ${source} 找到 ${String(survey.count)} 个对话，要导入 DeepCode 吗？`
+      : `Found ${String(survey.count)} conversations in ${source}. Import them into DeepCode?`,
+    detail: shared.join('\n'),
+    buttons: zh ? ['导入', '暂不导入'] : ['Import', 'Not now'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  })
+  // 先记下"问过了"：无论他答什么，都不该每次启动再问一遍。
+  markImportOffered(targetHome)
+  if (choice.response !== 0) return
+
+  let result: { copied: number; skipped: number }
+  try {
+    result = importSessions(source, targetHome)
+  } catch (error) {
+    await dialog.showMessageBox({
+      type: 'error',
+      title: zh ? '导入未完成' : 'Import did not finish',
+      message: zh ? '导入过程中出现错误' : 'An error occurred during the import',
+      detail: [
+        zh
+          ? '电脑原本的 DSH 数据未被改动。可以稍后重试，或跳过此步骤，不影响 DeepCode 使用。'
+          : 'The existing DSH data was not modified. You can retry later or skip this step; DeepCode works either way.',
+        '',
+        redactSecrets(String(error)),
+      ].join('\n'),
+      buttons: [zh ? '知道了' : 'OK'],
+      defaultId: 0,
+      noLink: true,
+    })
+    return
+  }
+  await dialog.showMessageBox({
+    type: 'info',
+    title: zh ? '导入完成' : 'Import complete',
+    message: zh
+      ? `已导入 ${String(result.copied)} 个对话`
+      : `Imported ${String(result.copied)} conversations`,
+    detail: [
+      ...result.skipped > 0
+        ? [zh
+          ? `另有 ${String(result.skipped)} 个已跳过：DeepCode 中已存在相同对话，未做覆盖。`
+          : `${String(result.skipped)} were skipped: DeepCode already had conversations with those ids, and nothing was overwritten.`]
+        : [],
+      zh
+        ? '电脑原本的 DSH 数据未做任何改动。'
+        : 'The existing DSH data was not changed.',
+    ].join('\n'),
+    buttons: [zh ? '好' : 'OK'],
+    defaultId: 0,
+    noLink: true,
+  })
+}
+
 void app.whenReady().then(async () => {
   // 配置自检要早：网关地址配错时用户仍能本地导出反馈，但得先知道为什么
   // 提交按钮不见了。
@@ -1933,13 +2058,14 @@ void app.whenReady().then(async () => {
   harnessApi = createHarnessApi({
     baseUrl: `http://${DEFAULT_HOST}:${DEFAULT_PORT}`,
     fetch: (url, init) => fetch(url, init),
+    zh: desktopLocaleZh,
   })
   // 闭包内的调用点用 non-null 局部别名：模块级 let 的 undefined 形态只
   // 属于 app ready 之前（requestQuit 有对应的降级守卫），ready 之后恒有值。
   const rpc = harnessApi
   // UI state（窗口几何、主题、恢复提示确认、面板偏好）：损坏只回退
   // 安全默认值并记诊断，绝不挡住 launcher/Harness 启动。
-  uiStore = createUiStateStore(userDataDir)
+  uiStore = createUiStateStore(userDataDir, desktopLocaleZh)
   const uiResult = uiStore.read()
   if (uiResult.error !== null) {
     console.error(`[deepcode] UI 状态损坏，已回退安全默认值: ${uiResult.error}`)
@@ -1957,7 +2083,7 @@ void app.whenReady().then(async () => {
   // launcher state 是 profile 与 DSH_HOME 的唯一来源：文件缺失（新用户）
   // 回退默认 Managed/web；文件损坏不再只有退出——用户可选择备份后恢复
   // 默认、打开配置所在文件夹或退出，恢复默认绝不触碰任何用户数据。
-  const launcher = createLauncherStateStore(userDataDir)
+  const launcher = createLauncherStateStore(userDataDir, desktopLocaleZh)
   try {
     launcher.read()
   } catch (error) {
@@ -1997,6 +2123,7 @@ void app.whenReady().then(async () => {
     packaged,
     root,
     dshHome,
+    zh: desktopLocaleZh(),
     ...packaged ? {
       resourcesPath: process.resourcesPath,
       packagedCwd: app.getPath('home'),
@@ -2021,8 +2148,27 @@ void app.whenReady().then(async () => {
   /** 最近一次 feedback-send 的用户文本（copy-open 组装正文用）。 */
   let feedbackUserText = ''
 
-  /** 诊断包是否已收集（open 时收集一次；面板关闭后保留给下一次）。 */
-  let feedbackDiagnosticsReady = false
+  /**
+   * 诊断包收集时的环境指纹；与当前不一致即说明它过期了。
+   *
+   * 原先这里是个一次性布尔（收集过就永远不再收集），于是诊断包被钉死在
+   * 「本进程第一次打开反馈面板」那一刻。人工验收（2026-08-27）实测：先在
+   * 托管 Home 打开过一次反馈，之后切到自己的目录、换了 profile、Harness 还
+   * 崩过一轮，issue 正文里的诊断包仍写着最初那套 Managed/web——而 issue 抬头
+   * 走的是当前值 Existing，同一份报告里两处自相矛盾，拿去排查会指向错误的目录。
+   *
+   * 改成指纹而不是每次都重收，是为了保住原来的意图：用户可以编辑诊断包，
+   * 同一环境下反复开合面板不该把他的编辑冲掉。环境真变了才重来。
+   */
+  let feedbackDiagnosticsStamp: string | null = null
+
+  /** 决定诊断包是否过期的三件事：家在哪、跑的哪套、它活着没有。 */
+  const feedbackEnvironmentStamp = (): string => {
+    const state = launcher.read()
+    const home = state.active.home
+    const path = home.kind === 'existing' ? home.path : 'managed'
+    return `${home.kind}:${path}:${state.active.profile}:${harness.status().phase}`
+  }
 
   const buildModel = (): DesktopControlModel => {
     // 派生事实在一次构建里只读一次盘：state 与 feedUrl 读到后向下传，
@@ -2030,11 +2176,15 @@ void app.whenReady().then(async () => {
     // 文件既慢又可能读到两个不同版本）。
     const state = launcher.read()
     const feedUrl = readUpdateFeed(userDataDir)
+    const activeHome = resolveHarnessHome(state.active.home, userDataDir)
     return buildControlModel({
       locale: desktopLocaleZh() ? 'zh' : 'en',
       state,
       status: harness.status(),
-      activeDshHome: resolveHarnessHome(state.active.home, userDataDir),
+      activeDshHome: activeHome,
+      // 会话数只在越过警戒线时有值；内部按 Home 缓存，控制面的定时刷新
+      // 不会变成一轮又一轮的扫盘。
+      sessionPressure: readSessionPressure(activeHome),
       discovery: controlState.discovery,
       discoveryError: controlState.discoveryError,
       logPath: service.logPath,
@@ -2156,6 +2306,7 @@ void app.whenReady().then(async () => {
     resolveHome: selection => resolveHarnessHome(selection.home, userDataDir),
     runtime: createRuntimeAdapter(packaged, root),
     log: (line) =>{  console.error(line) },
+    zh: desktopLocaleZh,
     // 七相状态每次变化都推送 ControlModel：切换/重启/恢复期间胶囊实时变化。
     onStatusChanged: () => {
       broadcast()
@@ -2319,6 +2470,7 @@ void app.whenReady().then(async () => {
         : [...shell.args, '-d', cwdChoice.cwd]
       const operation = runDesktopCommand({
         slot: 'terminal',
+        zh: desktopLocaleZh(),
         command: shell.executable,
         args: wtArgs,
         cwd: cwdChoice.cwd,
@@ -2407,6 +2559,7 @@ void app.whenReady().then(async () => {
 
     const operation = runDesktopCommand({
       slot: 'terminal',
+      zh: desktopLocaleZh(),
       command: hostCommand,
       args: hostArgs,
       // host 进程自己的 cwd 与用户终端的 cwd 是两回事：pty 的 cwd 走
@@ -2601,7 +2754,7 @@ void app.whenReady().then(async () => {
               + 'The recovery record and snapshot are intact, so the user can restore the pre-operation state from the DeepCode settings page.',
         ],
       ],
-    })
+    }, zh)
     recoveryJournal = {
       ...journal,
       state: 'recovery-needed',
@@ -2845,7 +2998,16 @@ void app.whenReady().then(async () => {
       await harness.restart()
       const after = harness.status()
       if (after.phase === 'running') {
-        recoveryJournal = { ...recoveryJournal, state: 'recovered', updatedAt: now() }
+        // 只改 state 会把 failure 里那句「正在重启验证」留在屏幕上——验证其实
+        // 几秒前就过了。住户实测因此以为还要自己手动重启一次（2026-08-26）。
+        recoveryJournal = {
+          ...recoveryJournal,
+          state: 'recovered',
+          failure: zh
+            ? '已自动恢复并重启成功，可以继续使用；刚才那个插件没有装上。'
+            : 'Recovered automatically and restarted successfully; the plugin was not installed.',
+          updatedAt: now(),
+        }
         writeRecoveryJournal()
         // DeepCode 自己动了用户 Profile 里的文件——这件事必须留下记录，
         // 否则用户看到文件内容变了却查不到是谁改的。
@@ -2872,7 +3034,7 @@ void app.whenReady().then(async () => {
                 : 'State it plainly: this was DeepCode automatic recovery, it happens at most once, and its purpose was to get the harness starting again. The plugin the user tried to install is not installed.',
             ],
           ],
-        })
+        }, zh)
         clearRecoverySnapshots()
       } else {
         recoveryJournal = {
@@ -3046,7 +3208,7 @@ void app.whenReady().then(async () => {
                 + 'Nothing on disk was modified; the user can inspect those files and decide.',
           ],
         ],
-      })
+      }, zh)
       broadcast()
       void dialog.showMessageBox({
         type: 'warning',
@@ -3337,6 +3499,7 @@ void app.whenReady().then(async () => {
     const shimPath = `${shimDir};${process.env.PATH ?? ''}`
     const op = runDesktopCommand({
       slot: 'maintenance',
+      zh: desktopLocaleZh(),
       command: launch.command,
       args: launch.args,
       cwd: launch.cwd,
@@ -3678,7 +3841,7 @@ void app.whenReady().then(async () => {
     const feedUrl = readUpdateFeed(userDataDir)
     updateView = updateViewOf({ channel: feedUrl, state: 'checking' })
     broadcast()
-    const outcome = await runUpdateCheck(updateRunnerDeps, feedUrl, versionInfo.appVersion)
+    const outcome = await runUpdateCheck(updateRunnerDeps, feedUrl, versionInfo.appVersion, desktopLocaleZh())
     applyCheckOutcome(feedUrl, outcome, background)
     broadcast()
   }
@@ -3757,6 +3920,7 @@ void app.whenReady().then(async () => {
         lastProgressBroadcastAt = now
         broadcast()
       },
+      desktopLocaleZh(),
     )
     updateAbort = null
     switch (outcome.kind) {
@@ -3824,7 +3988,7 @@ void app.whenReady().then(async () => {
                 : 'This is usually a network problem or a temporarily unreachable update server — DeepCode is not broken and the user did nothing wrong. The current version keeps working.',
             ],
           ],
-        })
+        }, zhUpdate)
         break
       }
     }
@@ -4054,7 +4218,12 @@ void app.whenReady().then(async () => {
     // 「若本环境已接入自动提交通道，请直接使用本内容发送」——**而我们并没有接**，
     // 用户拿着长文不知道往哪去。报告的长度与去向都由这条提示词决定，所以在这里治。
     '正文必须收敛成一段话，总长不超过 400 字：说清现象、可能原因与建议，不要分成多个小节、不要列长清单。用户要的是一段能直接粘贴出去的话，不是一篇文档。',
-    `正文的最后一行固定写：提交地址 ${githubNewIssueUrl('')} —— 并用一句话提示用户复制上面的正文、打开该地址粘贴提交。`,
+    // 提交动作归界面，不归正文（住户 2026-08-26 验收实测）。这条原本让 AI 在正文
+    // 末尾写一个提交地址并教用户复制粘贴，结果是把用户从好路径推去了差路径：
+    // 「复制并打开 GitHub」按钮会把标题、正文和诊断包一起预填进 GitHub，而手工
+    // 复制那条只带得走 AI 这段分析——标题是空的、诊断包没跟过去，偏偏正文里还
+    // 写着「诊断包已随 issue 附上」，自相矛盾。
+    '不要在正文里写提交地址，也不要教用户复制粘贴——界面上的「复制并打开 GitHub」按钮会把标题、正文与诊断包一起带去 GitHub。正文最后用一句话提示用户点这个按钮即可。',
     '',
     '[用户的问题]',
     userText,
@@ -4080,7 +4249,7 @@ void app.whenReady().then(async () => {
     if (recoveryBlocked || harnessApi === undefined) {
       feedbackView.phase = 'degraded'
       feedbackView.reply = null
-      feedbackView.issueTitle = issueTitle(null, text)
+      feedbackView.issueTitle = issueTitle(null, text, desktopLocaleZh())
       broadcast()
       return
     }
@@ -4100,11 +4269,11 @@ void app.whenReady().then(async () => {
       if (reply === null) {
         feedbackView.phase = 'degraded'
         feedbackView.reply = null
-        feedbackView.issueTitle = issueTitle(null, text)
+        feedbackView.issueTitle = issueTitle(null, text, desktopLocaleZh())
       } else {
         feedbackView.phase = 'replied'
         feedbackView.reply = reply
-        feedbackView.issueTitle = issueTitle(reply, text)
+        feedbackView.issueTitle = issueTitle(reply, text, desktopLocaleZh())
       }
       broadcast()
     })()
@@ -4116,6 +4285,7 @@ void app.whenReady().then(async () => {
     const dict = stringsFor(localeOf())
     const state = launcher.read()
     const body = buildIssueBody({
+      zh: desktopLocaleZh(),
       appVersion: versionInfo.appVersion,
       dshVersion: versionInfo.embeddedDshVersion,
       windowsVersion: windowsVersionText,
@@ -4128,7 +4298,7 @@ void app.whenReady().then(async () => {
       clipboard.writeText(body)
       // 标题+正文全走 URL 预填（P8-D30 收尾）：用户打开 GitHub 只剩点
       // Create。剪贴板仍然复制完整正文——URL 超长截断时的兜底。
-      void shell.openExternal(githubNewIssueUrl(feedbackView.issueTitle, body))
+      void shell.openExternal(githubNewIssueUrl(feedbackView.issueTitle, body, desktopLocaleZh()))
       feedbackView.notice = dict['feedback.notice.copied'] ?? 'feedback.notice.copied'
     } catch (error) {
       feedbackView.notice = `${dict['feedback.notice.failed'] ?? 'feedback.notice.failed'}${redactSecrets(String(error instanceof Error ? error.message : error))}`
@@ -4148,6 +4318,7 @@ void app.whenReady().then(async () => {
     const dict = stringsFor(localeOf())
     const state = launcher.read()
     const body = buildIssueBody({
+      zh: desktopLocaleZh(),
       appVersion: versionInfo.appVersion,
       dshVersion: versionInfo.embeddedDshVersion,
       windowsVersion: windowsVersionText,
@@ -4213,6 +4384,7 @@ void app.whenReady().then(async () => {
   }
 
   const dispatch = createControlDispatcher({
+    zh: desktopLocaleZh,
     controller: harness,
     readState: () => launcher.read(),
     resolveActiveHome: state => resolveHarnessHome(state.active.home, userDataDir),
@@ -4221,6 +4393,41 @@ void app.whenReady().then(async () => {
       const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
       if (result.canceled) return null
       return result.filePaths[0] ?? null
+    },
+    // 接管用户自己的 Home 时，把它的 DSH 包版本与我们自带的差异如实记进
+    // 事件文件。不弹窗、不阻拦：这是用户自己的目录，版本不同也常常照跑，
+    // 为一个"可能"弹模态只会教人闭眼点掉。但一旦真的因为双副本崩了工具
+    // 调用，报错本身（Cannot read properties of undefined）指不到这里，
+    // 而 Profile 里的 DS 读得到这份记录，能直接把原因讲给用户听。
+    recordRuntimeSkew: (homePath, profile) => {
+      try {
+        const skews = detectRuntimeVersionSkew(
+          join(homePath, 'profiles', profile, 'node_modules'),
+          join(process.resourcesPath, 'dsh', 'node_modules'),
+        )
+        const zhSkew = desktopLocaleZh()
+        const body = describeRuntimeVersionSkew(skews, zhSkew)
+        if (body !== null) {
+          appendDesktopEvent(homePath, {
+            at: formatStampLocal(new Date().toISOString()),
+            title: zhSkew ? 'DSH 包版本与 DeepCode 自带的不一致' : 'DSH package versions differ from the ones DeepCode ships',
+            sections: [[zhSkew ? '发生了什么' : 'What happened', body]],
+          }, zhSkew)
+        }
+        // 第二件事，主题不同所以单独记一条：DeepCode 对 Existing Home 一向
+        // 只读，唯一的例外在上游 credentials-local——它认出旧版 flat 布局
+        // 会就地改写（值不变，只换外层结构）。承诺过不改，就该在改之前把
+        // 这一次说清楚，而不是让用户事后发现自己的文件被动过。
+        if (hasLegacyCredentialsLayout(homePath)) {
+          appendDesktopEvent(homePath, {
+            at: formatStampLocal(new Date().toISOString()),
+            title: zhSkew ? '这个目录里的凭据文件会被改写一次' : 'The credentials file in this directory will be rewritten once',
+            sections: [[zhSkew ? '发生了什么' : 'What happened', describeLegacyCredentialsLayout(zhSkew)]],
+          }, zhSkew)
+        }
+      } catch {
+        // 诊断记录失败绝不能连累切换本身：用户要的是换 Home，不是这条笔记。
+      }
     },
     confirmDisruptive: async (action) => {
       // 文案只说真话：会中断什么、丢什么、不动什么。绝不用"可能会有影响"
@@ -4383,9 +4590,10 @@ void app.whenReady().then(async () => {
     },
     openFeedback: () => {
       // 打开面板：诊断包收集一次（脱敏在收集点完成），面板内容可编辑。
-      if (!feedbackDiagnosticsReady) {
+      const stamp = feedbackEnvironmentStamp()
+      if (feedbackDiagnosticsStamp !== stamp) {
         feedbackView.diagnostics = collectFeedbackDiagnostics()
-        feedbackDiagnosticsReady = true
+        feedbackDiagnosticsStamp = stamp
       }
       feedbackView.open = true
       feedbackView.notice = null
@@ -4656,6 +4864,9 @@ void app.whenReady().then(async () => {
   })
 
   const win = createWindow(uiResult.state)
+  // 在 Harness 起来之前问：导入的对话要能被这次 boot 直接看到，否则用户
+  // 得重启一次才发现东西进来了。
+  await offerSessionImport(resolveHarnessHome(launcher.read().active.home, userDataDir))
   await controller.start()
   // 启动完成后结算恢复通知：上次失败已回退 LKG 且本次成功启动时提示一次。
   settleRecoveryNotice()
@@ -4709,7 +4920,7 @@ void app.whenReady().then(async () => {
               + 'If a plugin was installed recently, suspect that first; the DeepCode settings page offers a restore entry.',
         ],
       ],
-    })
+    }, zhFail)
     const needsManualRecovery = recoveryJournal !== null
       && (recoveryJournal.state === 'recovery-needed' || recoveryJournal.state === 'drift')
     if (!needsManualRecovery) {

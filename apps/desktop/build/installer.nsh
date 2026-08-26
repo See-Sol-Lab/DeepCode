@@ -217,6 +217,12 @@
 !endif
 
 !macro customUnInstall
+  # updater 下载缓存（2026-08-27 人工验收发现）：electron-updater 把下载好的安装包
+  # 留在 %LOCALAPPDATA% 下，实测卸载完那儿还躺着 136 MB，而用户根本不会知道它在。
+  # 目录名由 package.json 的 name（@see-sol-lab/deepcode）去掉斜杠再接 -updater 得来，
+  # 改包名时这里要跟着改。它是程序的下载缓存、不是用户的东西，所以无条件清掉，
+  # 不并进下面那个「要不要删数据目录」的询问。
+  RMDir /r "$LOCALAPPDATA\@see-sol-labdeepcode-updater"
   # P8-D21：卸载器从来没有交代过用户数据留在哪儿。这里问一次，默认保留。
   #
   # 时机说明（这段是本宏唯一的复杂之处，别照直觉改）：一键卸载器在 un.onInit 里
@@ -247,4 +253,34 @@
       ${endif}
     deepcodeKeepAppData:
   ${endif}
+!macroend
+
+# ── 安装目录长度闸门（2026-08-26）──
+# Windows 仍然拒绝超过 260 字符的路径。产物里最长的相对路径来自第三方包
+# （嵌套 node_modules ＋ 一个文件的三份构建变体），我们改不动，因此留给安装
+# 目录的余量是固定的：260 − 最长相对路径 − 1 个分隔符。
+#
+# 越界的后果不像它的成因：文件照样能解压进去，几个月后升级时卸载器才失败，
+# 而且报的是「DSH Desktop 无法关闭，请关闭后重试」（上游有 6 例）。用户于是
+# 关程序、杀进程、重启，全都没用——关闭从来不是问题所在。
+#
+# 所以在装之前就拦。此宏在模板的 .onInit 里、initMultiUser 之后展开，$INSTDIR
+# 这时已是终值：默认目录、注册表里记录的旧安装位置、以及 /D= 覆盖都已生效。
+#
+# ${DEEPCODE_MAX_INSTDIR_LEN} 与 scripts/build-desktop-dist.ts 实测的余量绑定：
+# 该脚本每次打包都会读取这里的数字，大于实测余量就让构建失败，两侧不会漂移。
+!define DEEPCODE_MAX_INSTDIR_LEN 85
+
+!macro customInit
+  # 注意：模板的 .onInit 在本宏之前就执行了 SetOutPath $INSTDIR（installer.nsi），
+  # 目录树因此已被建出来。被拒的安装留下的是空目录：没有文件写入，也没有注册表
+  # 项。抢在 SetOutPath 之前没有可用挂点，为此再 patch 模板不划算。
+  StrLen $0 "$INSTDIR"
+  ${If} $0 > ${DEEPCODE_MAX_INSTDIR_LEN}
+    ${IfNot} ${Silent}
+      MessageBox MB_OK|MB_ICONSTOP "安装目录过深，无法安装到这里：$\r$\n$INSTDIR$\r$\n$\r$\n该路径有 $0 个字符，上限是 ${DEEPCODE_MAX_INSTDIR_LEN} 个。程序内含的第三方 npm 包目录层层嵌套，再加上 Windows 的 260 字符路径上限，安装目录一旦过深，部分程序文件就无法写入，卸载与升级随后会失败。该限制来自 Windows 与这些第三方包，不是 DSH 或 DeepCode 引入的。$\r$\n请改用较浅的目录重新安装，例如 $LocalAppData\Programs\${APP_FILENAME}。$\r$\n$\r$\nThe installation directory is too deep:$\r$\n$INSTDIR$\r$\nIt is $0 characters; the limit is ${DEEPCODE_MAX_INSTDIR_LEN}. Third-party npm packages nest their directories deeply, and with Windows' 260-character path limit a deep installation directory leaves some program files unwritable, so uninstalling and updating fail later. The limit comes from Windows and those third-party packages, not from DSH or DeepCode.$\r$\nPlease install into a shorter directory, for example $LocalAppData\Programs\${APP_FILENAME}."
+    ${EndIf}
+    SetErrorLevel 2
+    Quit
+  ${EndIf}
 !macroend

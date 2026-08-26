@@ -36,7 +36,7 @@ const ZH = {
   'tray.open': '打开 DeepCode',
   'tray.profile': '当前 Profile',
   'tray.status': 'Harness 状态',
-  'tray.profiles': 'Profiles',
+  'tray.profiles': '切换 Profile',
   'tray.restart': '重启 Harness',
   'tray.terminal': '打开 DSH Terminal',
   'tray.updates': '检查更新',

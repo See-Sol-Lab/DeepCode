@@ -290,13 +290,28 @@ describe('streamDownload（size limit / cancel / HTTP 错误 / 进度）', () =>
   it('HTTP 非 2xx：明确失败', async () => {
     const failingGet: HttpGet = (url, callback) => {
       void url
-      callback({ statusCode: 404, on: () => {} })
+      callback({ statusCode: 500, on: () => {} })
       return { on: () => {} }
     }
     await expect(streamDownload(
       'https://x/a.exe', () => {}, 1024, new AbortController().signal, () => {},
       failingGet,
-    )).rejects.toThrow(/HTTP 404/)
+    )).rejects.toThrow(/HTTP 500/)
+  })
+
+  // 404 与「出错了」是两回事：`releases/latest/download/<asset>` 在还没有任何
+  // release 时就是 404。人工验收（2026-08-27）实测：发布前点检查更新，用户看到
+  // 「下载失败：HTTP 404」只会以为程序坏了。
+  it('HTTP 404：说成「没有可用更新」，不说成下载失败', async () => {
+    const notFoundGet: HttpGet = (url, callback) => {
+      void url
+      callback({ statusCode: 404, on: () => {} })
+      return { on: () => {} }
+    }
+    await expect(streamDownload(
+      'https://x/a.exe', () => {}, 1024, new AbortController().signal, () => {},
+      notFoundGet,
+    )).rejects.toThrow(/没有可用的更新/)
   })
 
   it('写入失败：明确报错且不再继续', async () => {

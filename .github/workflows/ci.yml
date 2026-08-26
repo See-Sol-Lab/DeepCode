@@ -1,8 +1,9 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
+  # No main-push trigger. This fork lands its work as direct pushes to main, so
+  # every commit fired the whole upstream matrix and mailed a failure for lanes
+  # it does not maintain. Pull requests and manual dispatch still reach it.
   pull_request:
   workflow_dispatch:
     inputs:

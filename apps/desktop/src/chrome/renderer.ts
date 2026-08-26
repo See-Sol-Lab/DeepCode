@@ -245,6 +245,35 @@ function render(): void {  if (model === null) return
     if (key !== undefined) node.setAttribute('aria-label', tr(key))
   }
 
+  // 插件恢复入口（2026-08-27 人工验收暴露的发布阻断项）。
+  //
+  // 插件把 Harness 搞坏之后，官方设置页随 3080 一起不可达，那个「恢复上次插件
+  // 变更」的按钮就住在里面——用户看得见故障、够不着解药。B3-15 当时只补了
+  // 「重启 Harness」，而坏插件还在时重启只会再失败一次，是个闭环。实测下来唯一
+  // 的活路是 DSH 终端敲 `dsh plugin --profile <p> remove <pkg>`，对不会敲命令的
+  // 人等于没有。
+  //
+  // 恢复动作本身一直在我们自己的控制层里（control-dispatch），不经过 3080，所以
+  // 这里只是把够不着的能力接出来。两种状态给两种出口：recovery-needed 直接恢复；
+  // drift（事务后文件被外部改过）绝不代用户覆盖，只把 Profile 文件夹打开。
+  const pluginRecoveryItem = document.getElementById('menu-plugin-recovery')
+  if (pluginRecoveryItem !== null) {
+    const pluginRecovery = model.pluginManager.recovery
+    const actionable = pluginRecovery !== null
+      && (pluginRecovery.state === 'recovery-needed' || pluginRecovery.state === 'drift')
+    pluginRecoveryItem.hidden = !actionable
+    if (actionable) {
+      const drift = pluginRecovery.state === 'drift'
+      pluginRecoveryItem.textContent = tr(drift
+        ? 'menu.plugin-recovery.open-profile'
+        : 'menu.plugin-recovery.restore')
+      // onclick 而非 addEventListener：render 每次广播都跑，累加监听器会让
+      // 一次点击发出多条命令。
+      pluginRecoveryItem.onclick = (): void => {
+        run({ type: drift ? 'plugin-recovery-open-profile' : 'plugin-recovery-restore' })
+      }
+    }
+  }
   // 内置浏览器 pane（B3-11）：菜单项只在插件创建过 pane 后出现，文案随开合。
   const browserPaneItem = document.getElementById('menu-browser-pane')
   if (browserPaneItem !== null) {

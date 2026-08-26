@@ -50,6 +50,8 @@ export interface HarnessApiOptions {
   fetch: FetchLike
   /** 单次调用的超时（毫秒）。 */
   timeoutMs?: number
+  /** 读取当前界面是否使用中文；每次响应解析时重新读取。 */
+  zh?: () => boolean
 }
 
 /** 官方 RPC 客户端：只暴露 DeepCode 需要的 settings 与 session 方法。 */
@@ -129,46 +131,46 @@ export interface SessionHistoryValue {
 export const DEFAULT_RPC_TIMEOUT_MS = 5_000
 
 /** 严格解析 settings namespace 视图（值字段保持 unknown，调用方再解释）。 */
-function parseNamespaceView(raw: unknown, where: string): SettingsNamespaceView {
+function parseNamespaceView(raw: unknown, where: string, zh: boolean): SettingsNamespaceView {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-    throw new HarnessRpcError('bad-response', `${where}: 必须是对象`)
+    throw new HarnessRpcError('bad-response', zh ? `${where}: 必须是对象` : `${where}: must be an object`)
   }
   const record = raw as Record<string, unknown>
   const { ns, applies, revision } = record
   if (typeof ns !== 'string' || ns.length === 0) {
-    throw new HarnessRpcError('bad-response', `${where}.ns: 必须是非空字符串`)
+    throw new HarnessRpcError('bad-response', zh ? `${where}.ns: 必须是非空字符串` : `${where}.ns: must be a non-empty string`)
   }
   if (applies !== 'live' && applies !== 'restart') {
-    throw new HarnessRpcError('bad-response', `${where}.applies: 未知值 ${JSON.stringify(applies)}`)
+    throw new HarnessRpcError('bad-response', zh ? `${where}.applies: 未知值 ${JSON.stringify(applies)}` : `${where}.applies: unknown value ${JSON.stringify(applies)}`)
   }
   if (typeof revision !== 'number' || !Number.isInteger(revision) || revision < 0) {
-    throw new HarnessRpcError('bad-response', `${where}.revision: 必须是非负整数`)
+    throw new HarnessRpcError('bad-response', zh ? `${where}.revision: 必须是非负整数` : `${where}.revision: must be a non-negative integer`)
   }
   if (!('value' in record)) {
-    throw new HarnessRpcError('bad-response', `${where}.value: 缺失`)
+    throw new HarnessRpcError('bad-response', zh ? `${where}.value: 缺失` : `${where}.value: is missing`)
   }
   return { ns, value: record.value, applies, revision }
 }
 
 /** 严格解析 settings.describe 的 value。 */
-function parseDescribeValue(raw: unknown): SettingsDescribeValue {
+function parseDescribeValue(raw: unknown, zh: boolean): SettingsDescribeValue {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-    throw new HarnessRpcError('bad-response', 'settings.describe value: 必须是对象')
+    throw new HarnessRpcError('bad-response', zh ? 'settings.describe value: 必须是对象' : 'settings.describe value: must be an object')
   }
   const record = raw as Record<string, unknown>
   if (typeof record.writable !== 'boolean') {
-    throw new HarnessRpcError('bad-response', 'settings.describe value.writable: 必须是布尔值')
+    throw new HarnessRpcError('bad-response', zh ? 'settings.describe value.writable: 必须是布尔值' : 'settings.describe value.writable: must be a boolean')
   }
   if (typeof record.hasDocument !== 'boolean') {
-    throw new HarnessRpcError('bad-response', 'settings.describe value.hasDocument: 必须是布尔值')
+    throw new HarnessRpcError('bad-response', zh ? 'settings.describe value.hasDocument: 必须是布尔值' : 'settings.describe value.hasDocument: must be a boolean')
   }
   if (!Array.isArray(record.namespaces)) {
-    throw new HarnessRpcError('bad-response', 'settings.describe value.namespaces: 必须是数组')
+    throw new HarnessRpcError('bad-response', zh ? 'settings.describe value.namespaces: 必须是数组' : 'settings.describe value.namespaces: must be an array')
   }
   return {
     writable: record.writable,
     hasDocument: record.hasDocument,
-    namespaces: record.namespaces.map((row, index) => parseNamespaceView(row, `namespaces[${index}]`)),
+    namespaces: record.namespaces.map((row, index) => parseNamespaceView(row, `namespaces[${index}]`, zh)),
   }
 }
 
@@ -185,20 +187,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * @param where - 定位用字段路径。
  * @returns 校验通过的摘要。
  */
-function parseSessionSummary(raw: unknown, where: string): SessionSummary {
-  if (!isRecord(raw)) throw new HarnessRpcError('bad-response', `${where}: 必须是对象`)
+function parseSessionSummary(raw: unknown, where: string, zh: boolean): SessionSummary {
+  if (!isRecord(raw)) throw new HarnessRpcError('bad-response', zh ? `${where}: 必须是对象` : `${where}: must be an object`)
   const { sessionId, updatedAt, running, blank } = raw
   if (typeof sessionId !== 'string' || sessionId.length === 0) {
-    throw new HarnessRpcError('bad-response', `${where}.sessionId: 必须是非空字符串`)
+    throw new HarnessRpcError('bad-response', zh ? `${where}.sessionId: 必须是非空字符串` : `${where}.sessionId: must be a non-empty string`)
   }
   if (typeof updatedAt !== 'number' || !Number.isFinite(updatedAt)) {
-    throw new HarnessRpcError('bad-response', `${where}.updatedAt: 必须是有限数字`)
+    throw new HarnessRpcError('bad-response', zh ? `${where}.updatedAt: 必须是有限数字` : `${where}.updatedAt: must be a finite number`)
   }
   if (typeof running !== 'boolean') {
-    throw new HarnessRpcError('bad-response', `${where}.running: 必须是布尔值`)
+    throw new HarnessRpcError('bad-response', zh ? `${where}.running: 必须是布尔值` : `${where}.running: must be a boolean`)
   }
   if (typeof blank !== 'boolean') {
-    throw new HarnessRpcError('bad-response', `${where}.blank: 必须是布尔值`)
+    throw new HarnessRpcError('bad-response', zh ? `${where}.blank: 必须是布尔值` : `${where}.blank: must be a boolean`)
   }
   return {
     sessionId,
@@ -214,18 +216,18 @@ function parseSessionSummary(raw: unknown, where: string): SessionSummary {
 }
 
 /** 严格解析 session.list 的响应值。 */
-function parseSessionListValue(raw: unknown): SessionListValue {
+function parseSessionListValue(raw: unknown, zh: boolean): SessionListValue {
   if (!isRecord(raw) || !Array.isArray(raw.items)) {
-    throw new HarnessRpcError('bad-response', 'session.list value: 必须是含 items 数组的对象')
+    throw new HarnessRpcError('bad-response', zh ? 'session.list value: 必须是含 items 数组的对象' : 'session.list value: must be an object containing an items array')
   }
-  return { items: raw.items.map((row, index) => parseSessionSummary(row, `items[${index}]`)) }
+  return { items: raw.items.map((row, index) => parseSessionSummary(row, `items[${index}]`, zh)) }
 }
 
 /** 严格解析 session.create 的响应值。 */
-function parseSessionCreateValue(raw: unknown): SessionCreateValue {
-  if (!isRecord(raw)) throw new HarnessRpcError('bad-response', 'session.create value: 必须是对象')
+function parseSessionCreateValue(raw: unknown, zh: boolean): SessionCreateValue {
+  if (!isRecord(raw)) throw new HarnessRpcError('bad-response', zh ? 'session.create value: 必须是对象' : 'session.create value: must be an object')
   if (typeof raw.sessionId !== 'string' || raw.sessionId.length === 0) {
-    throw new HarnessRpcError('bad-response', 'session.create value.sessionId: 必须是非空字符串')
+    throw new HarnessRpcError('bad-response', zh ? 'session.create value.sessionId: 必须是非空字符串' : 'session.create value.sessionId: must be a non-empty string')
   }
   return {
     sessionId: raw.sessionId,
@@ -234,44 +236,46 @@ function parseSessionCreateValue(raw: unknown): SessionCreateValue {
 }
 
 /** 严格解析 session.prompt 的响应值。 */
-function assertSessionPromptValue(raw: unknown): void {
+function assertSessionPromptValue(raw: unknown, zh: boolean): void {
   if (!isRecord(raw) || raw.accepted !== true) {
-    throw new HarnessRpcError('bad-response', 'session.prompt value: accepted 必须为 true')
+    throw new HarnessRpcError('bad-response', zh ? 'session.prompt value: accepted 必须为 true' : 'session.prompt value: accepted must be true')
   }
 }
 
 /** 严格解析 session.history 的一条事件视图。 */
-function parseSessionEventView(raw: unknown, where: string): SessionEventView {
-  if (!isRecord(raw)) throw new HarnessRpcError('bad-response', `${where}: 必须是对象`)
+function parseSessionEventView(raw: unknown, where: string, zh: boolean): SessionEventView {
+  if (!isRecord(raw)) throw new HarnessRpcError('bad-response', zh ? `${where}: 必须是对象` : `${where}: must be an object`)
   if (typeof raw.type !== 'string' || raw.type.length === 0) {
-    throw new HarnessRpcError('bad-response', `${where}.type: 必须是非空字符串`)
+    throw new HarnessRpcError('bad-response', zh ? `${where}.type: 必须是非空字符串` : `${where}.type: must be a non-empty string`)
   }
   if (typeof raw.seq !== 'number' || !Number.isInteger(raw.seq) || raw.seq < 0) {
-    throw new HarnessRpcError('bad-response', `${where}.seq: 必须是非负整数`)
+    throw new HarnessRpcError('bad-response', zh ? `${where}.seq: 必须是非负整数` : `${where}.seq: must be a non-negative integer`)
   }
   if (typeof raw.time !== 'number' || !Number.isFinite(raw.time)) {
-    throw new HarnessRpcError('bad-response', `${where}.time: 必须是有限数字`)
+    throw new HarnessRpcError('bad-response', zh ? `${where}.time: 必须是有限数字` : `${where}.time: must be a finite number`)
   }
   if (!('data' in raw)) {
-    throw new HarnessRpcError('bad-response', `${where}.data: 缺失`)
+    throw new HarnessRpcError('bad-response', zh ? `${where}.data: 缺失` : `${where}.data: is missing`)
   }
   return { type: raw.type, seq: raw.seq, time: raw.time, data: raw.data }
 }
 
 /** 严格解析 session.history 的响应值。 */
-function parseSessionHistoryValue(raw: unknown): SessionHistoryValue {
+function parseSessionHistoryValue(raw: unknown, zh: boolean): SessionHistoryValue {
   if (!isRecord(raw) || !Array.isArray(raw.events)) {
-    throw new HarnessRpcError('bad-response', 'session.history value: 必须是含 events 数组的对象')
+    throw new HarnessRpcError('bad-response', zh ? 'session.history value: 必须是含 events 数组的对象' : 'session.history value: must be an object containing an events array')
   }
   if (typeof raw.hasMore !== 'boolean') {
-    throw new HarnessRpcError('bad-response', 'session.history value.hasMore: 必须是布尔值')
+    throw new HarnessRpcError('bad-response', zh ? 'session.history value.hasMore: 必须是布尔值' : 'session.history value.hasMore: must be a boolean')
   }
   return {
     events: raw.events.map((row, index) => {
       if (!isRecord(row) || !('event' in row)) {
-        throw new HarnessRpcError('bad-response', `session.history value.events[${index}]: 必须含 event`)
+        throw new HarnessRpcError('bad-response', zh
+          ? `session.history value.events[${index}]: 必须含 event`
+          : `session.history value.events[${index}]: must contain event`)
       }
-      return { event: parseSessionEventView(row.event, `events[${index}].event`) }
+      return { event: parseSessionEventView(row.event, `events[${index}].event`, zh) }
     }),
     hasMore: raw.hasMore,
   }
@@ -284,6 +288,7 @@ function parseSessionHistoryValue(raw: unknown): SessionHistoryValue {
  */
 export function createHarnessApi(options: HarnessApiOptions): HarnessApi {
   const timeoutMs = options.timeoutMs ?? DEFAULT_RPC_TIMEOUT_MS
+  const zh = options.zh ?? (() => true)
 
   /** 单次调用的超时上限：调用方传更紧的超时（如退出确认的 1500ms）时取更小值。 */
   const call = async (method: string, payload: unknown, callTimeoutMs: number = timeoutMs): Promise<unknown> => {
@@ -301,33 +306,35 @@ export function createHarnessApi(options: HarnessApiOptions): HarnessApi {
       throw new HarnessRpcError('unreachable', error instanceof Error ? error.message : String(error))
     }
     if (!response.ok || response.status !== 200) {
-      throw new HarnessRpcError('transport', `官方服务返回 HTTP ${String(response.status)}`)
+      throw new HarnessRpcError('transport', zh()
+        ? `官方服务返回 HTTP ${String(response.status)}`
+        : `The Harness service returned HTTP ${String(response.status)}`)
     }
     let body: unknown
     try {
       body = await response.json()
     } catch {
-      throw new HarnessRpcError('bad-response', '响应不是有效 JSON')
+      throw new HarnessRpcError('bad-response', zh() ? '响应不是有效 JSON' : 'The response is not valid JSON')
     }
     if (!isRecord(body) || body.type !== 'server-response' || body.rpcId !== rpcId || !('result' in body)) {
-      throw new HarnessRpcError('bad-response', '响应信封不符合官方 RPC 契约')
+      throw new HarnessRpcError('bad-response', zh() ? '响应信封不符合官方 RPC 契约' : 'The response envelope does not match the Harness RPC contract')
     }
     const result = body.result
-    if (!isRecord(result)) throw new HarnessRpcError('bad-response', 'result: 必须是对象')
+    if (!isRecord(result)) throw new HarnessRpcError('bad-response', zh() ? 'result: 必须是对象' : 'result: must be an object')
     if (result.ok === true) {
-      if (!('value' in result)) throw new HarnessRpcError('bad-response', 'ok 响应缺少 value')
+      if (!('value' in result)) throw new HarnessRpcError('bad-response', zh() ? 'ok 响应缺少 value' : 'The successful response is missing value')
       return result.value
     }
     const error = result.error
     if (isRecord(error) && typeof error.code === 'string' && typeof error.message === 'string') {
       throw new HarnessRpcError(error.code, error.message)
     }
-    throw new HarnessRpcError('bad-response', '错误响应的 error 形状不符')
+    throw new HarnessRpcError('bad-response', zh() ? '错误响应的 error 形状不符' : 'The error response has an invalid error value')
   }
 
   return {
     async settingsDescribe() {
-      return parseDescribeValue(await call('settings.describe', {}))
+      return parseDescribeValue(await call('settings.describe', {}), zh())
     },
     async settingsMutate(ns, ops, expectedRevision) {
       const value = await call('settings.mutate', {
@@ -335,21 +342,21 @@ export function createHarnessApi(options: HarnessApiOptions): HarnessApi {
         ops,
         ...expectedRevision === undefined ? {} : { expectedRevision },
       })
-      return parseNamespaceView(value, 'settings.mutate value')
+      return parseNamespaceView(value, 'settings.mutate value', zh())
     },
     async sessionList() {
-      return parseSessionListValue(await call('session.list', {}, 1_500))
+      return parseSessionListValue(await call('session.list', {}, 1_500), zh())
     },
     async sessionCreate(payload) {
       const value = await call('session.create', payload)
-      return parseSessionCreateValue(value)
+      return parseSessionCreateValue(value, zh())
     },
     async sessionPrompt(payload) {
-      assertSessionPromptValue(await call('session.prompt', payload))
+      assertSessionPromptValue(await call('session.prompt', payload), zh())
     },
     async sessionHistory(payload) {
       const value = await call('session.history', payload)
-      return parseSessionHistoryValue(value)
+      return parseSessionHistoryValue(value, zh())
     },
   }
 }

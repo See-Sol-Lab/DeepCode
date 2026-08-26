@@ -66,6 +66,8 @@ export interface HarnessControllerOptions {
   runtime: HarnessRuntimeAdapter
   /** 失败路径的旁路诊断日志；已脱敏限长。 */
   log?: (line: string) => void
+  /** 读取当前界面是否使用中文；每次失败时重新读取。 */
+  zh?: () => boolean
   /**
    * 每次内存 runtime 状态变化时同步回调（Desktop Chrome 据此推送
    * ControlModel）。controller 仍是状态唯一来源；回调异常不得影响
@@ -99,12 +101,14 @@ class ShutdownAbort extends Error {
  * @param error - 原始抛出值。
  * @param selection - 失败时正在启动的选择。
  */
-function toBootFailure(stage: BootFailure['stage'], error: unknown, selection?: HarnessSelection): BootFailure {
+function toBootFailure(stage: BootFailure['stage'], error: unknown, zh: boolean, selection?: HarnessSelection): BootFailure {
   const raw = error instanceof Error ? error.message : String(error)
   const redacted = redactSecrets(raw).slice(0, BOOT_FAILURE_MAX_MESSAGE)
   return {
     stage,
-    message: redacted.length > 0 ? redacted : `${stage} 阶段失败（无错误消息）`,
+    message: redacted.length > 0
+      ? redacted
+      : (zh ? `${stage} 阶段失败（无错误消息）` : `The ${stage} stage failed without an error message`),
     ...selection === undefined ? {} : { selection },
   }
 }
@@ -151,6 +155,11 @@ export class HarnessController {
   private stopInFlight: Promise<void> | undefined
 
   constructor(private readonly options: HarnessControllerOptions) {}
+
+  /** 当前错误文案语言；未提供时保留既有中文行为。 */
+  private zh(): boolean {
+    return this.options.zh?.() ?? true
+  }
 
   /** 当前内存 runtime 状态。 */
   status(): HarnessStatus {
@@ -218,7 +227,9 @@ export class HarnessController {
         const failure = (error as BootAttemptError).failure
         this.setStatus({ phase: 'failed', failure })
         this.options.store.write({ ...before, pending: null, lastBootFailure: failure })
-        this.options.log?.(`[deepcode] 切换失败（${failure.stage}）: ${failure.message}`)
+        this.options.log?.(this.zh()
+          ? `[deepcode] 切换失败（${failure.stage}）: ${failure.message}`
+          : `[deepcode] Switch failed (${failure.stage}): ${failure.message}`)
         // 4. 单次 lastKnownGood 回退；为空则停在 failed。
         const fallback = before.lastKnownGood
         if (fallback === null) return
@@ -235,13 +246,17 @@ export class HarnessController {
             // 只有下一次完整成功的 switchTo/restart 才清。
             lastBootFailure: failure,
           })
-          this.options.log?.('[deepcode] 已回退到 lastKnownGood（recovered）')
+          this.options.log?.(this.zh()
+            ? '[deepcode] 已回退到 lastKnownGood（recovered）'
+            : '[deepcode] Recovered by returning to lastKnownGood')
         } catch (fallbackError) {
           if (fallbackError instanceof ShutdownAbort) return
           const fallbackFailure = (fallbackError as BootAttemptError).failure
           this.setStatus({ phase: 'failed', failure: fallbackFailure })
           this.options.store.write({ ...before, pending: null, lastBootFailure: fallbackFailure })
-          this.options.log?.(`[deepcode] 回退失败（${fallbackFailure.stage}）: ${fallbackFailure.message}`)
+          this.options.log?.(this.zh()
+            ? `[deepcode] 回退失败（${fallbackFailure.stage}）: ${fallbackFailure.message}`
+            : `[deepcode] Recovery fallback failed (${fallbackFailure.stage}): ${fallbackFailure.message}`)
         }
         return
       }
@@ -284,7 +299,9 @@ export class HarnessController {
         const failure = (error as BootAttemptError).failure
         this.setStatus({ phase: 'failed', failure })
         this.options.store.write({ ...state, lastBootFailure: failure })
-        this.options.log?.(`[deepcode] 重启失败（${failure.stage}）: ${failure.message}`)
+        this.options.log?.(this.zh()
+          ? `[deepcode] 重启失败（${failure.stage}）: ${failure.message}`
+          : `[deepcode] Restart failed (${failure.stage}): ${failure.message}`)
       }
     })
   }
@@ -321,14 +338,18 @@ export class HarnessController {
     const redacted = redactSecrets(message).slice(0, BOOT_FAILURE_MAX_MESSAGE)
     const failure: BootFailure = {
       stage: 'runtime',
-      message: redacted.length > 0 ? redacted : 'runtime 阶段失败（无错误消息）',
+      message: redacted.length > 0
+        ? redacted
+        : (this.zh() ? 'runtime 阶段失败（无错误消息）' : 'The runtime stage failed without an error message'),
     }
     return this.queue(() => {
       if (this.shutdownRequested) return Promise.resolve()
       // 主动 stop 收尾后的退出不是意外；running 之外的状态也不必改写。
       if (this.runtimeStatus.phase !== 'running') return Promise.resolve()
       this.setStatus({ phase: 'failed', failure })
-      this.options.log?.(`[deepcode] DSH 服务意外退出: ${failure.message}`)
+      this.options.log?.(this.zh()
+        ? `[deepcode] DSH 服务意外退出: ${failure.message}`
+        : `[deepcode] The DSH service exited unexpectedly: ${failure.message}`)
       return Promise.resolve()
     })
   }
@@ -348,7 +369,9 @@ export class HarnessController {
       const failure = (error as BootAttemptError).failure
       this.setStatus({ phase: 'failed', failure })
       this.options.store.write({ ...state, lastBootFailure: failure })
-      this.options.log?.(`[deepcode] 启动失败（${failure.stage}）: ${failure.message}`)
+      this.options.log?.(this.zh()
+        ? `[deepcode] 启动失败（${failure.stage}）: ${failure.message}`
+        : `[deepcode] Startup failed (${failure.stage}): ${failure.message}`)
     }
   }
 
@@ -375,9 +398,11 @@ export class HarnessController {
       // 这里是在处理另一个错误的路上做尽力清理：停不下来要记下来，但绝不
       // 能用它替换掉真正该报给用户的那个失败原因。
       await this.options.runtime.stopProcess().catch((stopError: unknown) => {
-        console.error(`[deepcode] 清理子进程失败: ${String(stopError instanceof Error ? stopError.message : stopError)}`)
+        console.error(this.zh()
+          ? `[deepcode] 清理子进程失败: ${String(stopError instanceof Error ? stopError.message : stopError)}`
+          : `[deepcode] Failed to clean up the child process: ${String(stopError instanceof Error ? stopError.message : stopError)}`)
       })
-      throw new BootAttemptError(toBootFailure('spawn', error, target))
+      throw new BootAttemptError(toBootFailure('spawn', error, this.zh(), target))
     }
     // 孤儿进程窗口：stop() 同步段发起 terminate 时 spawn 还没 settle，
     // 那次 stopProcess 无进程可杀；刚 settle 的 child 只能由这里停掉。
@@ -394,9 +419,11 @@ export class HarnessController {
       // 这里是在处理另一个错误的路上做尽力清理：停不下来要记下来，但绝不
       // 能用它替换掉真正该报给用户的那个失败原因。
       await this.options.runtime.stopProcess().catch((stopError: unknown) => {
-        console.error(`[deepcode] 清理子进程失败: ${String(stopError instanceof Error ? stopError.message : stopError)}`)
+        console.error(this.zh()
+          ? `[deepcode] 清理子进程失败: ${String(stopError instanceof Error ? stopError.message : stopError)}`
+          : `[deepcode] Failed to clean up the child process: ${String(stopError instanceof Error ? stopError.message : stopError)}`)
       })
-      throw new BootAttemptError(toBootFailure('readiness', error, target))
+      throw new BootAttemptError(toBootFailure('readiness', error, this.zh(), target))
     }
     this.assertNotShuttingDown()
     try {
@@ -406,9 +433,11 @@ export class HarnessController {
       // 这里是在处理另一个错误的路上做尽力清理：停不下来要记下来，但绝不
       // 能用它替换掉真正该报给用户的那个失败原因。
       await this.options.runtime.stopProcess().catch((stopError: unknown) => {
-        console.error(`[deepcode] 清理子进程失败: ${String(stopError instanceof Error ? stopError.message : stopError)}`)
+        console.error(this.zh()
+          ? `[deepcode] 清理子进程失败: ${String(stopError instanceof Error ? stopError.message : stopError)}`
+          : `[deepcode] Failed to clean up the child process: ${String(stopError instanceof Error ? stopError.message : stopError)}`)
       })
-      throw new BootAttemptError(toBootFailure('page-load', error, target))
+      throw new BootAttemptError(toBootFailure('page-load', error, this.zh(), target))
     }
   }
 

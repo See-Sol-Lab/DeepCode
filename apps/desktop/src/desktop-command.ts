@@ -56,6 +56,8 @@ export interface DesktopCommandInput {
   onExit?: (result: DesktopCommandResult) => void
   /** 可选的取消信号：cancel 清理完整 process tree。 */
   signal?: AbortSignal
+  /** 是否使用中文错误文案。 */
+  zh?: boolean
 }
 
 /** 一次运行中的桌面维护操作句柄。 */
@@ -70,8 +72,10 @@ export interface DesktopOperation {
 
 /** 已有同槽位桌面维护操作在进行时的明确错误（按槽位单例约束）。 */
 export class DesktopCommandBusyError extends Error {
-  constructor(slot: DesktopCommandSlot) {
-    super(`已有一项${slot === 'terminal' ? '终端' : '维护'}操作在进行中；请先取消或等待其结束`)
+  constructor(slot: DesktopCommandSlot, zh = true) {
+    super(zh
+      ? `已有一项${slot === 'terminal' ? '终端' : '维护'}操作在进行中；请先取消或等待其结束`
+      : `A ${slot} operation is already running; cancel it or wait for it to finish`)
     this.name = 'DesktopCommandBusyError'
   }
 }
@@ -90,9 +94,10 @@ const activeBySlot: Record<DesktopCommandSlot, DesktopOperation | null> = {
  * @returns 操作句柄。
  */
 export function runDesktopCommand(input: DesktopCommandInput): DesktopOperation {
+  const zh = input.zh ?? true
   const current = activeBySlot[input.slot]
   if (current !== null && current.running()) {
-    throw new DesktopCommandBusyError(input.slot)
+    throw new DesktopCommandBusyError(input.slot, zh)
   }
   const child: ChildProcess = spawn(input.command, [...input.args], {
     cwd: input.cwd,
@@ -109,7 +114,9 @@ export function runDesktopCommand(input: DesktopCommandInput): DesktopOperation 
     try {
       run()
     } catch (error) {
-      console.error(`[deepcode] 桌面维护操作${what}回调抛错（已隔离）: ${String(error instanceof Error ? error.message : error)}`)
+      console.error(zh
+        ? `[deepcode] 桌面维护操作${what}回调抛错（已隔离）: ${String(error instanceof Error ? error.message : error)}`
+        : `[deepcode] The desktop ${what} callback threw and was isolated: ${String(error instanceof Error ? error.message : error)}`)
     }
   }
 
@@ -118,10 +125,10 @@ export function runDesktopCommand(input: DesktopCommandInput): DesktopOperation 
     const decoder = new StringDecoder('utf8')
     return {
       push(chunk: Buffer): void {
-        safely('输出', () => { input.onOutput?.(stream, redactor.push(decoder.write(chunk))) })
+        safely(zh ? '输出' : 'output', () => { input.onOutput?.(stream, redactor.push(decoder.write(chunk))) })
       },
       flush(): void {
-        safely('输出', () => { input.onOutput?.(stream, redactor.push(decoder.end()) + redactor.flush()) })
+        safely(zh ? '输出' : 'output', () => { input.onOutput?.(stream, redactor.push(decoder.end()) + redactor.flush()) })
       },
     }
   }
@@ -147,7 +154,7 @@ export function runDesktopCommand(input: DesktopCommandInput): DesktopOperation 
     // 清理先于回调：回调即使抛错（已被 safely 兜住），槽位也已经释放。
     activeBySlot[input.slot] = null
     input.signal?.removeEventListener('abort', onAbort)
-    safely('结束', () => { input.onExit?.(result) })
+    safely(zh ? '结束' : 'exit', () => { input.onExit?.(result) })
     for (const wake of settleWaiters.splice(0)) wake()
   }
 
@@ -159,7 +166,9 @@ export function runDesktopCommand(input: DesktopCommandInput): DesktopOperation 
       child.stdin.write(data, (error) => {
         if (error !== null && error !== undefined && !exited) {
           // stdin 写失败（子进程已关闭输入等）：只记诊断，不击穿调用方。
-          console.error(`[deepcode] 桌面维护操作 stdin 写入失败: ${error.message}`)
+          console.error(zh
+            ? `[deepcode] 桌面维护操作 stdin 写入失败: ${error.message}`
+            : `[deepcode] Writing to the desktop operation stdin failed: ${error.message}`)
         }
       })
     },
@@ -178,12 +187,18 @@ export function runDesktopCommand(input: DesktopCommandInput): DesktopOperation 
         // 制造第二个错误。等 error 事件把它结算掉即可。
         return
       }
-      void stopProcess(child).catch((error: unknown) => {
+      void stopProcess(child, undefined, undefined, undefined, zh).catch((error: unknown) => {
         // 进程停不下来时不会再有 close 事件，等待结算的人会永远等下去。
         // 就地结算并把原因如实写进结果——绝不谎称它已经结束。
         const detail = String(error instanceof Error ? error.message : error)
-        console.error(`[deepcode] 桌面维护操作无法终止子进程: ${detail}`)
-        settle({ exitCode: null, signal: null, error: `无法终止子进程：${detail}` })
+        console.error(zh
+          ? `[deepcode] 桌面维护操作无法终止子进程: ${detail}`
+          : `[deepcode] The desktop operation could not stop the child process: ${detail}`)
+        settle({
+          exitCode: null,
+          signal: null,
+          error: zh ? `无法终止子进程：${detail}` : `Could not stop the child process: ${detail}`,
+        })
       })
     })
     return cancelInFlight
