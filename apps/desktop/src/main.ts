@@ -206,11 +206,14 @@ const BROWSER_PANE_MARKER_URL = `data:text/html;charset=utf-8,${encodeURICompone
 <html><head><meta charset="utf-8"><title>deepcode-browser-pane</title><style>
   body { margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh;
          background: #f9f8f8; color: #1e232c; font-family: system-ui, "Segoe UI", sans-serif; }
+  html[data-theme='dark'] body { background: #0a0a0a; color: #e8e8ea; }
   .box { text-align: center; opacity: 0.75; }
   .globe { font-size: 40px; margin-bottom: 14px; }
   .title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
   .hint { font-size: 12.5px; color: #6b7280; line-height: 1.7; }
+  html[data-theme='dark'] .hint { color: #9aa1ac; }
   .vision { font-size: 12px; color: #9aa1ac; line-height: 1.7; margin-top: 10px; }
+  html[data-theme='dark'] .vision { color: #7c828d; }
 </style></head><body><div class="box">
   <div class="globe">🌐</div>
   <div class="title">浏览器面板 · Browser Panel</div>
@@ -388,10 +391,6 @@ function parseHarnessThemePreference(text: string | null): ThemePreference {
   return value === 'light' || value === 'dark' || value === 'system' ? value : 'system'
 }
 
-function readHarnessThemePreference(dshHome: string): ThemePreference {
-  return parseHarnessThemePreference(readHarnessSettingsText(dshHome))
-}
-
 // 曾经这里有一个 writeHarnessThemePreferenceViaSettings——菜单里那个主题入口的
 // 写路径。入口按 P8-D18 删掉之后它就没有调用者了，一并移除：DeepCode 现在只
 // 「读」官方的主题偏好、跟着它变，不再写它。切换由官方「外观」自己负责（D16 修好
@@ -423,10 +422,6 @@ function parseHarnessLocalePreference(text: string | null): 'zh' | 'en' | null {
   if (value.startsWith('zh')) return 'zh'
   if (value.startsWith('en')) return 'en'
   return null
-}
-
-function readHarnessLocalePreference(dshHome: string): 'zh' | 'en' | null {
-  return parseHarnessLocalePreference(readHarnessSettingsText(dshHome))
 }
 
 /** 壳 UI 是否使用中文：官方语言偏好优先，未存时跟随系统语言。 */
@@ -504,6 +499,19 @@ function watchHarnessTheme(dshHome: string): void {
   }
 }
 
+/**
+ * Read both shell preferences from one active Home and follow its settings file.
+ * The second call after first boot is required for a fresh Managed Home: its
+ * directory does not exist when the pre-boot call first tries to watch it.
+ * @param dshHome - Active DSH_HOME absolute path.
+ */
+function followHarnessPreferences(dshHome: string): void {
+  const text = readHarnessSettingsText(dshHome)
+  applyTheme(parseHarnessThemePreference(text))
+  harnessLocalePreference = parseHarnessLocalePreference(text)
+  watchHarnessTheme(dshHome)
+}
+
 /** 生效主题下的窗口背景页（最底层的海；compat view 透明后由它透上来）。 */
 function loadWindowBackdrop(win: BrowserWindow, theme: 'dark' | 'light'): void {
   void win.webContents.executeJavaScript(
@@ -548,7 +556,29 @@ function applyTheme(preference: ThemePreference): void {
   // 右上角那三个原生按钮会留在旧配色里，跟顶栏对不上（实机抓获）。
   applyTitleBarOverlay()
   if (mainWindow !== undefined) loadWindowBackdrop(mainWindow, effectiveThemeNow)
+  applyBrowserPaneTheme()
   // 终端侧窗刻意不在这里出现：它永远深色（P8-D28，住户定），不跟主题。
+}
+
+/**
+ * 把当前主题同步到内置浏览器 pane。
+ *
+ * 两件事：pane 的底色（导航空窗期露出的那一层），以及**我们自己的**空状态
+ * 引导页。用户打开的外部网页一律不碰——往别人的页面里注入 data-theme 既没有
+ * 意义，也越过了这块 view 的边界。判据是当前 URL 就是我们那张 marker 页。
+ *
+ * 2026-08-27 发布前排查补上：此前底色写死 #ffffff、空状态页写死浅色配色，
+ * 于是深色主题下打开浏览器面板会露出一整块白，属于住户点名要根除的
+ * 「只换一部分」。
+ */
+function applyBrowserPaneTheme(): void {
+  const view = browserPaneView
+  if (view === undefined || view.webContents.isDestroyed()) return
+  view.setBackgroundColor(THEME_BACKGROUND[effectiveThemeNow])
+  if (view.webContents.getURL() !== BROWSER_PANE_MARKER_URL) return
+  void view.webContents.executeJavaScript(
+    `document.documentElement.dataset.theme = ${JSON.stringify(effectiveThemeNow)}`,
+  ).catch(() => undefined)
 }
 
 /** 把当前主题同步到 Windows 原生窗口按钮那一块（titleBarOverlay）。 */
@@ -1305,7 +1335,8 @@ function ensureBrowserPane(win: BrowserWindow): WebContentsView {
       sandbox: true,
     },
   })
-  view.setBackgroundColor('#ffffff')
+  // 底色跟主题：写死白色会让深色主题下每次导航都闪一下白（2026-08-27 发布前排查）。
+  view.setBackgroundColor(THEME_BACKGROUND[effectiveThemeNow])
   // 外部页面的 target=_blank / window.open 一律不许开原生窗口：默认行为会
   // 弹出一扇 DeepCode 管不着的 BrowserWindow——用户拿到一扇没有关闭语义的
   // 孤窗，而 agent 的 CDP 认领只盯这一块 view，等于当场失明（单标签不变式
@@ -2077,6 +2108,7 @@ void app.whenReady().then(async () => {
     mainWindow?.setBackgroundColor(THEME_BACKGROUND[effectiveThemeNow])
     applyTitleBarOverlay()
     if (mainWindow !== undefined) loadWindowBackdrop(mainWindow, effectiveThemeNow)
+    applyBrowserPaneTheme()
     broadcast()
   })
 
@@ -2114,10 +2146,7 @@ void app.whenReady().then(async () => {
   // provider 默认 watch 该文档、外部编辑会热发布，两边读的是同一份事实）。
   // 必须放在 launcher 可读之后：DSH_HOME 由 active home 决定。
   const themeHome = resolveHarnessHome(launcher.read().active.home, userDataDir)
-  applyTheme(readHarnessThemePreference(themeHome))
-  // 语言同款收口（D29）：官方 locale.preference 是唯一事实源，未存则跟系统。
-  harnessLocalePreference = readHarnessLocalePreference(themeHome)
-  watchHarnessTheme(themeHome)
+  followHarnessPreferences(themeHome)
 
   const discover = (dshHome: string): Promise<ProfileDiscoveryV1> => discoverProfiles({
     packaged,
@@ -4655,6 +4684,9 @@ void app.whenReady().then(async () => {
    */
   const runCommand = async (command: DesktopControlCommand): Promise<void> => {
     await dispatch(command).catch(reportFailure)
+    if (command.type === 'choose-existing-profile' || command.type === 'use-managed-home') {
+      followHarnessPreferences(resolveHarnessHome(launcher.read().active.home, userDataDir))
+    }
     settleRecoveryNotice()
     // 插件事务结算只绑定 boot 型命令（restart/switch/use-managed-home）：
     // 命令完成时 boot 已结算，pending 事务在此 verified 或进入恢复链。
@@ -4868,6 +4900,7 @@ void app.whenReady().then(async () => {
   // 得重启一次才发现东西进来了。
   await offerSessionImport(resolveHarnessHome(launcher.read().active.home, userDataDir))
   await controller.start()
+  followHarnessPreferences(resolveHarnessHome(launcher.read().active.home, userDataDir))
   // 启动完成后结算恢复通知：上次失败已回退 LKG 且本次成功启动时提示一次。
   settleRecoveryNotice()
   // 权限事实：boot 完成后从官方 settings 读取并显示（fail closed）；Managed

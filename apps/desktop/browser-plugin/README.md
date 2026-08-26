@@ -1,81 +1,66 @@
 # @see-sol-lab/deepcode-browser
 
-DeepCode 浏览器能力插件：经官方 tool-calling 循环暴露真实浏览器（headed Edge）
-给 DeepCode 里的 DS。只读浏览 + 交互 + 安全层（SSRF 门禁、权限分级）。
+English | [中文](README.zh.md)
 
-## 工具
+DeepCode's browser plugin exposes a visible Microsoft Edge browser to the agent through the official Harness tool-calling loop. It combines read-only browsing, interaction tools, SSRF protection, permission levels, and approval for sensitive actions.
 
-**只读（L0）**
-- `browser_navigate`：打开 URL（SSRF 门禁先行——本机/内网/保留段一律拒绝，包括
-  DeepCode 自己的 3080 控制桥；这是特性不是例外）
-- `browser_snapshot`：无障碍树（CDP a11y）+ 可见文本，返回稳定 `ref` 供交互工具定位
-- `browser_screenshot`：截图存本地；**若当前模型不带视觉，须告知用户查看截图需切换
-  到带视觉的模型**（住户产品约束）
-- `browser_wait`：load / network-idle / selector / 延时
-- `browser_tabs`：标签页 list / new / switch / close
+## Tools
 
-**交互（M3，L1）**
-- `browser_click` / `browser_hover`：点击 / 悬停（ref 优先，text / CSS / role+name 兜底）
-- `browser_type`：输入文本（clear_first / press_enter）
-- `browser_scroll`：滚动（up / down / top / bottom，或把元素滚进视野）
-- `browser_keyboard`：按键（Enter / Tab / Control+A 等）
+### Read-only (L0)
 
-**敏感（L2）**
-- `browser_submit`：提交表单 / 发送消息 / 登录——**永远先经官方 ApprovalService
-  征求用户授权**，approval 缺失 fail closed。
+- `browser_navigate` opens a URL after the SSRF policy accepts it. Local, private, and reserved addresses are refused, including DeepCode's own loopback control service.
+- `browser_snapshot` returns the accessibility tree and visible text, with stable `ref` values for later interaction.
+- `browser_screenshot` saves a page screenshot locally. A vision-capable model is required to inspect the image itself.
+- `browser_wait` waits for load, network idle, a selector, or a bounded delay.
+- `browser_tabs` lists, creates, switches, and closes tabs.
 
-**交互边界（住户定的体验约束）**：所有交互都是**在浏览器进程内注入**（CDP Input
-domain）——**绝不触碰用户的物理鼠标与键盘，绝不抢占桌面焦点**。用户在别的窗口照常
-工作，浏览器自己静静翻自己的。与「OS 级接管鼠标」的自动化（如部分 Codex 行为）有
-本质区别。
+### Interactive (L1)
 
-权限门控：read-only 会话拒绝全部 L1 交互（浏览器交互对外部世界有副作用，不因不写
-工作区豁免）；L2 走官方 ApprovalService，approval 缺失 fail closed。
+- `browser_click` and `browser_hover` target a stable `ref`, text, CSS selector, or role and name.
+- `browser_type` enters text with optional clearing and Enter.
+- `browser_scroll` scrolls the page or brings an element into view.
+- `browser_keyboard` sends supported keys to the browser.
 
-## 安装
+### Sensitive (L2)
+
+- `browser_submit` submits a form, sends a message, or completes a login action only after the official Harness ApprovalService authorizes it. A missing approval service fails closed.
+
+The interaction tools inject input inside the browser process through CDP. They never move the user's physical mouse, type through the physical keyboard, or take desktop focus.
+
+Read-only sessions reject every L1 interaction. L2 actions pass the read-only check and then require approval.
+
+## Installation
+
+The DeepCode Managed Profile includes the browser overlay. A compatible custom Profile can install the package through the official plugin path:
 
 ```sh
-# 产品期：registry 包名（依赖由 pnpm 解析进 profile node_modules）
 dsh plugin add @see-sol-lab/deepcode-browser
 
-# 开发期：tarball（npm pack 产物；与 registry 行为一致）
+# Development tarball
 dsh plugin add ./see-sol-lab-deepcode-browser-0.1.0.tgz
 ```
 
-插件声明 `dsh.bundle.patch`，`dsh plugin add` 后自动进入 profile 的组合层栈
-（reconcile 无需手改 profile）。
+The package declares `dsh.bundle.patch`, so `dsh plugin add` inserts its bundle into the Profile composition without a manual patch edit.
 
-> **注意（spike 实测）**：本地目录 spec（`dsh plugin add ./dir`）的传递依赖不会
-> 链接进 profile node_modules（pnpm 对 file:/link: 依赖标 private hoist），
-> 独立环境加载必挂。带依赖插件请用 registry 包名或 tarball。
+Use a registry package or tarball for a plugin with runtime dependencies. pnpm does not link the transitive dependencies of a local directory specification into an isolated Profile's `node_modules`.
 
-## 依赖界限（菲博 §7.1.2）
+## Runtime dependencies
 
-`playwright-core` 是插件的运行时依赖，**只装进 profile 的 node_modules**——
-绝不进入 DeepCode 私有 Runtime / electron 包。浏览器内核复用系统 Edge
-（`channel: 'msedge'`），零内核下载、headed 可见、跟随系统更新。
+`playwright-core` belongs to the plugin's runtime closure under the Profile `node_modules`; it is not added to the DeepCode private runtime or Electron payload. The plugin reuses the installed Microsoft Edge channel and downloads no browser engine.
 
-## 安全设计（菲博 §7.1.5）
+## Security
 
-- **SSRF 先锁后看**：导航目标先过 `validateNavigationTarget`（协议/长度/凭据
-  卫生 → DNS 解析 → 全部 IP 校验），浏览器 context 强制走本机 SSRF 代理
-  （解析后按 IP 连接 + 重定向逐跳重新校验），DNS 重绑定无法到达内网。
-- **权限门控**：L0 只读直放；L1 交互在 read-only 会话拒绝（浏览器交互对外部
-  世界有副作用，不因不写工作区豁免）；L2 敏感操作走官方 ApprovalService，
-  approval 缺失 fail closed。
-- **无 evaluate**：B2/V1 明确不做任意脚本执行（菲博 §7.1.4 裁决）；将来如需，
-  走 CDP isolated world + 固定只读 helper 集。
-- **Cookie 不持久化**：headed 模式下用户可在可见窗口内人工登录（B2 决策）；
-  持久化开关属 B3。
+- **SSRF enforcement:** URL validation checks the protocol, length, credentials, DNS result, and every resolved address. The browser context uses a local proxy that connects to the checked IP and revalidates every redirect.
+- **Permission levels:** L0 is read-only, L1 is refused in read-only sessions, and L2 requires the official ApprovalService.
+- **No arbitrary evaluation:** V1 exposes no page-script evaluation tool.
+- **Ephemeral cookies:** browser cookies are not persisted in V1. A user can complete an approved login in the visible browser, but a later browser run starts without that cookie state.
 
-## 开发
+## Development
 
 ```sh
-pnpm --dir apps/desktop/browser-plugin install   # 开发依赖（workspace 根已含）
-node node_modules/typescript/bin/tsc -b apps/desktop/browser-plugin   # 构建 lib/
-pnpm exec vitest run apps/desktop/tests/browser-plugin                # 单测
+pnpm --dir apps/desktop/browser-plugin install
+node node_modules/typescript/bin/tsc -b apps/desktop/browser-plugin
+pnpm exec vitest run apps/desktop/tests/browser-plugin
 ```
 
-测试位于 `apps/desktop/tests/browser-plugin/`（纳入 `apps/*/tests` 测试面）。
-真浏览器冒烟（navigate 公网页 → snapshot a11y 树）属 dev/packaged 双形态 e2e，
-需要真实 Edge 与出站网络，由验收方执行。
+Unit tests live under `apps/desktop/tests/browser-plugin/`. Real-browser smoke testing needs Microsoft Edge and outbound network access.

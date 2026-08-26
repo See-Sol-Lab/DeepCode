@@ -14,7 +14,7 @@ Separately, every canonical page carries lines written for its GitHub reader —
 
 ## Decision
 
-[website/docs.ts](../../../../website/docs.ts) owns section placement. `sections` declares the groups per locale, and `sectionSpec(locale, label)` returns a group's position and collapse behavior, throwing when a locale declares no placement for a label. A group absent from the declaration now fails the build instead of sorting silently to the top. Placement is per locale because the two sidebars name their groups independently, and a label both use — `SDK` — cannot hold one rank against `入门` and against `Guide` at once.
+[website/docs.ts](../../../../website/docs.ts) owns section placement. `sections` declares the groups per locale, and `sectionSpec(locale, label)` returns a group's position and collapse behavior, throwing when a locale declares no placement for a label. A group absent from the declaration fails the build instead of sorting silently to the top. Placement is per locale because the two sidebars name their groups independently, and a label both use — `SDK` — cannot hold one rank against `开始使用` and against `Get started` at once.
 
 Subsystem pages are grouped by concern — overview, core and scopes, sessions and persistence, model and context, execution and tools, policy and interaction, platform and access — and the six topical groups render collapsed until one holds the page being read. The groups sort last within the reference sidebar: expanded, they outnumber every other group combined, so anything placed after them is reachable only by scrolling past the whole list. Page `order` derives from array position rather than a hand-written number.
 
@@ -22,7 +22,7 @@ Subsystem pages are grouped by concern — overview, core and scopes, sessions a
 
 `projectedPageContent` in [scripts/project-doc-site.ts](../../../../scripts/project-doc-site.ts) drops the language-switcher line and the repository badge. The switcher match is confined to the first eight lines so a tutorial that shows the convention still renders its example.
 
-The navigation-bar title is the DeepSeek wordmark inlined into `siteTitle`, which VitePress renders as HTML. Inlining is what lets the mark's `currentColor` fills follow the active theme; `themeConfig.logo` renders an `<img>`, which freezes the mark at the colors its file declares and would need one asset per theme. The sidebar scrollbar rests invisible and appears while scrolling, marked by a `data-` attribute rather than a class because Vue rewrites `class` wholesale when it patches the element.
+The navigation-bar title is a text DeepCode lockup with a release tag, returned by `siteTitle` as the HTML VitePress renders. It needs no theme-specific image asset and keeps the documentation site distinct from the upstream DeepSeek wordmark. The sidebar scrollbar rests invisible and appears while scrolling, marked by a `data-` attribute rather than a class because Vue rewrites `class` wholesale when it patches the element.
 
 ## Alternatives considered
 
@@ -38,4 +38,4 @@ The reference sidebar measures 1452px with every subsystem group collapsed, agai
 
 Canonical Markdown is unchanged by the chrome stripping — the switcher and badge still serve GitHub readers. The cost is that the projector now knows two presentation conventions of the source corpus, which a page written with a different switcher wording would not match.
 
-The wordmark is a second copy of a mark that also lives in `apps/web/public/favicon.svg` and `packages/client/ui-primitives/src/FishLogo.tsx`, each carrying its own presentation. A change to the DeepSeek wordmark reaches the documentation site only by updating this copy.
+The text lockup gives up a graphical documentation mark. It keeps the site independent of the upstream DeepSeek brand assets and leaves product imagery to the canonical Markdown pages, whose repository-relative images the projector carries into the site.

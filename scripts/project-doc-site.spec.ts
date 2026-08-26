@@ -97,8 +97,8 @@ describe('publishableImage', () => {
 })
 
 describe('resolveRepositoryRef', () => {
-  it('defaults to public master instead of a private workflow SHA', () => {
-    expect(resolveRepositoryRef({ GITHUB_SHA: 'private-sha' })).toBe('master')
+  it('defaults to public main instead of a private workflow SHA', () => {
+    expect(resolveRepositoryRef({ GITHUB_SHA: 'private-sha' })).toBe('main')
   })
 
   it('accepts an explicit public repository ref', () => {
@@ -119,7 +119,7 @@ describe('rewriteMarkdown', () => {
       repositoryRef: 'abc123',
     })).toBe(
       '[B](./reference/b.md#part) '
-      + '[source](https://github.com/deepseek-ai/deepseek-harness/blob/abc123/packages/tool.ts#L2) '
+      + '[source](https://github.com/See-Sol-Lab/DeepCode/blob/abc123/packages/tool.ts#L2) '
       + '[web](https://example.com)\n',
     )
   })
@@ -145,7 +145,7 @@ describe('rewriteMarkdown', () => {
       pages,
       repoRoot: root,
       repositoryRef: 'abc123',
-    })).toBe('![logo](https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/abc123/packages/logo.svg)\n')
+    })).toBe('![logo](https://raw.githubusercontent.com/See-Sol-Lab/DeepCode/abc123/packages/logo.svg)\n')
   })
 
   it('hands an image to the placer and uses the URL it returns', () => {
@@ -224,7 +224,7 @@ describe('rewriteMarkdown', () => {
       repositoryRef: 'abc123',
     })).toBe(
       '[title](./reference/b.md "b.md") '
-      + '[escaped](https://github.com/deepseek-ai/deepseek-harness/blob/abc123/docs/x(y).md)\n',
+      + '[escaped](https://github.com/See-Sol-Lab/DeepCode/blob/abc123/docs/x(y).md)\n',
     )
   })
 
@@ -449,11 +449,11 @@ describe('sidebar ordering', () => {
 
   it('declares placements per locale rather than in one shared list', () => {
     // `SDK` labels a group in both locales, so one shared list would have to
-    // rank it against `入门` and against `Guide` at the same position.
-    expect(sectionSpec('root', 'SDK').index).toBeGreaterThan(sectionSpec('root', '入门').index)
-    expect(sectionSpec('en', 'SDK').index).toBeGreaterThan(sectionSpec('en', 'Guide').index)
-    expect(() => sectionSpec('en', '入门')).toThrow()
-    expect(() => sectionSpec('root', 'Guide')).toThrow()
+    // rank it against `开始使用` and against `Get started` at the same position.
+    expect(sectionSpec('root', 'SDK').index).toBeGreaterThan(sectionSpec('root', '开始使用').index)
+    expect(sectionSpec('en', 'SDK').index).toBeGreaterThan(sectionSpec('en', 'Get started').index)
+    expect(() => sectionSpec('en', '开始使用')).toThrow()
+    expect(() => sectionSpec('root', 'Get started')).toThrow()
   })
 
   it('lands every navigation item on a page the manifest publishes', () => {
@@ -674,7 +674,7 @@ describe('raw Markdown projection of the published manifest', () => {
   // emission and the 181-file link walk past vitest's 5s default.
   beforeAll(() => {
     mirror = mkdtempSync(join(tmpdir(), 'dsh-doc-mirror-real-'))
-    emitRawMarkdownPages(mirror, { pages: docsPages, repoRoot: repositoryRoot, repositoryRef: 'master' })
+    emitRawMarkdownPages(mirror, { pages: docsPages, repoRoot: repositoryRoot, repositoryRef: 'main' })
   }, 60_000)
 
   afterAll(() => {

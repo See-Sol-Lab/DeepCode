@@ -14,7 +14,7 @@ Status: implemented
 
 ## 决定
 
-[website/docs.ts](../../../../website/docs.ts) 拥有分区位置。`sections` 按 locale 声明各分组，`sectionSpec(locale, label)` 返回分组的位置与折叠行为，当某 locale 未为该 label 声明位置时抛错。未出现在声明中的分组现在会让构建失败，而不是静默排到最前。位置按 locale 声明，是因为两侧侧边栏各自命名分组，而两侧共用的标签 `SDK` 无法同时相对 `入门` 和相对 `Guide` 取同一位次。
+[website/docs.ts](../../../../website/docs.ts) 拥有分区位置。`sections` 按 locale 声明各分组，`sectionSpec(locale, label)` 返回分组的位置与折叠行为，当某 locale 未为该 label 声明位置时抛错。未出现在声明中的分组会让构建失败，而不是静默排到最前。位置按 locale 声明，是因为两侧侧边栏各自命名分组，而两侧共用的标签 `SDK` 无法同时相对 `开始使用` 和相对 `Get started` 取同一位次。
 
 子系统页按关注点分组——总览、内核与作用域、会话与持久化、模型与上下文、执行与工具、策略与交互、平台与接入——其中六个主题组保持折叠，直到某一组包含正在阅读的页面。这些分组排在参考侧边栏的最后：展开时它们的数量超过其余所有分组之和，因此排在它们之后的任何内容都只能靠滚过整个列表才能到达。页面 `order` 由数组位置推导，不再手写数字。
 
@@ -22,7 +22,7 @@ Status: implemented
 
 [scripts/project-doc-site.ts](../../../../scripts/project-doc-site.ts) 中的 `projectedPageContent` 会丢弃语言切换行和仓库徽章。切换行的匹配被限制在前八行内，因此展示该约定的教程仍能渲染出它的示例。
 
-导航栏标题是内联进 `siteTitle` 的 DeepSeek 字标，VitePress 会将其按 HTML 渲染。内联正是让字标的 `currentColor` 填充跟随当前主题的原因；`themeConfig.logo` 渲染为 `<img>`，会把字标固定为文件声明的颜色，并且需要为每套主题各准备一份资源。侧边栏滚动条平时不可见，滚动时出现，通过 `data-` 属性而非 class 标记，因为 Vue 在 patch 该元素时会整体重写 `class`。
+导航栏标题是带 Release 标签的 DeepCode 文本 lockup，由 `siteTitle` 返回并交给 VitePress 按 HTML 渲染。它不需要针对主题准备图片资源，也让文档站与上游 DeepSeek 字标保持清晰区分。侧边栏滚动条平时不可见，滚动时出现，通过 `data-` 属性而非 class 标记，因为 Vue 在 patch 该元素时会整体重写 `class`。
 
 ## 考虑过的替代方案
 
@@ -38,4 +38,4 @@ Status: implemented
 
 剥离 chrome 不改动规范 Markdown——切换行与徽章仍服务于 GitHub 读者。代价是投影器现在知晓源语料的两项呈现约定，而采用不同切换行措辞的页面将不会被匹配到。
 
-字标是同一图形的第二份副本，另两份位于 `apps/web/public/favicon.svg` 和 `packages/client/ui-primitives/src/FishLogo.tsx`，各自承载自己的呈现方式。DeepSeek 字标的变更只有通过更新这份副本才能到达文档站。
+文本 lockup 放弃了文档站专用图形标记。它让站点不依赖上游 DeepSeek 品牌资源；产品图片保留在权威 Markdown 页面中，并由投影器把仓库相对图片带入站点。

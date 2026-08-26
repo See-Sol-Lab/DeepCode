@@ -89,6 +89,25 @@ export async function shutdownApp(app: ElectronApplication): Promise<void> {
  */
 const VIEW_FILE_BY_PREFIX: Readonly<Record<string, string>> = { 'file://': '/index.html' }
 
+/**
+ * 在承载底图的背景页（backdrop.html）里执行脚本。
+ *
+ * 上面那张前缀表寻不到它：顶栏页与背景页都是 `file://`，判据落在文件名上，
+ * 而表里那一行已经被 `/index.html` 占着。背景页又必须能被单独问到——底图是
+ * 主进程 executeJavaScript 注入的，与顶栏那条 renderer 渲染路径完全独立，
+ * 只验顶栏会漏掉「只换面板不换底图」的那一半（G7）。
+ * @param app - 已启动的 Electron 应用。
+ * @param script - 在背景页里执行的脚本源码。
+ * @returns 脚本的返回值。
+ */
+export async function evalInBackdrop<T>(app: ElectronApplication, script: string): Promise<T> {
+  return app.evaluate(async ({ webContents }, payload) => {
+    const target = webContents.getAllWebContents().find(contents => contents.getURL().endsWith('/backdrop.html'))
+    if (target === undefined) throw new Error('找不到背景页 backdrop.html 的 webContents')
+    return target.executeJavaScript(payload) as Promise<unknown>
+  }, script) as Promise<T>
+}
+
 /** 在 URL 前缀匹配的 webContents 里执行脚本并返回结果。 */
 export async function evalInView<T>(app: ElectronApplication, urlPrefix: string, script: string): Promise<T> {
   const file = VIEW_FILE_BY_PREFIX[urlPrefix] ?? null

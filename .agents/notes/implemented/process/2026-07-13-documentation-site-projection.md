@@ -18,7 +18,7 @@ Canonical Markdown remains in the repository tier that owns it. Product-facing g
 
 Locale home projections retain only the canonical YAML frontmatter. The repository-facing body keeps its H1 and bilingual source links, while the frontmatter implements the [locale-preserving quick-start redirect](../simplification/2026-08-11-quickstart-documentation-home.md) and the site navigation owns locale switching.
 
-The projector parses Markdown links without reserializing the document. A link to another published source becomes a site-relative route; a link to an unpublished repository file becomes a source link under the `deepseek-ai/deepseek-harness` repository home; a repository image is copied into the generated tree and referenced from there ([why](2026-08-06-doc-site-carries-its-images.md)). Missing relative targets fail projection. Unit tests pin these transformations, and `docs:check` runs the projector tests plus a production VitePress build as part of `doc-sync` and the parallel documentation gates.
+The projector parses Markdown links without reserializing the document. A link to another published source becomes a site-relative route; a link to an unpublished repository file becomes a source link under the `See-Sol-Lab/DeepCode` repository home; a repository image is copied into the generated tree and referenced from there ([why](2026-08-06-doc-site-carries-its-images.md)). Missing relative targets fail projection. Unit tests pin these transformations, and `docs:check` runs the projector tests plus a production VitePress build as part of `doc-sync` and the parallel documentation gates.
 
 `verify-public-repository-links` rejects references to the unavailable legacy repository from tracked files. Source and edit links use the current repository home.
 
@@ -42,10 +42,10 @@ Site publication remains separate from site construction. A dedicated GitHub Act
 
 **Build only in a deployment workflow.** A deployment job can reveal rendering failures after merge. Keeping the production build in `doc-sync` makes the same failure visible locally and in ordinary CI even when no public deployment exists.
 
-**Hard-code the public project path.** A fixed `/deepseek-harness/` base works for the public project URL but not for the unique origin assigned to a private Pages site or for a future custom domain. Consuming Pages metadata keeps one build contract across those destinations.
+**Hard-code the public project path.** A fixed `/DeepCode/` base works for the public project URL but not for the unique origin assigned to a private Pages site or for a custom domain. Consuming Pages metadata keeps one build contract across those destinations.
 
 ## Consequences
 
-Documentation facts have one editable home, public routes remain stable across source moves, and the site can include generated references without committing another generated copy. Local development watches canonical inputs and regenerates the disposable projection. The layout gate makes an obsolete site-specific Markdown tree a merge failure instead of ignored build input. Publication to Pages runs as a manual dispatch from a release tag, so the site presents a released snapshot rather than the current master ([why](2026-08-21-documentation-site-tag-release.md)).
+Documentation facts have one editable home, public routes remain stable across source moves, and the site can include generated references without committing another generated copy. Local development watches canonical inputs and regenerates the disposable projection. The layout gate makes an obsolete site-specific Markdown tree a merge failure instead of ignored build input. Publication to Pages runs as a manual dispatch from a release tag, so the site presents a released snapshot rather than the current main branch ([why](2026-08-21-documentation-site-tag-release.md)).
 
 The publication manifest is a maintained allowlist, and link projection adds a small repository-specific build adapter. A new kind of Markdown link behavior needs a projector test. Mermaid support also increases the client bundle size, but preserves diagrams already used by the canonical documentation.

@@ -9,7 +9,7 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { readFileSync, rmSync } from 'node:fs'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { _electron } from 'playwright-core'
 import { describe, expect, it } from 'vitest'
@@ -26,6 +26,7 @@ import {
   portConnectable as portOpen,
   CHROME_URL_PREFIX,
   clickChromeButton,
+  evalInBackdrop,
   evalInView,
   shutdownApp,
   waitForChromeElement,
@@ -254,6 +255,167 @@ describe.runIf(packagedExists)('Resident Host（P2 常驻生命周期）', () =>
       } finally {
         // 断言失败/退出未完成时的兜底收割：不让泄漏实例占住 3080 毒害
         // 后续文件（连环 launch 超时 + fail-loud 对话框风暴的教训）。
+        await shutdownApp(app)
+      }
+    } finally {
+      cleanupTempRoot(temp)
+    }
+  })
+
+  it('G6：fresh Managed Home 首次写入英文 locale 后，Chrome 状态胶囊同步变为英文', async () => {
+    const temp = isolationRoot('g6')
+    try {
+      const app = await _electron.launch({
+        executablePath: EXE,
+        env: parityEnv(temp),
+        args: [...launchArgs(temp), '--lang=zh-CN', '--disable-gpu'],
+        timeout: 120_000,
+      })
+      try {
+        await waitForWindow(app)
+        await waitForCompMount(app)
+        await waitLauncherState(temp)
+        await expect.poll(
+          () => evalInView<string>(app, CHROME_URL_PREFIX, "document.getElementById('status-text')?.textContent ?? ''"),
+          { timeout: 15_000 },
+        ).toBe('运行中 · web')
+
+        writeFileSync(join(userDataDir(temp), 'dsh', 'settings.yaml'), 'locale:\n  preference: en\n')
+
+        await expect.poll(
+          () => evalInView<string>(app, CHROME_URL_PREFIX, "document.getElementById('status-text')?.textContent ?? ''"),
+          { timeout: 15_000 },
+        ).toBe('Running · web')
+      } finally {
+        await shutdownApp(app)
+      }
+    } finally {
+      cleanupTempRoot(temp)
+    }
+  })
+
+  // 「只换面板不换底图」的守门人。
+  //
+  // 住户 2026-08-27 凌晨的原话：发布之前必须确保切换不会出现任何只换面板不换
+  // 底图的情况，不然这就是严重的事故。那次事故的根因是 fresh Managed Home 首启
+  // 时 dsh 目录还不存在、settings watcher 挂载失败，于是那个会话里怎么切都传不
+  // 到壳——面板（官方 web UI 自己的状态）变了，底图与顶栏留在原处；重启一次就
+  // 自愈，所以每次回头复验都复现不了。
+  //
+  // G6 已经守住同一条 watcher 的 locale 侧，但主题走的是另一条赋值路径：locale
+  // 与顶栏由 renderer 按 model 渲染，**底图由主进程 executeJavaScript 注入进背景
+  // 页**，且那句注入的失败被 catch 静默吞掉。两条路必须分别断言，只验其中一条
+  // 会漏掉的正是住户最在意的那一半。
+  //
+  // 不假设测试机的系统主题：先写 light 落到已知态，再切 dark 验证跟随。
+  it('G7：fresh Managed Home 切换主题后，底图与顶栏一起跟随（只换面板不换底图 = 事故）', async () => {
+    const temp = isolationRoot('g7')
+    try {
+      const app = await _electron.launch({
+        executablePath: EXE,
+        env: parityEnv(temp),
+        args: [...launchArgs(temp), '--lang=zh-CN', '--disable-gpu'],
+        timeout: 120_000,
+      })
+      try {
+        await waitForWindow(app)
+        await waitForCompMount(app)
+        await waitLauncherState(temp)
+        // 背景页要按文件名单独寻址：firstWindow 拿到的是顶栏页，而它俩的
+        // data-theme 恰好同步，只验它会让底图漏网（这条测试第一版就栽在这）。
+        const settings = join(userDataDir(temp), 'dsh', 'settings.yaml')
+
+        writeFileSync(settings, 'ui-theme:\n  preference: light\n')
+        await expect.poll(
+          () => evalInBackdrop<string>(app, "document.documentElement.dataset.theme ?? ''"),
+          { timeout: 15_000 },
+        ).toBe('light')
+
+        writeFileSync(settings, 'ui-theme:\n  preference: dark\n')
+
+        // 底图：两层海按 data-theme 互斥显隐，只有真的切过去 opacity 才会翻转。
+        await expect.poll(
+          () => evalInBackdrop<string>(app, "document.documentElement.dataset.theme ?? ''"),
+          { timeout: 15_000 },
+        ).toBe('dark')
+        await expect.poll(
+          () => evalInBackdrop<string>(
+            app,
+            "(() => { const sea = document.querySelector('.sea-dark'); return sea === null ? '' : getComputedStyle(sea).opacity })()",
+          ),
+          { timeout: 15_000 },
+        ).toBe('1')
+        expect(await evalInBackdrop<string>(
+          app,
+          "(() => { const sea = document.querySelector('.sea-light'); return sea === null ? '' : getComputedStyle(sea).opacity })()",
+        )).toBe('0')
+
+        // 顶栏走的是另一条路（renderer 按 model.effectiveTheme 自己渲染），
+        // 与底图一起断言才能证明两条路径没有各走各的。
+        await expect.poll(
+          () => evalInView<string>(app, CHROME_URL_PREFIX, "document.documentElement.dataset.theme ?? ''"),
+          { timeout: 15_000 },
+        ).toBe('dark')
+      } finally {
+        await shutdownApp(app)
+      }
+    } finally {
+      cleanupTempRoot(temp)
+    }
+  })
+
+  // 「该藏的没藏住」的守门人。
+  //
+  // 2026-08-27 发布前住户抓到：英文界面的菜单里冒出一个中文按钮「恢复上次插件
+  // 变更」，而当时 Harness 正常运行、那个入口根本不该存在。两件事同一个根因——
+  // .menu-item 的 display:flex 盖掉了 hidden 属性自带的 display:none，于是按钮
+  // 露了出来；而 renderer 只在它「该出现」时才赋 textContent，没轮到赋值，显示
+  // 的就是 index.html 里写死的中文初始文本。
+  //
+  // 同一条 CSS 也一直让「浏览器面板」那一项常驻菜单（它本该只在插件建过 pane
+  // 之后出现），只是没人注意。样式表里原本单独修过 #recovery-banner 的同一个
+  // 病，说明这坑踩过两次。
+  //
+  // 断言必须看**计算样式**而不是 hidden 属性：属性一直都在，是 display 把它
+  // 盖了——只查属性会一路绿灯。
+  it('G8：Harness 正常时，本该隐藏的菜单项真的不显示（hidden 不能被 display 盖掉）', async () => {
+    const temp = isolationRoot('g8')
+    try {
+      const app = await _electron.launch({
+        executablePath: EXE,
+        env: parityEnv(temp),
+        args: [...launchArgs(temp), '--lang=zh-CN', '--disable-gpu'],
+        timeout: 120_000,
+      })
+      try {
+        await waitForWindow(app)
+        await waitForCompMount(app)
+        await waitLauncherState(temp)
+
+        // 恢复入口：只在 recovery-needed / drift 时出现，此刻不该有。
+        await expect.poll(
+          () => evalInView<string>(
+            app,
+            CHROME_URL_PREFIX,
+            "getComputedStyle(document.getElementById('menu-plugin-recovery')).display",
+          ),
+          { timeout: 15_000 },
+        ).toBe('none')
+
+        // 浏览器面板项：只在插件创建过 pane 之后出现，全新启动不该有。
+        expect(await evalInView<string>(
+          app,
+          CHROME_URL_PREFIX,
+          "getComputedStyle(document.getElementById('menu-browser-pane')).display",
+        )).toBe('none')
+
+        // 对照：一直都在的项必须仍然可见，别把 hidden 修成「全都不显示」。
+        expect(await evalInView<string>(
+          app,
+          CHROME_URL_PREFIX,
+          "getComputedStyle(document.getElementById('menu-restart-harness')).display",
+        )).not.toBe('none')
+      } finally {
         await shutdownApp(app)
       }
     } finally {

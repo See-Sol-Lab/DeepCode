@@ -274,6 +274,14 @@ button:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* hidden 属性必须真的隐藏。
+   任何给元素设了 display 的类都会盖掉 [hidden] 自带的 display:none——
+   .menu-item{display:flex} 就是这样让「浏览器面板」和「恢复上次插件变更」
+   两个本该藏起来的菜单项一直露在外面（2026-08-27 发布前住户抓到：英文界面里
+   冒出一个中文按钮，因为它连 textContent 都没轮到被赋值）。
+   下面那条 #recovery-banner 是当初单独修的同一个病，留着不碍事。 */
+[hidden] { display: none !important; }
+
 #recovery-banner[hidden] { display: none; }
 
 #recovery-banner-text {

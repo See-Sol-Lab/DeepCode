@@ -1,97 +1,196 @@
-# DeepCode
+![DeepCode——Harness 优先的 agent coding 桌面工作区](docs/user/deepcode/assets/deepcode-banner.png)
+
+<div align="center">
+
+# <img src="./apps/desktop/src/chrome/icon.png" width="38" alt="" align="absmiddle" /> DeepCode
+
+</div>
+
+<div align="right">
 
 [English](README.md) | 中文
 
-> **像 Codex 一样使用。像实验室一样检查。像 Harness 一样扩展。**
+</div>
 
-> **许可证：** DeepCode 采用分层许可证。See-Sol-Lab 原创 DeepCode 产品代码在明确范围内采用 PolyForm Perimeter 1.0.1，以源码可见方式发布；上游 DeepSeek Harness 仍为 MIT。详见 [DeepCode 许可说明](DEEPCODE-LICENSE.md)。
+<p align="center">
+  <em>像 Codex 一样使用。像实验室一样检查。像 Harness 一样扩展。</em>
+</p>
 
-DeepCode 是一个 DeepSeek 原生、Harness 优先、可观察、可编程的智能体工作台。[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 是运行内核；DeepCode Workbench 是产品；官方 DSH Web UI 保留为兼容视图与上游回归基线。
+<p align="center">
+  由 DeepSeek Harness 驱动的 Windows DeepSeek 原生 Agent Workbench。
+</p>
 
-DeepCode 在 Harness 原生组合中保留 profile、Cordis 插件、session 事件、工具、凭据、权限、记忆、压缩和 hooks。Workbench 为日常智能体工作、运行时检查和可复现实验提供渐进式界面，同时不建立第二套智能体运行时或隐藏状态库。
+<p align="center">
+  <a href="https://github.com/See-Sol-Lab/DeepCode/releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/See-Sol-Lab/DeepCode?style=flat-square&label=release" /></a>
+  <a href="https://github.com/See-Sol-Lab/DeepCode/releases"><img alt="下载量" src="https://img.shields.io/github/downloads/See-Sol-Lab/DeepCode/total?style=flat-square" /></a>
+  <img alt="Windows 10 与 11 x64" src="https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-0078D4?style=flat-square&logo=windows" />
+  <a href="DEEPCODE-LICENSE.md"><img alt="源码可见" src="https://img.shields.io/badge/source-available-6f42c1?style=flat-square" /></a>
+</p>
 
-产品有两项竞争承诺：
+<!-- PRODUCT HUNT BADGE SLOT: DeepCode Product Hunt URL 创建后添加官方 post badge。 -->
 
-- 做最好的 DeepSeek 桌面 GUI：一个 DeepSeek 桌面客户端该有的每项能力，都做成打磨过的 Windows 发行版。
-- 做最好的 DeepSeek Workbench：支持任意 DSH profile、真实执行用户 Cordis 插件、原生开放 memory/compaction/hooks、公开可复现的 DeepSeek benchmark，并用 Runtime Lens 提供上下文、来源、压缩、hook、回放和 A/B 实验能力。
+DeepCode 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 变成完整的 Windows 产品：安装应用、连接 DeepSeek、选择工作区，然后让 agent 检查、编辑、浏览、运行工具并解释自己的工作。Harness 仍是会话、模型、凭据、权限、工具、记忆、压缩与插件状态的唯一运行时和真源。
 
-这两条都是正在实现中的目标，不是对现状的描述。
+**非官方产品：** DeepCode 与 DeepSeek 无隶属关系，也未获其背书。上游 Harness 运行时与官方 Web UI 是 DeepSeek 的工作成果。
 
-完整产品约定见 [DEEPCODE.md](DEEPCODE.md)。
+## 下载
 
-DeepCode 是非官方社区项目，与 DeepSeek 无隶属关系，也未获其背书。官方 Web UI 与上游 Harness packages 是 DeepSeek 的工作成果。
+| 平台 | 下载 | 要求 |
+| --- | --- | --- |
+| Windows | [下载最新安装包](https://github.com/See-Sol-Lab/DeepCode/releases/latest) | Windows 10/11，x64 |
 
-## 开发者预览
+DeepCode 为当前 Windows 用户安装，不需要管理员权限，并自带 Harness 运行时、Node.js 与 pnpm。
 
-DeepCode 与 DeepSeek Harness 均处于活跃开发阶段。首个稳定版发布前可能发生破坏兼容性的变更。
+DeepCode V1 尚未进行代码签名，因此 Windows SmartScreen 可能显示未知发布者警告。请从同一个 Release 下载 `SHA256SUMS.txt`，并在运行前校验安装包：
 
-<a id="run"></a>
-
-## 运行
-
-### 通过 `npm` 运行 DeepSeek Harness
-
-安装 `Node.js`，然后运行：
-
-```sh
-npx @deepseek-ai/dsh web
+```powershell
+Get-FileHash .\DeepCode-Setup-<version>.exe -Algorithm SHA256
 ```
 
-该命令默认会在 `http://127.0.0.1:3080` 启动 Web UI，本机启动时还会用默认浏览器打开页面。通过 SSH 启动时只打印宿主机 URL，因为本地转发地址由 SSH 客户端或编辑器持有。传入 `--no-open` 可仅运行服务器而不打开浏览器。详见 [Web UI 指南](docs/user/guide/index.zh.md)。
+只有输出的 hash 与发布清单完全一致时才继续。详见[安装与故障排查指南](docs/user/deepcode/data-troubleshooting.zh.md#windows-smartscreen-blocks-the-installer)。
 
-### 在 Windows 上从源码运行 DeepCode Desktop
+## 快速开始
 
-从仓库源码运行：
+1. 安装并启动 DeepCode。
+2. 打开**设置 → 模型**，输入 DeepSeek API key。
+3. 选择模型。任务包含截图或其他视觉输入时，请选择支持图片的模型。
+4. 返回首页并选择工作区文件夹。
+5. 新建会话，向 agent 说明一个具体结果。
+6. 检查工具批准请求与最终文件改动。
+
+[DeepCode 快速开始指南](docs/user/deepcode/quickstart.zh.md)会带你完成完整的第一次会话。
+
+## 为什么选择 DeepCode
+
+| | |
+| --- | --- |
+| **Harness 原生** | Profile、会话、工具、凭据、权限、记忆、压缩、钩子与插件全部保留在 Harness 原生组合中。DeepCode 不建立第二套 agent 运行时。 |
+| **DeepSeek 优先** | DeepSeek 模型、推理、图片输入与 Harness 行为都是第一等产品路径，不是事后补上的兼容层。 |
+| **真正的 Windows 产品** | 一键当前用户安装、常驻托盘、模型设置、DSH Terminal、更新、反馈、诊断与卸载数据选择。 |
+| **可观察、可恢复** | 实时 Harness 状态、明确操作目标、已脱敏诊断、last-known-good Profile 恢复与受保护的插件改动，让失败可以理解并恢复。 |
+| **更安全的执行** | Sandbox 是推荐默认值，批准仍由 Harness 持有，Full Access 始终显示明确警告，浏览器提交必须要求批准。 |
+| **可编程** | 使用任意兼容的 Harness Profile 与 Cordis 插件，检查当前组合，并随时使用官方 DSH CLI。 |
+
+## 产品一览
+
+<!-- SCREENSHOT SLOT A: docs/user/deepcode/assets/workbench-overview.webp | 1600x1000 | 英文界面，一次已完成的 coding 任务，不得出现私人路径或凭据。 -->
+
+### 使用代码、文件与图片工作
+
+选择工作区、恢复持久化会话、向视觉模型附加图片、流式查看结果，并在桌面应用中检查工具活动。
+
+![DeepCode 视觉会话正确描述附加的界面截图](docs/user/deepcode/assets/vision-response.png)
+
+### 给 agent 一个真实浏览器
+
+DeepCode 内置浏览器使用可见的 Microsoft Edge，按 SSRF 规则检查导航与重定向，把物理鼠标与键盘控制留给用户，并通过 Harness 批准处理敏感提交。
+
+![DeepCode 会话使用内置浏览器检查公开网页](docs/user/deepcode/assets/browser-panel.png)
+
+### 检查并控制 Harness
+
+切换 Managed Home 或 Existing Home、选择 Profile、检查插件 effective status、通过官方 CLI 路径管理兼容插件，并在不掩盖事实的前提下恢复失败改动。
+
+![DeepCode 设置面板，包含通用、模型、插件与 agent preset 控制](docs/user/deepcode/assets/settings-panel.png)
+
+## V1 包含什么
+
+- Windows 10/11 x64 安装包与 portable unpacked build。
+- 通过 Harness 设置配置 DeepSeek 与自定义模型。
+- 为声明对应模态的模型提供文本与图片输入。
+- 基于工作区的 coding 会话，以及原生 Harness 工具与批准。
+- Managed Home 与 Existing Home，以及 Profile 发现和切换。
+- Plugin Manager，包括目标确认、流式输出、事后检查与受保护恢复。
+- 内置真实浏览器工具与可见 Browser Panel。
+- Sandbox、Full Access、Read-only 与 Custom 权限状态。
+- DSH Terminal，包括私有运行时 shim，绝不修改系统 PATH。
+- 更新校验、本地诊断导出、反馈、系统托盘与完整中英双语桌面文案。
+
+DeepCode V1 仅在 Windows x64 上测试。它尚未进行代码签名，也不提供 macOS 或 Linux 构建、账户系统、开机自启动或插件市场。
+
+## 文档
+
+| 指南 | 内容 |
+| --- | --- |
+| [快速开始](docs/user/deepcode/quickstart.zh.md) | 安装、连接 DeepSeek、选择工作区并完成第一次会话。 |
+| [模型与视觉](docs/user/deepcode/models.zh.md) | API key、模型选择、图片输入与自定义提供方。 |
+| [工作区与会话](docs/user/deepcode/workspaces-sessions.zh.md) | 工作区范围、持久化会话、附件、检查与托盘行为。 |
+| [Profile 与插件](docs/user/deepcode/profiles-plugins.zh.md) | Managed/Existing Home、Profile 切换、插件操作与恢复。 |
+| [权限与批准](docs/user/deepcode/permissions.zh.md) | Sandbox、Full Access、批准、Existing Home 行为与浏览器权限。 |
+| [桌面工具](docs/user/deepcode/desktop-tools.zh.md) | 浏览器、DSH Terminal、更新、诊断、反馈与生命周期。 |
+| [数据与故障排查](docs/user/deepcode/data-troubleshooting.zh.md) | 数据位置、隐私、卸载行为、常见失败与支持。 |
+
+文档网站同时保留上游 Harness 开发教程与参考资料，供插件作者与高级用户使用。
+
+## 数据与隐私
+
+DeepCode 把 Managed Harness Home 保存在 `%APPDATA%\DeepCode\dsh`。凭据、设置、会话、Profile 与插件会留在该 Home 中；已配置的模型提供方或工具仍可能发送任务要求的内容。
+
+服务日志会脱敏凭据形态文本。诊断包保存在本地，绝不自动上传。Crash dump 仍可能包含本地路径或内存片段，分享前必须检查。
+
+卸载时，DeepCode 会询问是否删除 `%APPDATA%\DeepCode`。保留该目录，即可在以后重新安装时继续使用凭据、设置、会话与 Profile。
+
+## 从源码构建
+
+### 从源码运行 DeepCode Desktop
+
+DeepCode 开发需要仓库声明的 Node.js 版本与 pnpm：
 
 ```sh
+git clone https://github.com/See-Sol-Lab/DeepCode.git
+cd DeepCode
 pnpm install
 pnpm run build
 pnpm run dev:desktop
 ```
 
-`dev:desktop` 启动本地 DSH Web 服务并打开当前 DeepCode Desktop 宿主；关闭窗口即停止服务。独立 Workbench 建设期间，该宿主目前显示兼容视图。详见 [apps/desktop](apps/desktop/README.zh.md)。
+构建 Windows 发行版：
+
+```sh
+pnpm run build:desktop-dist
+```
+
+工程细节与打包验证见 [DeepCode Desktop](apps/desktop/README.zh.md)。
+
+<a id="run"></a>
+
+### 通过 npm 运行 Harness
+
+安装 Node.js，然后启动上游 Web UI：
+
+```sh
+npx @deepseek-ai/dsh web
+```
+
+该命令在本机启动时会打开 `http://127.0.0.1:3080`。
 
 <a id="run-deepseek-harness-from-source"></a>
 
-### 从源码运行 DeepSeek Harness
+### 从源码运行 Harness
+
+DeepCode 公开代码树包含桌面构建所使用的上游 Harness 源码：
 
 ```sh
-git clone https://github.com/deepseek-ai/deepseek-harness.git
-cd deepseek-harness
 pnpm install
 pnpm run build
 pnpm dsh web
 ```
 
-`pnpm run build` 会准备仓库产物。`pnpm dsh web` 会直接使用这些已构建产物，不会重新构建。
+## 参与贡献与支持
 
-## 社区与支持
+- 通过 [DeepCode Issues](https://github.com/See-Sol-Lab/DeepCode/issues) 报告 DeepCode bug 与产品反馈。
+- 提交 PR 前请阅读 [CONTRIBUTING.md](CONTRIBUTING.zh.md)。
+- 上游 Harness 行为问题请使用 [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions)。
 
-- 通过本仓库提交 DeepCode 反馈与 bug 报告。
-- 上游 Harness 问题请使用 [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions)。
-- 为 Harness 插件仓库添加 [`dsh-plugin`](https://github.com/topics/dsh-plugin) 话题，便于发现。
-- 欢迎加入 <a href="https://discord.gg/Ycq5dCaS4">DeepSeek Harness Discord 社区</a>。
+## 许可证与上游关系
 
-## 参与贡献
+本仓库包含两类许可证范围：
 
-参见 [CONTRIBUTING.md](CONTRIBUTING.zh.md)。
+- 上游 DeepSeek Harness 代码及其衍生内容继续遵循 DeepSeek 的 [MIT License](LICENSE-MIT-UPSTREAM)。
+- DeepCode 原创桌面与产品代码以 [PolyForm Perimeter License 1.0.1](apps/desktop/LICENSE) 源码可见发布。个人、教育、研究、兴趣、公司内部使用及其他许可范围内的用途都可以；提供竞争产品需要获得 See-Sol-Lab 的单独授权。
 
-## 开发
-
-请先阅读[开发指南](docs/development.zh.md)与[架构文档](docs/architecture.zh.md)。
-
-面向 agent：请遵循 [AGENTS.md](AGENTS.md)。
-
-## 许可证
-
-DeepCode 采用**分层许可证**，因为本仓库同时包含上游 DeepSeek Harness 与 See-Sol-Lab 原创产品层。
-
-- 上游 DeepSeek Harness 代码及其衍生部分继续遵循 DeepSeek 的 [MIT License](LICENSE-MIT-UPSTREAM)。
-- [`apps/desktop/`](apps/desktop/) 下的 DeepCode 原创桌面/产品层采用 [PolyForm Perimeter License 1.0.1](apps/desktop/LICENSE)。个人、教育、研究、兴趣、公司内部使用及其他许可范围内的用途都可以；未经 See-Sol-Lab 另行书面授权，不得向他人提供与 DeepCode 竞争、可替代其功能或价值的产品。
-- 未来位于 `apps/desktop/` 之外的 See-Sol-Lab 原创组件，只有在明确引用 PolyForm Perimeter 或仓库许可说明时才适用该许可证。
-
-仓库根目录的 [`LICENSE`](LICENSE) 只是许可证适用范围说明，并不是覆盖整个仓库的单一许可证授权。具体适用范围见 [DeepCode 许可说明](DEEPCODE-LICENSE.md)。第三方依赖及其许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。这些软件许可证不授予 DeepCode 或 See-Sol-Lab 名称、标识及品牌资产的商标或品牌使用权。
+根目录 [`LICENSE`](LICENSE) 是适用范围说明，不是覆盖整个仓库的单一许可证授权。重新分发软件前，请阅读 [DeepCode 许可说明](DEEPCODE-LICENSE.md)与[第三方声明](THIRD_PARTY_NOTICES.md)。
 
 ---
 
-本仓库是 DeepCode 的公开发布仓库。它 fork 自官方 DeepSeek Harness，日常产品开发在另一个未公开的私有仓库中进行；这里发布的是产品代码树本身，而不是那个仓库的历史。
+DeepCode 是公开发布仓库。日常开发在另一个私有仓库中进行；Release 发布产品代码树，不公开私有开发历史。
