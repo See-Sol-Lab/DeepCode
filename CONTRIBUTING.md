@@ -2,22 +2,76 @@
 
 English | [中文](CONTRIBUTING.zh.md)
 
-Thank you for your interest in contributing to DeepSeek Harness!
+Thanks for considering a contribution to DeepCode! This is the shared development guide for the project, and we ask every contributor — human or agent — to give it a read first.
 
-We deeply believe in the power of open source communities, and that belief has shaped this project from the very beginning.
+DeepCode packages DeepSeek Harness into a Windows desktop product. There are plenty of ways to help: use it, report what breaks, improve the docs, or dive into the code.
 
-DeepSeek Harness is still at an early stage and under active development. We are sorry that we cannot accept external pull requests at the moment. However, contributing code to this repository is far from the only way to help. There are many other ways to get involved:
+## Reporting issues and suggesting features
 
-- Identify and report issues or bugs in GitHub Discussions:
-  - Upvote discussions that you would like to bring to the team's attention. We are a very small team and may not be able to reply to every post, but we monitor them and consider them when allocating resources.
-- Contribute to the ecosystem:
-  - Create a plugin that excites you and share it with others:
-    - Associate your GitHub project with the `dsh-plugin` topic to help others discover your plugin.
-  - Write blog posts and how-to guides about DeepSeek Harness.
-  - Answer questions and help other members of the community.
+- **Report a bug**: open a [DeepCode issue](https://github.com/See-Sol-Lab/DeepCode/issues) with your Windows version, DeepCode version, and steps to reproduce. Screenshots or logs are very welcome.
+- **Suggest a feature or share feedback**: use Issues as well. Tell us what problem you want solved and how you expect it to work.
+- **Ask about upstream Harness behavior**: [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions) is the better place for that.
 
-DeepSeek Harness is designed to be deeply customizable. We do not believe that packages in the official repository are inherently more important than packages created by the community. You may consider this repository an idea, an official showcase, and a source of inspiration, but not a mandate from us.
+## Development setup
 
-We have already seen exciting projects emerge from the community, and we hope to see the ecosystem continue to grow in its own directions.
+**Prerequisites**
 
-Into the unknown.
+- Windows 10/11 x64
+- Node.js `^22.19.0` or `>=24.0.0`
+- pnpm 11 (run `corepack enable` to get it)
+
+**Clone and install**
+
+```sh
+git clone https://github.com/See-Sol-Lab/DeepCode.git
+cd DeepCode
+pnpm install
+```
+
+**Common commands**
+
+| Command | What it does |
+| --- | --- |
+| `pnpm run build` | Build everything |
+| `pnpm run dev:desktop` | Start the desktop app in development mode |
+| `pnpm run build:desktop-dist` | Build the Windows distribution |
+| `pnpm run typecheck` | Run type checking |
+| `pnpm run lint` | Check code style (`lint:fix` applies fixes) |
+| `pnpm test` | Run the test suite |
+
+See [apps/desktop/README.md](apps/desktop/README.md) for engineering details and packaging verification.
+
+## Repository boundaries
+
+If DeepCode's vision is a car, DeepSeek Harness is the engine inside it. Upstream Harness core files track the official repository and stay as they are here — please keep this principle in mind before opening a PR.
+
+In practice:
+
+- **DeepCode's own desktop code lives in `apps/desktop/`.** Improvements here are welcome.
+- **Upstream Harness code** (`packages/`, `apps/cli`, `apps/web`, and friends) follows the official repository. Send changes for those to [upstream](https://github.com/deepseek-ai/deepseek-harness).
+
+## Sending a pull request
+
+- Keep each PR to a single logical change. Focused diffs are easier to read and to merge.
+- Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages, such as `fix(desktop): ...` or `docs: ...`.
+- In the PR description, cover three things: what changed, why, and how you verified it.
+- Keep UI copy and documentation in sync across English and Chinese.
+
+**Before you submit**
+
+- [ ] Changes stay within `apps/desktop/` or another DeepCode-owned area
+- [ ] `pnpm run build` passes
+- [ ] `pnpm run typecheck` and `pnpm run lint` pass
+- [ ] UI and documentation changes are synced in both languages
+- [ ] The PR description covers what changed, why, and how it was verified
+
+## Code of conduct
+
+Please be kind and respectful, and keep discussions focused on the work. We want this to be a welcoming place for newcomers.
+
+## Contact
+
+- DeepCode bugs and product feedback: [DeepCode Issues](https://github.com/See-Sol-Lab/DeepCode/issues)
+- Questions about upstream Harness behavior: [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions)
+
+Thanks again for spending your time on DeepCode.
