@@ -83,4 +83,4 @@ DeepCode.exe --export-diagnostics
 
 ## 获取帮助
 
-新建 issue 前，请先搜索已有 [DeepCode issues](https://github.com/See-Sol-Lab/DeepCode/issues)。请提供 DeepCode 版本、Windows 版本、尝试过的操作、可见错误，以及你已经检查过的诊断文件。
+新建 issue 前，请先搜索已有 [DeepCode issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues)。请提供 DeepCode 版本、Windows 版本、尝试过的操作、可见错误，以及你已经检查过的诊断文件。

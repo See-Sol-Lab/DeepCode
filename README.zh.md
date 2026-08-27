@@ -21,8 +21,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/See-Sol-Lab/DeepCode/releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/See-Sol-Lab/DeepCode?style=flat-square&label=release" /></a>
-  <a href="https://github.com/See-Sol-Lab/DeepCode/releases"><img alt="下载量" src="https://img.shields.io/github/downloads/See-Sol-Lab/DeepCode/total?style=flat-square" /></a>
+  <a href="https://github.com/See-Sol-Lab/DeepSeekGUI/releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/See-Sol-Lab/DeepSeekGUI?style=flat-square&label=release" /></a>
+  <a href="https://github.com/See-Sol-Lab/DeepSeekGUI/releases"><img alt="下载量" src="https://img.shields.io/github/downloads/See-Sol-Lab/DeepSeekGUI/total?style=flat-square" /></a>
   <img alt="Windows 10 与 11 x64" src="https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-0078D4?style=flat-square&logo=windows" />
   <a href="DEEPCODE-LICENSE.md"><img alt="源码可见" src="https://img.shields.io/badge/source-available-6f42c1?style=flat-square" /></a>
 </p>
@@ -37,17 +37,17 @@ DeepCode 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
 
 | 平台 | 下载 | 要求 |
 | --- | --- | --- |
-| Windows | [下载安装包](https://github.com/See-Sol-Lab/DeepCode/releases/download/v1.0.0/DeepCode-Setup-1.0.0.exe) | Windows 10/11，x64 |
+| Windows | [下载安装包](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/download/v1.0.0/DeepCode-Setup-1.0.0.exe) | Windows 10/11，x64 |
 
 DeepCode 为当前 Windows 用户安装，不需要管理员权限，并自带 Harness 运行时、Node.js 与 pnpm。
 
 或在已安装 [GitHub CLI](https://cli.github.com/) 的 PowerShell 中下载最新安装包与校验清单：
 
 ```powershell
-gh release download --repo See-Sol-Lab/DeepCode --pattern 'DeepCode-Setup-*.exe' --pattern 'SHA256SUMS.txt' --clobber
+gh release download --repo See-Sol-Lab/DeepSeekGUI --pattern 'DeepCode-Setup-*.exe' --pattern 'SHA256SUMS.txt' --clobber
 ```
 
-DeepCode V1 尚未进行代码签名，因此 Windows SmartScreen 可能显示未知发布者警告。请从同一个 Release 下载 [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepCode/releases/download/v1.0.0/SHA256SUMS.txt)，并在运行前校验安装包：
+DeepCode V1 尚未进行代码签名，因此 Windows SmartScreen 可能显示未知发布者警告。请从同一个 Release 下载 [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/download/v1.0.0/SHA256SUMS.txt)，并在运行前校验安装包：
 
 ```powershell
 Get-FileHash .\DeepCode-Setup-1.0.0.exe -Algorithm SHA256
@@ -143,7 +143,7 @@ DeepCode 把 Managed Harness Home 保存在 `%APPDATA%\DeepCode\dsh`。凭据、
 DeepCode 开发需要仓库声明的 Node.js 版本与 pnpm：
 
 ```sh
-git clone https://github.com/See-Sol-Lab/DeepCode.git
+git clone https://github.com/See-Sol-Lab/DeepSeekGUI.git
 cd DeepCode
 pnpm install
 pnpm run build
@@ -184,7 +184,7 @@ pnpm dsh web
 
 ## 参与贡献与支持
 
-- 通过 [DeepCode Issues](https://github.com/See-Sol-Lab/DeepCode/issues) 报告 DeepCode bug 与产品反馈。
+- 通过 [DeepCode Issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues) 报告 DeepCode bug 与产品反馈。
 - 提交 PR 前请阅读 [CONTRIBUTING.md](CONTRIBUTING.zh.md)。
 - 上游 Harness 行为问题请使用 [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions)。
 

@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url'
 import { parseUpdateManifest } from '../apps/desktop/src/update-service.ts'
 
 /** Repository that serves the public releases. */
-const RELEASE_REPO = 'See-Sol-Lab/DeepCode'
+const RELEASE_REPO = 'See-Sol-Lab/DeepSeekGUI'
 
 /**
  * Release tag convention: `v` + the DeepCode app version. The asset URL must

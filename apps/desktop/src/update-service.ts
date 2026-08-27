@@ -138,7 +138,7 @@ export interface UpdateManifest {
  * 用它覆盖。
  */
 export const DEFAULT_UPDATE_FEED_URL
-  = 'https://github.com/See-Sol-Lab/DeepCode/releases/latest/download/update-manifest.json'
+  = 'https://github.com/See-Sol-Lab/DeepSeekGUI/releases/latest/download/update-manifest.json'
 
 /**
  * 解析更新通道：没有覆盖配置就用内置公开通道；有配置就必须合法。

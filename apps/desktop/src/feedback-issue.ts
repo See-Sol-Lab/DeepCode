@@ -122,7 +122,7 @@ export function buildIssueBody(input: FeedbackIssueInput): string {
  * @returns 完整 URL。
  */
 export function githubNewIssueUrl(title: string, body = '', zh = true): string {
-  const base = 'https://github.com/See-Sol-Lab/DeepCode/issues/new'
+  const base = 'https://github.com/See-Sol-Lab/DeepSeekGUI/issues/new'
   if (body === '') {
     return `${base}?template=bug_report.md&labels=user-feedback&title=${encodeURIComponent(title)}`
   }

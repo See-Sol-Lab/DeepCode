@@ -119,7 +119,7 @@ describe('rewriteMarkdown', () => {
       repositoryRef: 'abc123',
     })).toBe(
       '[B](./reference/b.md#part) '
-      + '[source](https://github.com/See-Sol-Lab/DeepCode/blob/abc123/packages/tool.ts#L2) '
+      + '[source](https://github.com/See-Sol-Lab/DeepSeekGUI/blob/abc123/packages/tool.ts#L2) '
       + '[web](https://example.com)\n',
     )
   })
@@ -145,7 +145,7 @@ describe('rewriteMarkdown', () => {
       pages,
       repoRoot: root,
       repositoryRef: 'abc123',
-    })).toBe('![logo](https://raw.githubusercontent.com/See-Sol-Lab/DeepCode/abc123/packages/logo.svg)\n')
+    })).toBe('![logo](https://raw.githubusercontent.com/See-Sol-Lab/DeepSeekGUI/abc123/packages/logo.svg)\n')
   })
 
   it('hands an image to the placer and uses the URL it returns', () => {
@@ -224,7 +224,7 @@ describe('rewriteMarkdown', () => {
       repositoryRef: 'abc123',
     })).toBe(
       '[title](./reference/b.md "b.md") '
-      + '[escaped](https://github.com/See-Sol-Lab/DeepCode/blob/abc123/docs/x(y).md)\n',
+      + '[escaped](https://github.com/See-Sol-Lab/DeepSeekGUI/blob/abc123/docs/x(y).md)\n',
     )
   })
 

@@ -12,9 +12,9 @@
 
 ## 1. 下载 DeepCode
 
-下载 [`DeepCode-Setup-1.0.0.exe`](https://github.com/See-Sol-Lab/DeepCode/releases/download/v1.0.0/DeepCode-Setup-1.0.0.exe)。
+下载 [`DeepCode-Setup-1.0.0.exe`](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/download/v1.0.0/DeepCode-Setup-1.0.0.exe)。
 
-DeepCode V1 尚未进行代码签名。Windows SmartScreen 可能显示未知发布者警告。运行安装包前，请先用对应的 [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepCode/releases/download/v1.0.0/SHA256SUMS.txt) 校验文件：
+DeepCode V1 尚未进行代码签名。Windows SmartScreen 可能显示未知发布者警告。运行安装包前，请先用对应的 [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/download/v1.0.0/SHA256SUMS.txt) 校验文件：
 
 ```powershell
 Get-FileHash .\DeepCode-Setup-1.0.0.exe -Algorithm SHA256

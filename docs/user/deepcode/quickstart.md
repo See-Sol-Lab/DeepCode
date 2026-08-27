@@ -12,9 +12,9 @@ This tutorial takes a new Windows user from download to a working DeepSeek codin
 
 ## 1. Download DeepCode
 
-Download [`DeepCode-Setup-1.0.0.exe`](https://github.com/See-Sol-Lab/DeepCode/releases/download/v1.0.0/DeepCode-Setup-1.0.0.exe).
+Download [`DeepCode-Setup-1.0.0.exe`](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/download/v1.0.0/DeepCode-Setup-1.0.0.exe).
 
-DeepCode V1 is not code-signed. Windows SmartScreen may show an unknown-publisher warning. Verify the installer against the matching [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepCode/releases/download/v1.0.0/SHA256SUMS.txt) before running it:
+DeepCode V1 is not code-signed. Windows SmartScreen may show an unknown-publisher warning. Verify the installer against the matching [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/download/v1.0.0/SHA256SUMS.txt) before running it:
 
 ```powershell
 Get-FileHash .\DeepCode-Setup-1.0.0.exe -Algorithm SHA256

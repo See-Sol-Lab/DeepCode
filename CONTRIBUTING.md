@@ -8,7 +8,7 @@ DeepCode packages DeepSeek Harness into a Windows desktop product. There are ple
 
 ## Reporting issues and suggesting features
 
-- **Report a bug**: open a [DeepCode issue](https://github.com/See-Sol-Lab/DeepCode/issues) with your Windows version, DeepCode version, and steps to reproduce. Screenshots or logs are very welcome.
+- **Report a bug**: open a [DeepCode issue](https://github.com/See-Sol-Lab/DeepSeekGUI/issues) with your Windows version, DeepCode version, and steps to reproduce. Screenshots or logs are very welcome.
 - **Suggest a feature or share feedback**: use Issues as well. Tell us what problem you want solved and how you expect it to work.
 - **Ask about upstream Harness behavior**: [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions) is the better place for that.
 
@@ -23,7 +23,7 @@ DeepCode packages DeepSeek Harness into a Windows desktop product. There are ple
 **Clone and install**
 
 ```sh
-git clone https://github.com/See-Sol-Lab/DeepCode.git
+git clone https://github.com/See-Sol-Lab/DeepSeekGUI.git
 cd DeepCode
 pnpm install
 ```
@@ -71,7 +71,7 @@ Please be kind and respectful, and keep discussions focused on the work. We want
 
 ## Contact
 
-- DeepCode bugs and product feedback: [DeepCode Issues](https://github.com/See-Sol-Lab/DeepCode/issues)
+- DeepCode bugs and product feedback: [DeepCode Issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues)
 - Questions about upstream Harness behavior: [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions)
 
 Thanks again for spending your time on DeepCode.

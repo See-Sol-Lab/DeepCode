@@ -83,4 +83,4 @@ The command prints the output directory. Review the bundle before attaching it t
 
 ## Get help
 
-Search existing [DeepCode issues](https://github.com/See-Sol-Lab/DeepCode/issues) before opening a new one. Include the DeepCode version, Windows version, the action you attempted, the visible error, and only the diagnostics files you have reviewed.
+Search existing [DeepCode issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues) before opening a new one. Include the DeepCode version, Windows version, the action you attempted, the visible error, and only the diagnostics files you have reviewed.

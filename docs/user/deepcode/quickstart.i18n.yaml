@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/user/deepcode/quickstart.md
-quickstart.md: ec437f925dc56e13e69285357bb4ee26a0c2fdf7
-quickstart.zh.md: 603245506dcac3e669e86730b053fd92f471e7c2
+quickstart.md: 070adf97f93fbe0e51ebca0146de3ecc66081247
+quickstart.zh.md: 0b2db15fde01ae8bd562da668e43bb352c42839f

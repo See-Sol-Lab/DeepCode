@@ -18,7 +18,7 @@ Status: implemented
 
 各 locale 的首页投影只保留权威 YAML frontmatter。面向仓库的正文保留其 H1 和双语源文件链接；frontmatter 实现[保持 locale 不变的快速开始重定向](../simplification/2026-08-11-quickstart-documentation-home.zh.md)，网站导航负责切换 locale。
 
-投影器解析 Markdown 链接，但不会重新序列化文档。指向另一个已发布源文件的链接会变成站内相对路由；指向未发布仓库文件的链接会变成 `See-Sol-Lab/DeepCode` 仓库主页下的源文件链接；仓库图片会被拷贝进生成树并从那里引用（[原因](2026-08-06-doc-site-carries-its-images.zh.md)）。相对目标不存在时，投影会失败。单元测试会锁定这些转换行为，`docs:check` 则运行投影器测试和 VitePress 生产构建，并将二者纳入 `doc-sync` 和并行文档门禁。
+投影器解析 Markdown 链接，但不会重新序列化文档。指向另一个已发布源文件的链接会变成站内相对路由；指向未发布仓库文件的链接会变成 `See-Sol-Lab/DeepSeekGUI` 仓库主页下的源文件链接；仓库图片会被拷贝进生成树并从那里引用（[原因](2026-08-06-doc-site-carries-its-images.zh.md)）。相对目标不存在时，投影会失败。单元测试会锁定这些转换行为，`docs:check` 则运行投影器测试和 VitePress 生产构建，并将二者纳入 `doc-sync` 和并行文档门禁。
 
 `verify-public-repository-links` 会拒绝已跟踪文件中指向不可用旧仓库的引用。源文件链接和编辑链接使用当前仓库主页。
 

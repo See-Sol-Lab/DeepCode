@@ -21,8 +21,8 @@ English | [中文](README.zh.md)
 </p>
 
 <p align="center">
-  <a href="https://github.com/See-Sol-Lab/DeepCode/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/See-Sol-Lab/DeepCode?style=flat-square&label=release" /></a>
-  <a href="https://github.com/See-Sol-Lab/DeepCode/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/See-Sol-Lab/DeepCode/total?style=flat-square" /></a>
+  <a href="https://github.com/See-Sol-Lab/DeepSeekGUI/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/See-Sol-Lab/DeepSeekGUI?style=flat-square&label=release" /></a>
+  <a href="https://github.com/See-Sol-Lab/DeepSeekGUI/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/See-Sol-Lab/DeepSeekGUI/total?style=flat-square" /></a>
   <img alt="Windows 10 and 11 x64" src="https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-0078D4?style=flat-square&logo=windows" />
   <a href="DEEPCODE-LICENSE.md"><img alt="Source available" src="https://img.shields.io/badge/source-available-6f42c1?style=flat-square" /></a>
 </p>
@@ -37,17 +37,17 @@ DeepCode turns [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harnes
 
 | Platform | Download | Requirements |
 | --- | --- | --- |
-| Windows | [Download the installer](https://github.com/See-Sol-Lab/DeepCode/releases/download/v1.0.0/DeepCode-Setup-1.0.0.exe) | Windows 10/11, x64 |
+| Windows | [Download the installer](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/download/v1.0.0/DeepCode-Setup-1.0.0.exe) | Windows 10/11, x64 |
 
 DeepCode installs for the current Windows user without administrator rights and includes its own Harness runtime, Node.js, and pnpm.
 
 Or download the latest installer and checksum from PowerShell with [GitHub CLI](https://cli.github.com/):
 
 ```powershell
-gh release download --repo See-Sol-Lab/DeepCode --pattern 'DeepCode-Setup-*.exe' --pattern 'SHA256SUMS.txt' --clobber
+gh release download --repo See-Sol-Lab/DeepSeekGUI --pattern 'DeepCode-Setup-*.exe' --pattern 'SHA256SUMS.txt' --clobber
 ```
 
-DeepCode V1 is not code-signed, so Windows SmartScreen may show an unknown-publisher warning. Download [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepCode/releases/download/v1.0.0/SHA256SUMS.txt) from the same release and verify the installer before running it:
+DeepCode V1 is not code-signed, so Windows SmartScreen may show an unknown-publisher warning. Download [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/download/v1.0.0/SHA256SUMS.txt) from the same release and verify the installer before running it:
 
 ```powershell
 Get-FileHash .\DeepCode-Setup-1.0.0.exe -Algorithm SHA256
@@ -143,7 +143,7 @@ Uninstall asks whether to remove `%APPDATA%\DeepCode`. Keeping it preserves cred
 DeepCode development requires the Node.js version declared by the repository and pnpm:
 
 ```sh
-git clone https://github.com/See-Sol-Lab/DeepCode.git
+git clone https://github.com/See-Sol-Lab/DeepSeekGUI.git
 cd DeepCode
 pnpm install
 pnpm run build
@@ -184,7 +184,7 @@ pnpm dsh web
 
 ## Contributing and support
 
-- Report DeepCode bugs and product feedback through [DeepCode Issues](https://github.com/See-Sol-Lab/DeepCode/issues).
+- Report DeepCode bugs and product feedback through [DeepCode Issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues).
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) before sending a pull request.
 - Use [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions) for questions about upstream Harness behavior.
 

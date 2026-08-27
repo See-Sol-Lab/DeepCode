@@ -77,7 +77,7 @@ describe('buildIssueBody', () => {
 describe('githubNewIssueUrl', () => {
   it('模板名、标签与 URL 编码的标题', () => {
     const url = githubNewIssueUrl('保存无响应 & 崩溃？')
-    expect(url).toBe('https://github.com/See-Sol-Lab/DeepCode/issues/new'
+    expect(url).toBe('https://github.com/See-Sol-Lab/DeepSeekGUI/issues/new'
       + '?template=bug_report.md&labels=user-feedback&title='
       + encodeURIComponent('保存无响应 & 崩溃？'))
     expect(url).toContain('labels=user-feedback')

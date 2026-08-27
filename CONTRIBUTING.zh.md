@@ -8,7 +8,7 @@ DeepCode 是把 DeepSeek Harness 装进 Windows 的桌面产品。你能帮上�
 
 ## 报告问题与提建议
 
-- **报 bug**：到 [DeepCode Issues](https://github.com/See-Sol-Lab/DeepCode/issues) 提，带上 Windows 版本、DeepCode 版本和复现步骤，有截图或日志更好。
+- **报 bug**：到 [DeepCode Issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues) 提，带上 Windows 版本、DeepCode 版本和复现步骤，有截图或日志更好。
 - **提功能建议或反馈**：同样在 Issues 里聊，说清楚你想解决什么问题、期望它怎么工作。
 - **上游 Harness 本身的行为**：到 [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions) 提问，那边更对口。
 
@@ -23,7 +23,7 @@ DeepCode 是把 DeepSeek Harness 装进 Windows 的桌面产品。你能帮上�
 **克隆与安装**
 
 ```sh
-git clone https://github.com/See-Sol-Lab/DeepCode.git
+git clone https://github.com/See-Sol-Lab/DeepSeekGUI.git
 cd DeepCode
 pnpm install
 ```
@@ -53,7 +53,7 @@ pnpm install
 ## 提交 PR
 
 - 一个 PR 只做一件事，改动聚焦更容易读、也更容易合。
-- 提交信息使用 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/) 风格，例如 `fix(desktop): ...`、`docs: ...`。
+- 提交信息使用 [Conventional Commits](https://www.conventionalcommits.org/) 风格，例如 `fix(desktop): ...`、`docs: ...`。
 - PR 描述写清三件事：改了什么、为什么改、怎么验证的。
 - 界面文案与文档改动请中英同步。
 
@@ -71,7 +71,7 @@ pnpm install
 
 ## 联系我们
 
-- DeepCode 的 bug 与产品反馈：[DeepCode Issues](https://github.com/See-Sol-Lab/DeepCode/issues)
+- DeepCode 的 bug 与产品反馈：[DeepCode Issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues)
 - 上游 Harness 行为相关的问题：[DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions)
 
 再次感谢你愿意花时间参与 DeepCode。

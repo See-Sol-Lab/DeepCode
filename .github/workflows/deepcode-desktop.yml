@@ -96,7 +96,7 @@ jobs:
   desktop-windows-native:
     name: desktop / windows native packaged
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    # Fork reality (See-Sol-Lab/DeepCode): this repository has no upstream
+    # Fork reality (See-Sol-Lab/DeepSeekGUI): this repository has no upstream
     # dsh-*-16core hosted runner groups and no self-hosted runners. A label
     # that does not exist here leaves the job queued forever, which is how
     # fourteen runs stalled before B2-P1 — so this must stay a real

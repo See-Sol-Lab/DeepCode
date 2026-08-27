@@ -12,7 +12,7 @@ import type { DeepCodeVersionInfo } from './version-info.ts'
 
 /** license summary 与项目仓库（交付身份常量，与 DEEPCODE_VERSIONING.md 同源）。 */
 export const ABOUT_LICENSE_SUMMARY = 'DeepCode product layer: PolyForm Perimeter 1.0.1 · DeepSeek Harness runtime: MIT'
-export const ABOUT_REPOSITORY = 'https://github.com/See-Sol-Lab/DeepCode'
+export const ABOUT_REPOSITORY = 'https://github.com/See-Sol-Lab/DeepSeekGUI'
 
 /** About 详情的输入事实（全部受控来源）。 */
 export interface AboutDetailInput {
