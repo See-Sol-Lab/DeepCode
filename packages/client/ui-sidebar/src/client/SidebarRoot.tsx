@@ -143,7 +143,7 @@ export function SidebarRoot({
                 {renderSlot('sidebar.brand.name', {}, {
                   fallback: (
                     <>
-                      {/* Host hook (DeepCode P8-D34): a hosting build may brand
+                      {/* Host hook (DeepSeekGUI P8-D34): a hosting build may brand
                           this fallback via DSH_CLIENT_BRAND_NAME / _BADGE build
                           env (inlined like every DSH_CLIENT_* value). Unset,
                           this renders exactly the upstream local-build line. */}

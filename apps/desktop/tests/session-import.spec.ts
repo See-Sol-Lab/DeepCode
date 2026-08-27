@@ -27,7 +27,7 @@ function log(version: number, id: string): Buffer {
 
 /** Build a home with `count` sessions in one workspace, at the given format version. */
 function home(count: number, version = SUPPORTED_SESSION_FORMAT_VERSION, workspace = '--ws-a--'): string {
-  const root = mkdtempSync(join(tmpdir(), 'deepcode-import-'))
+  const root = mkdtempSync(join(tmpdir(), 'deepseekgui-import-'))
   for (let index = 0; index < count; index += 1) {
     const id = `session-${String(index)}`
     const dir = join(root, 'sessions', workspace, id)
@@ -41,7 +41,7 @@ function home(count: number, version = SUPPORTED_SESSION_FORMAT_VERSION, workspa
 }
 
 /** An empty home to import into. */
-const emptyHome = (): string => mkdtempSync(join(tmpdir(), 'deepcode-target-'))
+const emptyHome = (): string => mkdtempSync(join(tmpdir(), 'deepseekgui-target-'))
 
 describe('surveyImportableSessions', () => {
   it('finds nothing in a home that has no sessions', () => {
@@ -67,7 +67,7 @@ describe('surveyImportableSessions', () => {
   })
 
   it('reports a log it cannot parse as unknown rather than as importable', () => {
-    const root = mkdtempSync(join(tmpdir(), 'deepcode-import-'))
+    const root = mkdtempSync(join(tmpdir(), 'deepseekgui-import-'))
     const dir = join(root, 'sessions', '--ws--', 'session-0')
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, 'session.jsonl.zstd'), Buffer.from('not zstd at all', 'utf8'))
@@ -142,6 +142,6 @@ describe('shouldOfferImport', () => {
   it('records the answer beside the event log rather than in launcher state', () => {
     const target = emptyHome()
     markImportOffered(target)
-    expect(existsSync(join(target, 'deepcode', 'session-import-offered'))).toBe(true)
+    expect(existsSync(join(target, 'deepseekgui', 'session-import-offered'))).toBe(true)
   })
 })

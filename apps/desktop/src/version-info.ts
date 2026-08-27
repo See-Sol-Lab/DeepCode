@@ -1,7 +1,7 @@
 /**
- * DeepCode 交付身份的四元组版本事实。
+ * DeepSeekGUI 交付身份的四元组版本事实。
  * 四个事实各有唯一权威来源，绝不维护第二份手写常量：
- * - DeepCode app version：apps/desktop/package.json（打包态经 electron-builder
+ * - DeepSeekGUI app version：apps/desktop/package.json（打包态经 electron-builder
  *   写入 exe 元数据，运行时由 app.getVersion() 读回；开发态直接读 manifest）。
  * - embedded DSH version：实际打包 Runtime 的
  *   `resources/dsh/node_modules/@deepseek-ai/dsh/package.json`；开发态对应
@@ -12,7 +12,7 @@
  *   fail loud，开发态实时 git rev-parse，无 git 环境回退 null。
  * - Electron version + platform/arch：运行时 process 事实。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/version-info
+ * @module @see-sol-lab/deepseekgui/version-info
  */
 
 import { readFileSync } from 'node:fs'
@@ -28,12 +28,12 @@ export const SOURCE_COMMIT_FILENAME = join('dsh', 'source-commit.txt')
 /** 开发态 embedded DSH 对应的源码 manifest（apps/cli 即 @deepseek-ai/dsh）。 */
 const DEV_DSH_MANIFEST = join('apps', 'cli', 'package.json')
 
-/** 开发态 DeepCode app version 的 manifest。 */
+/** 开发态 DeepSeekGUI app version 的 manifest。 */
 const DEV_APP_MANIFEST = join('apps', 'desktop', 'package.json')
 
-/** DeepCode 交付身份的四元组版本事实。 */
-export interface DeepCodeVersionInfo {
-  /** DeepCode app version（唯一手写源头：apps/desktop/package.json）。 */
+/** DeepSeekGUI 交付身份的四元组版本事实。 */
+export interface DeepSeekGUIVersionInfo {
+  /** DeepSeekGUI app version（唯一手写源头：apps/desktop/package.json）。 */
   appVersion: string
   /** embedded DSH version（从实际打包 Runtime / 源码 manifest 读取）。 */
   embeddedDshVersion: string
@@ -80,12 +80,12 @@ export function readManifestVersion(path: string, what: string, zh = true): stri
 }
 
 /**
- * 开发态 DeepCode app version：读 apps/desktop/package.json。
+ * 开发态 DeepSeekGUI app version：读 apps/desktop/package.json。
  * @param root - 仓库根目录。
  * @returns version 字符串。
  */
 export function readDevAppVersion(root: string, zh = true): string {
-  return readManifestVersion(join(root, DEV_APP_MANIFEST), 'DeepCode app manifest', zh)
+  return readManifestVersion(join(root, DEV_APP_MANIFEST), 'DeepSeekGUI app manifest', zh)
 }
 
 /**
@@ -143,7 +143,7 @@ export function readDevSourceCommit(root: string): string | null {
 export interface VersionInfoInput {
   /** 打包态（发行目录）还是开发态（源码仓库）。 */
   packaged: boolean
-  /** DeepCode app version（打包态由 app.getVersion() 提供；开发态由 readDevAppVersion 提供）。 */
+  /** DeepSeekGUI app version（打包态由 app.getVersion() 提供；开发态由 readDevAppVersion 提供）。 */
   appVersion: string
   /** 打包态 process.resourcesPath；开发态仓库根目录。 */
   root: string
@@ -164,7 +164,7 @@ export interface VersionInfoInput {
  * @param input - 输入事实。
  * @returns 完整版本事实。
  */
-export function buildVersionInfo(input: VersionInfoInput): DeepCodeVersionInfo {
+export function buildVersionInfo(input: VersionInfoInput): DeepSeekGUIVersionInfo {
   const zh = input.zh ?? true
   return {
     appVersion: input.appVersion,

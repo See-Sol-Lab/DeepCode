@@ -9,11 +9,11 @@
  * - 日志进入 bundle 前已经过既有 redaction；
  * - 用户 home/path 在导出文本中归一化（<USER_HOME> 占位）。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/diagnostics-service
+ * @module @see-sol-lab/deepseekgui/diagnostics-service
  */
 
 import { maskWindowsLiteral } from './redact.ts'
-import type { DeepCodeVersionInfo } from './version-info.ts'
+import type { DeepSeekGUIVersionInfo } from './version-info.ts'
 
 /**
  * Build Info 的一行事实（Diagnostics Center 与 Copy Build Info 共用）。
@@ -69,7 +69,7 @@ export function shortSourceCommit(commit: string): string {
  * @returns 有序事实行。
  */
 export function buildInfoLines(input: {
-  version: DeepCodeVersionInfo
+  version: DeepSeekGUIVersionInfo
   homeKind: 'managed' | 'existing'
   profile: string
   harnessStatus: string
@@ -85,7 +85,7 @@ export function buildInfoLines(input: {
   const mask = input.maskPath ?? ((path: string) => path)
   const logPath = input.logPath ?? '(unavailable)'
   return [
-    { key: 'diag.build.app', label: 'DeepCode', value: input.version.appVersion },
+    { key: 'diag.build.app', label: 'DeepSeekGUI', value: input.version.appVersion },
     {
       key: 'diag.build.dsh',
       label: 'Embedded DSH',
@@ -223,7 +223,7 @@ export interface BundleSkippedEntry {
 export function assembleDiagnosticsBundle(input: {
   /** 用户主目录（归一化基准）。 */
   home: string
-  version: DeepCodeVersionInfo
+  version: DeepSeekGUIVersionInfo
   /** 已脱敏的日志条目（content 经 redaction 后才传入）。 */
   logEntries: { name: string; content: string; source: string }[]
   /** Build Info 文本。 */
@@ -285,7 +285,7 @@ export function assembleDiagnosticsBundle(input: {
  * @returns manifest JSON 文本。
  */
 export function buildBundleManifest(
-  version: DeepCodeVersionInfo,
+  version: DeepSeekGUIVersionInfo,
   entries: BundleManifestEntry[],
   skipped: BundleSkippedEntry[],
   exportedAt: string,
@@ -293,7 +293,7 @@ export function buildBundleManifest(
   return `${JSON.stringify({
     formatVersion: 2,
     exportedAt,
-    deepcodeVersion: version.appVersion,
+    deepseekguiVersion: version.appVersion,
     embeddedDshVersion: version.embeddedDshVersion,
     sourceCommit: version.sourceCommit ?? 'unknown',
     files: entries,

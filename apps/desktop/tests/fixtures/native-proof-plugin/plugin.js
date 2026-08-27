@@ -1,5 +1,5 @@
 /**
- * DeepCode native-plugin proof fixture: a minimal third-party-style Cordis
+ * DeepSeekGUI native-plugin proof fixture: a minimal third-party-style Cordis
  * function plugin. It is NOT a workspace package, production code never
  * imports it, and the packaged runtime never treats it as built-in — it only
  * ever mounts because a test-built profile lists it through a normal
@@ -19,7 +19,7 @@
 const { writeFileSync } = require('node:fs')
 const { createServer } = require('node:http')
 
-exports.name = 'deepcode-native-proof-plugin'
+exports.name = 'deepseekgui-native-proof-plugin'
 
 exports.apply = function apply(ctx, config = {}) {
   if (config.throw === true) {
@@ -31,7 +31,7 @@ exports.apply = function apply(ctx, config = {}) {
     // it can answer a readiness probe, making the negative path fail
     // deterministically at the readiness stage.
     setImmediate(() => { process.exit(1) })
-    throw new Error('deepcode-native-proof-plugin: apply threw on purpose')
+    throw new Error('deepseekgui-native-proof-plugin: apply threw on purpose')
   }
   if (typeof config.markerPath === 'string' && config.markerPath.length > 0) {
     writeFileSync(config.markerPath, JSON.stringify({

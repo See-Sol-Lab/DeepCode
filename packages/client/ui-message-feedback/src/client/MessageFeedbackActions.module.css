@@ -9,7 +9,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* Host hooks (DeepCode P8-D45): mirror MessageIconActions' scale hooks so
+  /* Host hooks (DeepSeekGUI P8-D45): mirror MessageIconActions' scale hooks so
      the rating buttons shrink with the rest of the footer row; defaults keep
      upstream 28px targets / 16px glyphs exactly. */
   width: var(--dsh-iconaction-size, 28px);

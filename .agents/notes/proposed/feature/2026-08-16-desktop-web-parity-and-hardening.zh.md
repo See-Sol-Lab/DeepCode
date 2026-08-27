@@ -12,7 +12,7 @@ Status: proposed
 
 - **外链**（`classifyLinkOpen`）：本机 DSH 源在窗口内导航；其他 `http`/`https` URL 无论来自 `window.open` 还是 `will-navigate` 都交系统默认浏览器（`shell.openExternal`）；其余协议一律拒绝。远程页面绝不在窗口内加载。
 - **单实例**：`requestSingleInstanceLock`；后到实例以退出码 0 结束，`second-instance` 恢复并聚焦既有窗口。
-- **面向 GUI 用户的诊断**：打包 GUI 把 DSH stdout/stderr pipe 进 `%APPDATA%\DeepCode\dsh-service.log`（上一份轮转为 `.old`，5MB 上限并留截断标记，`sk-…` 形态落盘前脱敏）；错误对话框指向该日志而不是终端。开发态与 smoke 仍继承控制台。
+- **面向 GUI 用户的诊断**：打包 GUI 把 DSH stdout/stderr pipe 进 `%APPDATA%\DeepSeekGUI\dsh-service.log`（上一份轮转为 `.old`，5MB 上限并留截断标记，`sk-…` 形态落盘前脱敏）；错误对话框指向该日志而不是终端。开发态与 smoke 仍继承控制台。
 - **停止健壮性**：`taskkill` 报 error 或非零退出且子进程仍在运行时，`stopProcess` 回退为直接 `kill()`；SIGKILL 宽限定时器仍是最后防线。
 - **发布集合泄漏扫描**：构建删除 `builder-debug.yml`（完整 NSIS 命令行：仓库、用户、临时与缓存路径），并在安装包构建后对整个 `dist/desktop` 发布集合（含安装器元数据）做只扫不改写的终扫；`builder-debug.yml` 与 `.package-lock.json` 的幸存副本按文件名即为 finding，该阶段出现仓库根路径也报 finding 而不改写——安装包已包裹的字节绝不被修改。
 - **可复现安装**（`scripts/runtime-lock.ts`）：staging consumer 移入 `dist/desktop`，闭包 tarball 用相对 `file:` spec；npm 锁文件保持启用，从提交在仓库的 `apps/desktop/runtime.package-lock.json` 种入并回写。外部 registry 依赖由此钉住；锁文件含任何机器绝对路径都会使构建失败。

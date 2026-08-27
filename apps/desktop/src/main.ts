@@ -1,5 +1,5 @@
 /**
- * DeepCode 主进程：由 HarnessController 协调 launcher state 与本机 DSH
+ * DeepSeekGUI 主进程：由 HarnessController 协调 launcher state 与本机 DSH
  * 服务（读取 active selection → spawn → HTTP 就绪 → 页面加载；切换失败
  * 单次回退 lastKnownGood）。窗口由一体化 Desktop Chrome（置顶
  * WebContentsView：顶栏 + 汉堡菜单 + Harness 控制面 + 状态胶囊）与
@@ -8,7 +8,7 @@
  * launcher-state + controller + discovery → main 构建 ControlModel →
  * 窄 preload → Chrome renderer → 封闭命令联合 → main → controller。
  * 关闭最后一个窗口时停止服务并退出。
- * @module @see-sol-lab/deepcode/main
+ * @module @see-sol-lab/deepseekgui/main
  */
 
 import {
@@ -148,7 +148,7 @@ import { clampBoundsToWorkArea, nextWindowState } from './window-state.ts'
 import {
   buildVersionInfo,
   readDevAppVersion,
-  type DeepCodeVersionInfo,
+  type DeepSeekGUIVersionInfo,
 } from './version-info.ts'
 import {
   DEFAULT_HOST,
@@ -168,7 +168,7 @@ import {
 } from './dsh-service.ts'
 
 /** 窗口与产品名称；窗口标题固定为该名称。 */
-const APP_NAME = 'DeepCode'
+const APP_NAME = 'DeepSeekGUI'
 
 /** Desktop Chrome 顶栏高度（px）；Compatibility View 从其下方开始。 */
 const CHROME_HEIGHT = 47
@@ -203,7 +203,7 @@ const BROWSER_PANE_RATIO = 0.45
  * 绝不碰其他 target。data URL 无网络请求，不经 SSRF 代理，天然安全。
  */
 const BROWSER_PANE_MARKER_URL = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html>
-<html><head><meta charset="utf-8"><title>deepcode-browser-pane</title><style>
+<html><head><meta charset="utf-8"><title>deepseekgui-browser-pane</title><style>
   body { margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh;
          background: #f9f8f8; color: #1e232c; font-family: system-ui, "Segoe UI", sans-serif; }
   html[data-theme='dark'] body { background: #0a0a0a; color: #e8e8ea; }
@@ -279,7 +279,7 @@ function failLocalized(dict: ChromeStrings, titleKey: string, messageKey: string
   const title = dictText(dict, titleKey)
   const message = dictText(dict, messageKey, params)
   if (SMOKE) {
-    console.error(`[deepcode] ${title}: ${message}`)
+    console.error(`[deepseekgui] ${title}: ${message}`)
   } else {
     dialog.showErrorBox(title, message)
   }
@@ -298,7 +298,7 @@ function failLocalized(dict: ChromeStrings, titleKey: string, messageKey: string
  */
 async function rescueLauncherState(store: LauncherStateStore, userDataDir: string, reason: string): Promise<boolean> {
   if (SMOKE) {
-    console.error(`[deepcode] launcher state 损坏（${reason}）；smoke 模式不弹救援对话框，退出`)
+    console.error(`[deepseekgui] launcher state 损坏（${reason}）；smoke 模式不弹救援对话框，退出`)
     return false
   }
   for (;;) {
@@ -342,7 +342,7 @@ const HARNESS_THEME_FIELD = 'preference'
 /**
  * 从 Harness 官方的 settings 文档读取主题偏好。
  *
- * **这是明暗状态的唯一事实源。** DeepCode 不再自己存一份主题偏好：官方
+ * **这是明暗状态的唯一事实源。** DeepSeekGUI 不再自己存一份主题偏好：官方
  * ui-theme 插件拥有它、官方 presenter 依据它投影 `body[data-ds-dark-theme]`，
  * 我们只负责把 light/dark 映射成自己的视觉（顶栏、背景图、玻璃材质）。
  * 早先的做法是自存一份再强写官方 DOM，那等于建立第二份状态并跟官方的
@@ -392,7 +392,7 @@ function parseHarnessThemePreference(text: string | null): ThemePreference {
 }
 
 // 曾经这里有一个 writeHarnessThemePreferenceViaSettings——菜单里那个主题入口的
-// 写路径。入口按 P8-D18 删掉之后它就没有调用者了，一并移除：DeepCode 现在只
+// 写路径。入口按 P8-D18 删掉之后它就没有调用者了，一并移除：DeepSeekGUI 现在只
 // 「读」官方的主题偏好、跟着它变，不再写它。切换由官方「外观」自己负责（D16 修好
 // 了回流，官方那边一改我们当场跟上）。
 
@@ -611,7 +611,7 @@ function showCloseToTrayNoticeOnce(): void {
   try {
     store.write({ ...state, closeToTrayNoticeAcknowledged: true })
   } catch (error) {
-    console.error(`[deepcode] UI 状态写入失败: ${String(error instanceof Error ? error.message : error)}`)
+    console.error(`[deepseekgui] UI 状态写入失败: ${String(error instanceof Error ? error.message : error)}`)
   }
   // 气泡是非阻断说明；即便显示失败，确认位已写，绝不反复骚扰。
   const dict = moduleDict()
@@ -704,7 +704,7 @@ app.on('before-quit', (event) => {
 
 app.setName(APP_NAME)
 
-// headless 诊断导出：`DeepCode.exe --export-diagnostics`。该模式绝不启动
+// headless 诊断导出：`DeepSeekGUI.exe --export-diagnostics`。该模式绝不启动
 // Harness/Profile/第三方插件/主窗口/tray、绝不监听 3080、绝不执行
 // plugin recovery 或 update——只把本地诊断证据组装成一个 bundle 并输出
 // 路径。单实例锁对它不适用：正在运行的实例与其并行导出只读证据无害。
@@ -723,7 +723,7 @@ if (userDataOverride !== '') {
 // 单实例：第二个实例立即退出，并把已有窗口带到前台。headless 导出模式
 // 不参与单实例语义（只读证据，不启动任何服务）——它连锁都不请求：请求
 // 本身就会在没有 GUI 在跑时**拿到**锁，导出的那几十秒内用户双击启动
-// DeepCode 会被判成第二实例而静默退出。而"GUI 起不来所以来导诊断"正是
+// DeepSeekGUI 会被判成第二实例而静默退出。而"GUI 起不来所以来导诊断"正是
 // 用户最可能同时再试一次启动的场景。
 const isPrimaryInstance = EXPORT_DIAGNOSTICS || app.requestSingleInstanceLock()
 if (!isPrimaryInstance) {
@@ -778,7 +778,7 @@ const service: {
  * 句末补一个句号——但只在它自己没有终止标点时（P8-D14）。
  *
  * 上游的 failure.message 有的自带句号、有的不带，而拼接处无条件补一个「。」，
- * 于是用户看到「…再重新启动 DeepCode。。请查看启动它的终端输出。」。
+ * 于是用户看到「…再重新启动 DeepSeekGUI。。请查看启动它的终端输出。」。
  * @param text - 待拼接的句子。
  * @returns 恰好一个终止标点的句子。
  */
@@ -829,7 +829,7 @@ const CLIENT_SETTLE_POLL_MS = 250
 const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
 /**
- * 等官方 UI 挂载 + DeepCode client 插件 settle（theme plugin 的 apply
+ * 等官方 UI 挂载 + DeepSeekGUI client 插件 settle（theme plugin 的 apply
  * 成功标记）。marker === false（插件激活失败）立即失败；超时失败。
  * 这是 boot 健康的一部分：HTTP 已回但 loader 拒绝 composition / 页面
  * 卡在 boot 时同样判失败，绝不让"坏插件"悄无声息地通过。
@@ -844,12 +844,12 @@ async function waitForClientSettle(view: WebContentsView): Promise<void> {
         `(() => {
           const root = document.getElementById('root')
           const mounted = root !== null && root.childElementCount > 0
-          const marker = window.__deepcodeClientSettled
+          const marker = window.__deepseekguiClientSettled
           return {
             mounted,
             settled: marker === true,
             failed: marker === false,
-            reason: marker === false ? (window.__deepcodeClientSettleReason ?? null) : null,
+            reason: marker === false ? (window.__deepseekguiClientSettleReason ?? null) : null,
           }
         })()`,
       ) as { mounted: boolean; settled: boolean; failed: boolean; reason: string | null }
@@ -859,11 +859,11 @@ async function waitForClientSettle(view: WebContentsView): Promise<void> {
     if (state !== null) {
       if (state.settled && state.mounted) return
       if (state.failed) {
-        throw new Error(`DeepCode client 插件激活失败：${state.reason ?? '未知原因'}`)
+        throw new Error(`DeepSeekGUI client 插件激活失败：${state.reason ?? '未知原因'}`)
       }
     }
     if (Date.now() >= deadline) {
-      throw new Error(`Client Loader 在 ${CLIENT_SETTLE_TIMEOUT_MS}ms 内未 settle（官方 UI 挂载或 DeepCode client 插件未就绪）`)
+      throw new Error(`Client Loader 在 ${CLIENT_SETTLE_TIMEOUT_MS}ms 内未 settle（官方 UI 挂载或 DeepSeekGUI client 插件未就绪）`)
     }
     await delay(CLIENT_SETTLE_POLL_MS)
   }
@@ -875,7 +875,7 @@ function createRuntimeAdapter(packaged: boolean, root: string): HarnessRuntimeAd
     async spawnProcess(selection) {
       if (await portInUse(DEFAULT_HOST, DEFAULT_PORT)) {
         throw new Error(
-          `本机端口 ${DEFAULT_PORT} 已被其他程序占用（例如已运行的 pnpm dsh web）。请先关闭占用该端口的程序，再重新启动 DeepCode。`,
+          `本机端口 ${DEFAULT_PORT} 已被其他程序占用（例如已运行的 pnpm dsh web）。请先关闭占用该端口的程序，再重新启动 DeepSeekGUI。`,
         )
       }
       const launch = resolveDshLaunch({
@@ -962,10 +962,10 @@ function createRuntimeAdapter(packaged: boolean, root: string): HarnessRuntimeAd
     async loadPage() {
       const view = compatView
       if (view === undefined) throw new Error(desktopLocaleZh() ? 'Compatibility View 不存在，无法加载页面' : 'The Compatibility View does not exist, so the page cannot be loaded')
-      // D39：控制桥参数只随 DeepCode 自己加载的页面下发（见 controlBridgeParam）。
-      const controlQuery = controlBridgeParam === undefined ? '' : `?deepcode-control=${encodeURIComponent(controlBridgeParam)}`
+      // D39：控制桥参数只随 DeepSeekGUI 自己加载的页面下发（见 controlBridgeParam）。
+      const controlQuery = controlBridgeParam === undefined ? '' : `?deepseekgui-control=${encodeURIComponent(controlBridgeParam)}`
       await view.webContents.loadURL(`http://${DEFAULT_HOST}:${DEFAULT_PORT}/${controlQuery}`)
-      // 下一代健康不能只看 HTTP：官方 UI 挂载 + DeepCode client 插件
+      // 下一代健康不能只看 HTTP：官方 UI 挂载 + DeepSeekGUI client 插件
       // settle（theme plugin 的 apply 成功标记）都必须成立。第三方坏插件
       // 会让 loader 拒绝整轮 composition 或卡在 boot——这条失败链正是
       // Plugin Mutation Recovery 要兜住的（P6 6.8）。
@@ -1019,7 +1019,7 @@ const pluginOperationInFlight = (): boolean =>
   pluginOperationHandle !== undefined
   || (pluginOperationView !== null && (pluginOperationView.step === 'running' || pluginOperationView.step === 'post-check'))
 
-// ---- Plugin Mutation Recovery 状态（journal 只存在 DeepCode userData） ----
+// ---- Plugin Mutation Recovery 状态（journal 只存在 DeepSeekGUI userData） ----
 
 /** 当前 recovery journal 的内存镜像；null = 无未决事务。 */
 let recoveryJournal: PluginRecoveryJournal | null = null
@@ -1027,13 +1027,13 @@ let recoveryJournal: PluginRecoveryJournal | null = null
 /** journal 读取失败时的一次性诊断（绝不因此挡任何功能）。 */
 let recoveryJournalError: string | null = null
 
-// ---- Update service 状态（main 单处持有；比较对象只能是 DeepCode app version） ----
+// ---- Update service 状态（main 单处持有；比较对象只能是 DeepSeekGUI app version） ----
 
 /** 更新通道配置文件（userData 下；缺失/损坏/非 https = unconfigured）。 */
-const UPDATE_FEED_FILENAME = 'deepcode-update-feed.json'
+const UPDATE_FEED_FILENAME = 'deepseekgui-update-feed.json'
 
 /** 当前版本装机时刻的记录（userData 下；见 {@link resolveInstallStamp}）。 */
-const INSTALL_STATE_FILENAME = 'deepcode-install-state.json'
+const INSTALL_STATE_FILENAME = 'deepseekgui-install-state.json'
 
 /** 装机时刻文本的进程内缓存（一次运行里恒定，见 {@link readInstallStampText}）。 */
 let installStampCache: string | null = null
@@ -1272,7 +1272,7 @@ let browserPaneCloseView: WebContentsView | undefined
 let browserPaneReady: Promise<void> | undefined
 
 /** 关闭钮点击的哨兵 URL：永不真实导航，will-navigate 拦截即收起。 */
-const BROWSER_PANE_CLOSE_SENTINEL = 'https://deepcode-browser-pane-close.invalid/'
+const BROWSER_PANE_CLOSE_SENTINEL = 'https://deepseekgui-browser-pane-close.invalid/'
 
 /** 关闭钮页面：透明底 + 半透明圆钮 ✕，hover 加深。 */
 const BROWSER_PANE_CLOSE_URL = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html>
@@ -1331,14 +1331,14 @@ function ensureBrowserPane(win: BrowserWindow): WebContentsView {
     webPreferences: {
       // 无 preload、无 node：这块 view 只渲染外部网页，与官方 view 同一
       // 安全姿势;操作全部经 CDP 从插件侧注入。
-      partition: 'deepcode-browser-pane',
+      partition: 'deepseekgui-browser-pane',
       sandbox: true,
     },
   })
   // 底色跟主题：写死白色会让深色主题下每次导航都闪一下白（2026-08-27 发布前排查）。
   view.setBackgroundColor(THEME_BACKGROUND[effectiveThemeNow])
   // 外部页面的 target=_blank / window.open 一律不许开原生窗口：默认行为会
-  // 弹出一扇 DeepCode 管不着的 BrowserWindow——用户拿到一扇没有关闭语义的
+  // 弹出一扇 DeepSeekGUI 管不着的 BrowserWindow——用户拿到一扇没有关闭语义的
   // 孤窗，而 agent 的 CDP 认领只盯这一块 view，等于当场失明（单标签不变式
   // 也随之失真）。改为在本 pane 内原地导航：仍走 pane session 的 SSRF 代理，
   // 与普通导航同一把关。
@@ -1517,7 +1517,7 @@ function createWindow(ui: DesktopUiStateV1): BrowserWindow {
 
   const moduleDir = dirname(fileURLToPath(import.meta.url))
 
-  // Compatibility View：未经篡改的官方 Web UI，绝不注入 DeepCode DOM。
+  // Compatibility View：未经篡改的官方 Web UI，绝不注入 DeepSeekGUI DOM。
   compatView = new WebContentsView({
     webPreferences: {
       contextIsolation: true,
@@ -1590,7 +1590,7 @@ function createWindow(ui: DesktopUiStateV1): BrowserWindow {
       store.write(nextWindowState(current, normal, win.isMinimized(), win.isMaximized()))
     } catch (error) {
       // UI 偏好写失败只记诊断，绝不挡退出或启动。
-      console.error(`[deepcode] UI 状态写入失败: ${String(error instanceof Error ? error.message : error)}`)
+      console.error(`[deepseekgui] UI 状态写入失败: ${String(error instanceof Error ? error.message : error)}`)
     }
   }
   let saveTimer: NodeJS.Timeout | undefined
@@ -1705,7 +1705,7 @@ function collectCrashDumpEvidence(userDataDir: string): {
  * @param root - 仓库根（打包态忽略）。
  * @returns 版本事实。
  */
-function readVersionInfo(packaged: boolean, root: string): DeepCodeVersionInfo {
+function readVersionInfo(packaged: boolean, root: string): DeepSeekGUIVersionInfo {
   try {
     return buildVersionInfo({
       packaged,
@@ -1717,7 +1717,7 @@ function readVersionInfo(packaged: boolean, root: string): DeepCodeVersionInfo {
       zh: desktopLocaleZh(),
     })
   } catch (error) {
-    console.error(`[deepcode] 版本事实读取失败，About 降级显示: ${String(error instanceof Error ? error.message : error)}`)
+    console.error(`[deepseekgui] 版本事实读取失败，About 降级显示: ${String(error instanceof Error ? error.message : error)}`)
     return {
       appVersion: packaged ? app.getVersion() : 'unknown',
       embeddedDshVersion: 'unknown',
@@ -1811,10 +1811,10 @@ function runHeadlessDiagnosticsExport(): void {
       writeFileSync(join(dir, name), content)
     }
     assertNotTimedOut()
-    console.log(`[deepcode] diagnostics bundle exported to ${dir}`)
+    console.log(`[deepseekgui] diagnostics bundle exported to ${dir}`)
     app.exit(0)
   } catch (error) {
-    console.error(`[deepcode] headless 诊断导出失败: ${String(error instanceof Error ? error.message : error)}`)
+    console.error(`[deepseekgui] headless 诊断导出失败: ${String(error instanceof Error ? error.message : error)}`)
     app.exit(1)
   }
 }
@@ -1824,7 +1824,7 @@ const PICKER_BRIDGE_PATH = '/pick'
 
 /**
  * D39 控制桥参数（`port.token`）：设置插件经 compat view 的页面 URL query
- * 拿到它。只有 DeepCode 自己加载的页面带这个参数——用户在外部浏览器打开
+ * 拿到它。只有 DeepSeekGUI 自己加载的页面带这个参数——用户在外部浏览器打开
  * 3080 时没有它，桌面控制分区于是不出现（那里本来也没有桌面可控）。
  */
 let controlBridgeParam: string | undefined
@@ -1833,7 +1833,7 @@ let controlBridgeParam: string | undefined
  * 目录选择桥：把官方 `host.pickDirectory` 落到宿主自己的系统对话框上（P8-D11）。
  *
  * 官方 native picker 在 Windows 上起的是 koffi 驱动的 COM 子进程，而它继承的
- * `process.execPath` 在打包态是 DeepCode.exe——worker 于是落在 Electron 的
+ * `process.execPath` 在打包态是 DeepSeekGUI.exe——worker 于是落在 Electron 的
  * Node realm 里 FATAL 崩溃，用户点「选择工作区」、选完目录，得到的是
  * "win32 folder dialog worker exited before reporting a result"，工作区根本
  * 选不了。我们的 picker 插件（overlay 里换掉官方那一行）不碰 koffi，改为请
@@ -1858,12 +1858,12 @@ async function startDirectoryPickerBridge(): Promise<void> {
       reply(404, { error: 'not found' })
       return
     }
-    if (request.headers['x-deepcode-picker-token'] !== token) {
+    if (request.headers['x-deepseekgui-picker-token'] !== token) {
       reply(404, { error: 'not found' })
       return
     }
     // 明确的标题有两个作用：用户看得懂自己在选什么（系统默认只写"打开"），
-    // 而验收侧也才分得清这个对话框是 DeepCode 弹的、还是别处来的。
+    // 而验收侧也才分得清这个对话框是 DeepSeekGUI 弹的、还是别处来的。
     void dialog.showOpenDialog({
       properties: ['openDirectory'],
       title: desktopLocaleZh() ? '选择工作区目录' : 'Select Workspace Directory',
@@ -1873,7 +1873,7 @@ async function startDirectoryPickerBridge(): Promise<void> {
         // 诊断（S12）：桥这一端是链路上唯一知道"系统对话框到底返回了什么"
         // 的地方。工作区建不起来时，先分清是这里就没拿到路径，还是拿到了
         // 而官方那边没接。
-        console.error(`[deepcode] picker bridge: ${result.canceled ? 'cancelled' : `picked ${String(result.filePaths.length)} path(s)`}`)
+        console.error(`[deepseekgui] picker bridge: ${result.canceled ? 'cancelled' : `picked ${String(result.filePaths.length)} path(s)`}`)
         reply(200, { path: chosen })
       },
       (error: unknown) => {
@@ -1889,8 +1889,8 @@ async function startDirectoryPickerBridge(): Promise<void> {
   const address = server.address()
   /* v8 ignore next 3 -- listening 之后 address() 必为 AddressInfo */
   if (address === null || typeof address === 'string') return
-  process.env.DEEPCODE_PICKER_ENDPOINT = `http://127.0.0.1:${address.port}${PICKER_BRIDGE_PATH}`
-  process.env.DEEPCODE_PICKER_TOKEN = token
+  process.env.DEEPSEEKGUI_PICKER_ENDPOINT = `http://127.0.0.1:${address.port}${PICKER_BRIDGE_PATH}`
+  process.env.DEEPSEEKGUI_PICKER_TOKEN = token
   // 桥不该拖住退出：它没有要 flush 的状态，进程该走就走。
   server.unref()
 }
@@ -1898,18 +1898,18 @@ async function startDirectoryPickerBridge(): Promise<void> {
 /**
  * 首次启动时，问用户要不要把他自己那套 DSH 的对话搬进来。
  *
- * 很多人装 DeepCode 之前机器上已经跑着官方 DSH。两者本来互不相干——我们自带
- * runtime、用自己的 Home——但他的历史都在那边，而新装的 DeepCode 是空的。
+ * 很多人装 DeepSeekGUI 之前机器上已经跑着官方 DSH。两者本来互不相干——我们自带
+ * runtime、用自己的 Home——但他的历史都在那边，而新装的 DeepSeekGUI 是空的。
  *
  * 无论他选哪个，都把权责说清楚：原件我们只读不删、留着不卸也没事、真正危险
- * 的是让两个程序写同一份数据，而那件事不是 DeepCode 造成的。凭据一律不搬，
+ * 的是让两个程序写同一份数据，而那件事不是 DeepSeekGUI 造成的。凭据一律不搬，
  * 让他自己重填一次——省他一次粘贴不值得我们去碰他的密钥文件。
- * @param targetHome - DeepCode 当前的 Home。
+ * @param targetHome - DeepSeekGUI 当前的 Home。
  */
 async function offerSessionImport(targetHome: string): Promise<void> {
   if (!shouldOfferImport(targetHome)) return
   const source = join(homedir(), '.dsh')
-  // 用户本来就把 DeepCode 指向了这个目录：没有"两套"，也没什么可搬的。
+  // 用户本来就把 DeepSeekGUI 指向了这个目录：没有"两套"，也没什么可搬的。
   if (resolve(source) === resolve(targetHome)) return
   const survey = surveyImportableSessions(source)
   if (survey === null) return
@@ -1920,15 +1920,15 @@ async function offerSessionImport(targetHome: string): Promise<void> {
       '注意：',
       '• 电脑原本的 DSH 数据保持不变——导入只是复制。',
       '• 请自行选择是否卸载原本的 DSH，如不卸载也没关系，两个程序互不干扰。',
-      '• 但请不要让两个程序同时用同一份数据（比如在 DeepCode 里把目录切到 DSH 的文件，或者在 DSH 打开 DeepCode 的工作区），两边会互相覆盖、出问题，该风险不是 DeepCode 带来的。',
-      '• API key 不会导入，请在 DeepCode 里重新填写。',
+      '• 但请不要让两个程序同时用同一份数据（比如在 DeepSeekGUI 里把目录切到 DSH 的文件，或者在 DSH 打开 DeepSeekGUI 的工作区），两边会互相覆盖、出问题，该风险不是 DeepSeekGUI 带来的。',
+      '• API key 不会导入，请在 DeepSeekGUI 里重新填写。',
     ]
     : [
       'Note:',
       '• The existing DSH data is unchanged — importing only copies it.',
       '• Whether to uninstall the existing DSH is up to you. Keeping both is fine; the two do not interfere.',
-      '• Do not point both programs at the same data (for example switching DeepCode to the DSH directory, or opening the DeepCode workspace in DSH). They will overwrite each other. This risk is not introduced by DeepCode.',
-      '• API keys are not imported. Please enter yours again in DeepCode.',
+      '• Do not point both programs at the same data (for example switching DeepSeekGUI to the DSH directory, or opening the DeepSeekGUI workspace in DSH). They will overwrite each other. This risk is not introduced by DeepSeekGUI.',
+      '• API keys are not imported. Please enter yours again in DeepSeekGUI.',
     ]
 
   if (!survey.importable) {
@@ -1939,8 +1939,8 @@ async function offerSessionImport(targetHome: string): Promise<void> {
       message: zh ? '找到已有对话，但本次无法导入' : 'Conversations found, but they cannot be imported',
       detail: [
         zh
-          ? `在 ${source} 找到 ${String(survey.count)} 个对话，但其存储格式（v${String(survey.formatVersion ?? -1)}）与 DeepCode 使用的（v${String(survey.supportedVersion)}）不一致，导入后无法打开，因此本次不导入。`
-          : `Found ${String(survey.count)} conversations in ${source}, but their storage format (v${String(survey.formatVersion ?? -1)}) does not match the one DeepCode uses (v${String(survey.supportedVersion)}). They would not open, so nothing is imported.`,
+          ? `在 ${source} 找到 ${String(survey.count)} 个对话，但其存储格式（v${String(survey.formatVersion ?? -1)}）与 DeepSeekGUI 使用的（v${String(survey.supportedVersion)}）不一致，导入后无法打开，因此本次不导入。`
+          : `Found ${String(survey.count)} conversations in ${source}, but their storage format (v${String(survey.formatVersion ?? -1)}) does not match the one DeepSeekGUI uses (v${String(survey.supportedVersion)}). They would not open, so nothing is imported.`,
         '',
         ...shared,
       ].join('\n'),
@@ -1956,8 +1956,8 @@ async function offerSessionImport(targetHome: string): Promise<void> {
     type: 'question',
     title: zh ? '检测到你电脑上已有 DSH' : 'An existing DSH was found',
     message: zh
-      ? `在 ${source} 找到 ${String(survey.count)} 个对话，要导入 DeepCode 吗？`
-      : `Found ${String(survey.count)} conversations in ${source}. Import them into DeepCode?`,
+      ? `在 ${source} 找到 ${String(survey.count)} 个对话，要导入 DeepSeekGUI 吗？`
+      : `Found ${String(survey.count)} conversations in ${source}. Import them into DeepSeekGUI?`,
     detail: shared.join('\n'),
     buttons: zh ? ['导入', '暂不导入'] : ['Import', 'Not now'],
     defaultId: 0,
@@ -1978,8 +1978,8 @@ async function offerSessionImport(targetHome: string): Promise<void> {
       message: zh ? '导入过程中出现错误' : 'An error occurred during the import',
       detail: [
         zh
-          ? '电脑原本的 DSH 数据未被改动。可以稍后重试，或跳过此步骤，不影响 DeepCode 使用。'
-          : 'The existing DSH data was not modified. You can retry later or skip this step; DeepCode works either way.',
+          ? '电脑原本的 DSH 数据未被改动。可以稍后重试，或跳过此步骤，不影响 DeepSeekGUI 使用。'
+          : 'The existing DSH data was not modified. You can retry later or skip this step; DeepSeekGUI works either way.',
         '',
         redactSecrets(String(error)),
       ].join('\n'),
@@ -1998,8 +1998,8 @@ async function offerSessionImport(targetHome: string): Promise<void> {
     detail: [
       ...result.skipped > 0
         ? [zh
-          ? `另有 ${String(result.skipped)} 个已跳过：DeepCode 中已存在相同对话，未做覆盖。`
-          : `${String(result.skipped)} were skipped: DeepCode already had conversations with those ids, and nothing was overwritten.`]
+          ? `另有 ${String(result.skipped)} 个已跳过：DeepSeekGUI 中已存在相同对话，未做覆盖。`
+          : `${String(result.skipped)} were skipped: DeepSeekGUI already had conversations with those ids, and nothing was overwritten.`]
         : [],
       zh
         ? '电脑原本的 DSH 数据未做任何改动。'
@@ -2015,7 +2015,7 @@ void app.whenReady().then(async () => {
   // 配置自检要早：网关地址配错时用户仍能本地导出反馈，但得先知道为什么
   // 提交按钮不见了。
   const gatewayWarning = feedbackGatewayConfigWarning(process.env)
-  if (gatewayWarning !== null) console.error(`[deepcode] ${gatewayWarning}`)
+  if (gatewayWarning !== null) console.error(`[deepseekgui] ${gatewayWarning}`)
   // headless：--export-diagnostics 分支——绝不启动 Harness/Profile/plugin/
   // window/tray/3080/update，只导本地诊断包后退出。
   if (EXPORT_DIAGNOSTICS) {
@@ -2070,14 +2070,14 @@ void app.whenReady().then(async () => {
     }))
   } catch (error) {
     // marker 写失败只记诊断：这条证据缺失绝不影响启动。
-    console.error(`[deepcode] active-run marker 写入失败: ${String(error instanceof Error ? error.message : error)}`)
+    console.error(`[deepseekgui] active-run marker 写入失败: ${String(error instanceof Error ? error.message : error)}`)
   }
   // 本地 Crashpad：只收集本地 dump、绝不上传（submitURL 置空 + 关闭
   // 自动上传）。dump 证据只进本机 diagnostics bundle。
   try {
     crashReporter.start({ uploadToServer: false, submitURL: '' })
   } catch (error) {
-    console.error(`[deepcode] crashReporter 启动失败（本地 dump 证据不可用）: ${String(error instanceof Error ? error.message : error)}`)
+    console.error(`[deepseekgui] crashReporter 启动失败（本地 dump 证据不可用）: ${String(error instanceof Error ? error.message : error)}`)
   }
   // PowerShell 7 只影响用户 Terminal 的推荐项（UX）：启动时探测一次，
   // 绝不参与 Agent sandbox 决策——Agent 的 PowerShell 始终走 Harness 的
@@ -2099,7 +2099,7 @@ void app.whenReady().then(async () => {
   uiStore = createUiStateStore(userDataDir, desktopLocaleZh)
   const uiResult = uiStore.read()
   if (uiResult.error !== null) {
-    console.error(`[deepcode] UI 状态损坏，已回退安全默认值: ${uiResult.error}`)
+    console.error(`[deepseekgui] UI 状态损坏，已回退安全默认值: ${uiResult.error}`)
   }
   // 系统主题变化时跟随（仅当偏好为 system 时才改变生效主题；始终推送
   // high contrast 状态）。Compatibility View 不受任何影响。
@@ -2289,7 +2289,7 @@ void app.whenReady().then(async () => {
         // 托盘入口 = Manual Check：打开更新面板展示结果。
         mainWindow?.show()
         mainWindow?.focus()
-        chromeView?.webContents.send('deepcode:open-update-panel')
+        chromeView?.webContents.send('deepseekgui:open-update-panel')
         await runCommand({ type: 'check-for-updates' })
         return
       case 'about':
@@ -2311,7 +2311,7 @@ void app.whenReady().then(async () => {
     const model = prebuilt ?? buildModel()
     const target = chromeView?.webContents
     if (target !== undefined && !target.isDestroyed()) {
-      target.send('deepcode:control-model-changed', model)
+      target.send('deepseekgui:control-model-changed', model)
     }
     // 背景页的启动态与胶囊同源（P8-D5）：同一个 model 推两处，不让它们各算各的。
     if (mainWindow !== undefined && !mainWindow.isDestroyed()) {
@@ -2381,11 +2381,11 @@ void app.whenReady().then(async () => {
    * @returns shim 目录绝对路径。
    */
   const ensureTerminalShims = (activeProfile: string): string => {
-    const dir = join(app.getPath('userData'), 'deepcode-bin')
+    const dir = join(app.getPath('userData'), 'deepseekgui-bin')
     mkdirSync(dir, { recursive: true })
     const devNode = process.env.npm_node_execpath ?? 'node'
     // npm 与 pnpm 都注入 npm_execpath，各自指向自己的入口：用 `npm run` 起
-    // DeepCode 时这里拿到的是 npm-cli.js，shim 会把 npm 当 pnpm 转发，终端里
+    // DeepSeekGUI 时这里拿到的是 npm-cli.js，shim 会把 npm 当 pnpm 转发，终端里
     // 敲 pnpm 实际跑的是 npm（P7-J 那个稳定红灯就是同一个成因）。只接受文件名
     // 确实是 pnpm 的入口；不认就当没有，落到下面那句明确的提示 shim。
     const injectedExecpath = process.env.npm_execpath
@@ -2394,7 +2394,7 @@ void app.whenReady().then(async () => {
       : undefined
     // dsh wrapper：main 进程（fs 已带 asar 补丁）从与 chrome/terminal 资产
     // 相同的锚（moduleDir → ../src/terminal/）读出内容，连同三个 .cmd 一起
-    // 写进 userData/deepcode-bin——shim 指向写出的真实文件。dev/packaged
+    // 写进 userData/deepseekgui-bin——shim 指向写出的真实文件。dev/packaged
     // 同一路径处理，消除形态分叉；纯 Node 模式的 shim 绝不依赖读 asar。
     const moduleDir = dirname(fileURLToPath(import.meta.url))
     const wrapperSource = join(moduleDir, '..', 'src', 'terminal', 'dsh-wrapper.cjs')
@@ -2417,7 +2417,7 @@ void app.whenReady().then(async () => {
       writeFileSync(join(dir, name), content)
     }
     if (!packaged && devPnpm === undefined) {
-      writeFileSync(join(dir, 'pnpm.cmd'), '@echo off\r\necho [deepcode] dev 模式下请经 pnpm script 启动 DeepCode\r\nexit /b 1\r\n')
+      writeFileSync(join(dir, 'pnpm.cmd'), '@echo off\r\necho [deepseekgui] dev 模式下请经 pnpm script 启动 DeepSeekGUI\r\nexit /b 1\r\n')
     }
     return dir
   }
@@ -2432,7 +2432,7 @@ void app.whenReady().then(async () => {
    *   host = ELECTRON_RUN_AS_NODE + runtime node-pty，xterm UI）。
    * - cwd 优先 active Profile 目录，不可用则 Harness Home（welcome 说明），
    *   绝不静默锚到 Electron install dir。
-   * - welcome 显示 DeepCode/DSH 版本、Active Profile、DSH_HOME 与私有
+   * - welcome 显示 DeepSeekGUI/DSH 版本、Active Profile、DSH_HOME 与私有
    *   Runtime 来源。
    */
   const openDshTerminal = (): void => {
@@ -2483,12 +2483,12 @@ void app.whenReady().then(async () => {
     }, localeOf())
 
     // Windows Terminal：独立系统终端窗口（exact argv 直 spawn）。
-    // welcome 经 deepcode-welcome.cmd（只含 echo 事实行）打印后交还交互；
+    // welcome 经 deepseekgui-welcome.cmd（只含 echo 事实行）打印后交还交互；
     // 承载 shell 用 System32 cmd（/k 是 cmd 的 argv 语义，避免 PowerShell
     // -Command 的 shell-string 违规）。启动后的真实失败（非零退出）明确
     // 报告，绝不 fallback 到别的宿主。
     if (shell.kind === 'external') {
-      const welcomeCmd = join(shimDir, 'deepcode-welcome.cmd')
+      const welcomeCmd = join(shimDir, 'deepseekgui-welcome.cmd')
       writeFileSync(
         welcomeCmd,
         welcomeLines.map(line => `echo ${line.replace(/[&|<>^%!]/g, '^$&')}`).join('\r\n') + '\r\n',
@@ -2531,7 +2531,7 @@ void app.whenReady().then(async () => {
     const win = new BrowserWindow({
       width: 900,
       height: 560,
-      title: 'DSH Terminal — DeepCode',
+      title: 'DSH Terminal — DeepSeekGUI',
       // 与主窗同款窗口图标（开发态否则是 Electron 默认原子）。
       icon: join(moduleDir, '..', 'src', 'chrome', 'icon.png'),
       // 固定深色；与 terminal/style.css 及 xterm 配色同值（原先三处
@@ -2544,7 +2544,7 @@ void app.whenReady().then(async () => {
         preload: join(moduleDir, 'terminal', 'preload.cjs'),
         // renderer 的退出消息按此选语言（P7-H：英文系统不再看到中文方块字）。
         additionalArguments: [
-          `--deepcode-locale=${desktopLocaleZh() ? 'zh' : 'en'}`,
+          `--deepseekgui-locale=${desktopLocaleZh() ? 'zh' : 'en'}`,
         ],
       },
     })
@@ -2565,7 +2565,7 @@ void app.whenReady().then(async () => {
         store.write({ ...store.read().state, terminalBounds: win.getContentBounds() })
       } catch (error) {
         // UI 偏好写失败只记诊断，绝不挡关窗。
-        console.error(`[deepcode] 终端窗几何写入失败: ${String(error instanceof Error ? error.message : error)}`)
+        console.error(`[deepseekgui] 终端窗几何写入失败: ${String(error instanceof Error ? error.message : error)}`)
       }
     })
     win.once('closed', () => {
@@ -2592,7 +2592,7 @@ void app.whenReady().then(async () => {
       command: hostCommand,
       args: hostArgs,
       // host 进程自己的 cwd 与用户终端的 cwd 是两回事：pty 的 cwd 走
-      // DEEPCODE_TERMINAL_CWD（terminal-host 里显式取用）。开发态 host 用
+      // DEEPSEEKGUI_TERMINAL_CWD（terminal-host 里显式取用）。开发态 host 用
       // `--import tsx/esm` 起源码，Node 按 host cwd 解析 'tsx'——cwd 落在
       // profile 目录时直接 ERR_MODULE_NOT_FOUND（2026-08-23 实机，D36 修好
       // 显示后现形），所以开发态必须以仓库根为 cwd；打包态维持原样。
@@ -2600,18 +2600,18 @@ void app.whenReady().then(async () => {
       env: {
         ...process.env,
         ...packaged ? { ELECTRON_RUN_AS_NODE: '1' } : {},
-        DEEPCODE_TERMINAL_DSH_HOME: dshHome,
-        DEEPCODE_TERMINAL_PATH: shimPath,
-        DEEPCODE_TERMINAL_WELCOME: welcomeLines.join('\n'),
-        DEEPCODE_TERMINAL_SHELL: shell.executable,
-        DEEPCODE_TERMINAL_SHELL_ARGS: JSON.stringify(shell.args),
-        DEEPCODE_TERMINAL_CWD: cwdChoice.cwd,
+        DEEPSEEKGUI_TERMINAL_DSH_HOME: dshHome,
+        DEEPSEEKGUI_TERMINAL_PATH: shimPath,
+        DEEPSEEKGUI_TERMINAL_WELCOME: welcomeLines.join('\n'),
+        DEEPSEEKGUI_TERMINAL_SHELL: shell.executable,
+        DEEPSEEKGUI_TERMINAL_SHELL_ARGS: JSON.stringify(shell.args),
+        DEEPSEEKGUI_TERMINAL_CWD: cwdChoice.cwd,
       },
       onOutput: (stream, text) => {
         if (win.isDestroyed()) return
 
         if (stream === 'stdout') {
-          win.webContents.send('deepcode-terminal:data', text)
+          win.webContents.send('deepseekgui-terminal:data', text)
           return
         }
         // stderr = JSON-lines 事件；非 JSON 行照实透传（已脱敏）。
@@ -2620,14 +2620,14 @@ void app.whenReady().then(async () => {
           try {
             const event = JSON.parse(line) as { event?: string; exitCode?: number | null; message?: string }
             if (event.event === 'exit') {
-              win.webContents.send('deepcode-terminal:exit', event.exitCode ?? null)
+              win.webContents.send('deepseekgui-terminal:exit', event.exitCode ?? null)
             } else if (event.event === 'error') {
-              win.webContents.send('deepcode-terminal:error', redactSecrets(event.message ?? ''))
+              win.webContents.send('deepseekgui-terminal:error', redactSecrets(event.message ?? ''))
             } else {
-              win.webContents.send('deepcode-terminal:data', line)
+              win.webContents.send('deepseekgui-terminal:data', line)
             }
           } catch {
-            win.webContents.send('deepcode-terminal:data', text)
+            win.webContents.send('deepseekgui-terminal:data', text)
             break
           }
         }
@@ -2636,10 +2636,10 @@ void app.whenReady().then(async () => {
         if (result.error !== undefined) {
           // 启动后的真实失败：明确报告（terminal UI 显示），绝不 fallback。
           if (!win.isDestroyed()) {
-            win.webContents.send('deepcode-terminal:error', redactSecrets(`终端启动失败: ${result.error}`))
+            win.webContents.send('deepseekgui-terminal:error', redactSecrets(`终端启动失败: ${result.error}`))
           }
         } else if (!win.isDestroyed()) {
-          win.webContents.send('deepcode-terminal:exit', result.exitCode)
+          win.webContents.send('deepseekgui-terminal:exit', result.exitCode)
         }
         terminalOperation = undefined
       },
@@ -2691,7 +2691,7 @@ void app.whenReady().then(async () => {
       return true
     } catch (error) {
       recoveryJournalError = redactSecrets(String(error instanceof Error ? error.message : error))
-      console.error(`[deepcode] recovery journal 写入失败: ${recoveryJournalError}`)
+      console.error(`[deepseekgui] recovery journal 写入失败: ${recoveryJournalError}`)
       return false
     }
   }
@@ -2722,7 +2722,7 @@ void app.whenReady().then(async () => {
       // 损坏的 journal 无法证明归属：按无未决事务处理并明确记录。
       recoveryJournal = null
       recoveryJournalError = redactSecrets(String(error instanceof Error ? error.message : error))
-      console.error(`[deepcode] recovery journal 损坏，按无未决事务处理: ${recoveryJournalError}`)
+      console.error(`[deepseekgui] recovery journal 损坏，按无未决事务处理: ${recoveryJournalError}`)
     }
   }
 
@@ -2777,10 +2777,10 @@ void app.whenReady().then(async () => {
         [
           zh ? '如果用户问起' : 'If the user asks',
           zh
-            ? '照上面的事实说明就好。这类失败不是 DeepCode 的故障，也不是助手的错，不需要道歉或替谁承担；'
-              + '恢复记录和快照都还在，可以告诉用户在 DeepCode 的设置页里恢复到这次操作之前的状态。'
-            : 'State the facts above as they are. This is not a DeepCode fault, and not something the assistant did wrong; there is nothing to apologise for. '
-              + 'The recovery record and snapshot are intact, so the user can restore the pre-operation state from the DeepCode settings page.',
+            ? '照上面的事实说明就好。这类失败不是 DeepSeekGUI 的故障，也不是助手的错，不需要道歉或替谁承担；'
+              + '恢复记录和快照都还在，可以告诉用户在 DeepSeekGUI 的设置页里恢复到这次操作之前的状态。'
+            : 'State the facts above as they are. This is not a DeepSeekGUI fault, and not something the assistant did wrong; there is nothing to apologise for. '
+              + 'The recovery record and snapshot are intact, so the user can restore the pre-operation state from the DeepSeekGUI settings page.',
         ],
       ],
     }, zh)
@@ -2843,8 +2843,8 @@ void app.whenReady().then(async () => {
         where,
         '',
         zh
-          ? '这已经是第三次了。你可以选择继续，但请先知道代价：这次安装如果失败或者被中断，DeepCode 没有办法帮你退回上一个状态，需要你自己处理 Profile 里的文件。'
-          : 'This is the third attempt. You may continue, but know the cost: if this install fails or is interrupted, DeepCode cannot roll the profile back for you — you will have to fix the files yourself.',
+          ? '这已经是第三次了。你可以选择继续，但请先知道代价：这次安装如果失败或者被中断，DeepSeekGUI 没有办法帮你退回上一个状态，需要你自己处理 Profile 里的文件。'
+          : 'This is the third attempt. You may continue, but know the cost: if this install fails or is interrupted, DeepSeekGUI cannot roll the profile back for you — you will have to fix the files yourself.',
       ].join('\n'),
     }).catch(() => ({ response: 1 }))
     return choice.response === 0
@@ -3038,17 +3038,17 @@ void app.whenReady().then(async () => {
           updatedAt: now(),
         }
         writeRecoveryJournal()
-        // DeepCode 自己动了用户 Profile 里的文件——这件事必须留下记录，
+        // DeepSeekGUI 自己动了用户 Profile 里的文件——这件事必须留下记录，
         // 否则用户看到文件内容变了却查不到是谁改的。
         appendDesktopEvent(journal.homePath, {
           at: formatStampLocal(now()),
-          title: zh ? 'DeepCode 自动恢复了插件配置文件' : 'DeepCode restored the plugin configuration automatically',
+          title: zh ? 'DeepSeekGUI 自动恢复了插件配置文件' : 'DeepSeekGUI restored the plugin configuration automatically',
           sections: [
             [
               zh ? '发生了什么' : 'What happened',
               zh
-                ? `上一次插件操作之后 Harness 起不来，DeepCode 把 Profile ${journal.profile} 的三个配置文件恢复到了操作之前的样子，然后重启验证通过。`
-                : `The harness failed to start after the last plugin operation, so DeepCode restored the three configuration files of profile ${journal.profile} to their pre-operation state and verified the restart.`,
+                ? `上一次插件操作之后 Harness 起不来，DeepSeekGUI 把 Profile ${journal.profile} 的三个配置文件恢复到了操作之前的样子，然后重启验证通过。`
+                : `The harness failed to start after the last plugin operation, so DeepSeekGUI restored the three configuration files of profile ${journal.profile} to their pre-operation state and verified the restart.`,
             ],
             [
               zh ? '用户的文件被改了吗' : 'Were the user files changed',
@@ -3059,8 +3059,8 @@ void app.whenReady().then(async () => {
             [
               zh ? '如果用户问起' : 'If the user asks',
               zh
-                ? '照实说明就好：这是 DeepCode 的自动恢复，只会发生一次，目的是让 Harness 能重新启动。用户之前装的那个插件没有装上。'
-                : 'State it plainly: this was DeepCode automatic recovery, it happens at most once, and its purpose was to get the harness starting again. The plugin the user tried to install is not installed.',
+                ? '照实说明就好：这是 DeepSeekGUI 的自动恢复，只会发生一次，目的是让 Harness 能重新启动。用户之前装的那个插件没有装上。'
+                : 'State it plainly: this was DeepSeekGUI automatic recovery, it happens at most once, and its purpose was to get the harness starting again. The plugin the user tried to install is not installed.',
             ],
           ],
         }, zh)
@@ -3112,8 +3112,8 @@ void app.whenReady().then(async () => {
         message: zh ? '恢复目标不是当前 Harness Home' : 'The recovery target is not the current Harness Home',
         detail: [
           zh
-            ? '这项待恢复的插件变更属于另一个 Harness Home。DeepCode 绝不会把它的快照写进当前 Home。'
-            : 'This pending plugin change belongs to a different Harness Home. DeepCode will never write its snapshot into the current Home.',
+            ? '这项待恢复的插件变更属于另一个 Harness Home。DeepSeekGUI 绝不会把它的快照写进当前 Home。'
+            : 'This pending plugin change belongs to a different Harness Home. DeepSeekGUI will never write its snapshot into the current Home.',
           '',
           `${zh ? '事务目标' : 'Transaction target'}：${journal.homePath}`,
           `${zh ? '当前 Home' : 'Current Home'}：${dshHome}`,
@@ -3147,7 +3147,7 @@ void app.whenReady().then(async () => {
       // 该组合可达（事务在 post-check 记录 hash 之前崩溃/被杀，boot 失败后
       // settle 置 recovery-needed 并写明"无法证明归属"）。缺少 post hash 时
       // 恢复计划的归属证明不成立——`?? {}` 降级虽不会误删（pre-absent 永不进
-      // remove 分支），却会把快照写回覆盖当前文件，等于绕过了"DeepCode 自己
+      // remove 分支），却会把快照写回覆盖当前文件，等于绕过了"DeepSeekGUI 自己
       // 发起、hash 能证明归属"的恢复前提。此处只给人工入口，绝不执行恢复。
       const choice = await dialog.showMessageBox({
         type: 'warning',
@@ -3225,8 +3225,8 @@ void app.whenReady().then(async () => {
           [
             zh ? '为什么没有恢复' : 'Why nothing was restored',
             zh
-              ? '继续恢复会用旧快照覆盖掉这些更新的改动。DeepCode 选择什么都不做，磁盘保持原样。'
-              : 'Restoring would have overwritten those newer changes with an old snapshot, so DeepCode did nothing and the disk is untouched.',
+              ? '继续恢复会用旧快照覆盖掉这些更新的改动。DeepSeekGUI 选择什么都不做，磁盘保持原样。'
+              : 'Restoring would have overwritten those newer changes with an old snapshot, so DeepSeekGUI did nothing and the disk is untouched.',
           ],
           [
             zh ? '如果用户问起' : 'If the user asks',
@@ -3611,7 +3611,7 @@ void app.whenReady().then(async () => {
         }
       } catch (error) {
         postHashesComplete = false
-        console.error(`[deepcode] post-operation hash 读取失败，journal 保持 running: ${redactSecrets(String(error instanceof Error ? error.message : error))}`)
+        console.error(`[deepseekgui] post-operation hash 读取失败，journal 保持 running: ${redactSecrets(String(error instanceof Error ? error.message : error))}`)
       }
       // 只有读全了才升 pending-verification。读不到就停在 running——
       // handoff 提示照常给（操作本身已经成功，用户仍需重启），少的只是
@@ -3681,7 +3681,7 @@ void app.whenReady().then(async () => {
 
   /**
    * Managed Home 的推荐默认：官方 permission service 存在但没有明确
-   * defaultPreset 时，在第一次真正启动 Agent session 前把 DeepCode 推荐
+   * defaultPreset 时，在第一次真正启动 Agent session 前把 DeepSeekGUI 推荐
    * 的 sandbox preset 写入官方 settings（唯一写路径）。只对 Managed Home
    * 生效；Existing Home 绝不静默改写。写入失败只记诊断——permission
    * service 的推断默认本身也是安全 preset，绝不因此降级到 Full Access。
@@ -3697,14 +3697,14 @@ void app.whenReady().then(async () => {
       ])
       await refreshPermissions()
     } catch (error) {
-      console.error(`[deepcode] 写入 Managed Home 推荐权限预设失败（官方推断默认仍生效）: ${String(error instanceof Error ? error.message : error)}`)
+      console.error(`[deepseekgui] 写入 Managed Home 推荐权限预设失败（官方推断默认仍生效）: ${String(error instanceof Error ? error.message : error)}`)
     }
   }
 
   /**
    * 切换权限模式：Full Access 必须显式风险确认；Existing Home 切回
    * Sandbox 也要先确认（会修改用户选择的现有 Harness 设置）。全部写入
-   * 走官方 settings service，绝不写 DeepCode 私有权限文件。
+   * 走官方 settings service，绝不写 DeepSeekGUI 私有权限文件。
    * @param mode - sandbox / full-access。
    */
   const runPermissionSwitch = async (mode: 'sandbox' | 'full-access'): Promise<void> => {
@@ -3718,8 +3718,8 @@ void app.whenReady().then(async () => {
         buttons: [zh ? '确定' : 'OK'],
         message: zh ? '权限控制当前不可用' : 'Permission controls are currently unavailable',
         detail: zh
-          ? '无法从 Harness 读取权限设置，DeepCode 不会在此时修改任何权限配置。'
-          : 'DeepCode could not read the permission settings from Harness and will not modify any permission configuration right now.',
+          ? '无法从 Harness 读取权限设置，DeepSeekGUI 不会在此时修改任何权限配置。'
+          : 'DeepSeekGUI could not read the permission settings from Harness and will not modify any permission configuration right now.',
       }).catch(() => undefined)
       return
     }
@@ -3859,7 +3859,7 @@ void app.whenReady().then(async () => {
   }
 
   /**
-   * 检查更新（Manual 与 background 共用）。比较对象只能是 DeepCode app
+   * 检查更新（Manual 与 background 共用）。比较对象只能是 DeepSeekGUI app
    * version。未配置公开 feed：Manual 明确显示"当前未配置公开更新通道"，
    * background 安静结束；网络错误 background 静默；只有 strictly newer
    * stable 才进入 available。
@@ -3909,7 +3909,7 @@ void app.whenReady().then(async () => {
     }
     const updateDir = join(userDataDir, 'updates')
     mkdirSync(updateDir, { recursive: true })
-    const destPath = join(updateDir, sanitizeAssetFilename(asset.filename) ?? 'DeepCode-Setup.exe')
+    const destPath = join(updateDir, sanitizeAssetFilename(asset.filename) ?? 'DeepSeekGUI-Setup.exe')
     // M2 single-slot 接线：目录内最多一份产物——新下载前清掉旧产物与
     // 旧 verified 记录；verified 成功后落盘记录，重启后可复用（同版本
     // 同 digest 跳过下载），绝不产生孤儿文件。
@@ -4013,8 +4013,8 @@ void app.whenReady().then(async () => {
             [
               zhUpdate ? '如果用户问起' : 'If the user asks',
               zhUpdate
-                ? '这多半是网络问题或更新服务器暂时不可达，不是 DeepCode 坏了，也不是用户做错了什么。现在的版本照常可用。'
-                : 'This is usually a network problem or a temporarily unreachable update server — DeepCode is not broken and the user did nothing wrong. The current version keeps working.',
+                ? '这多半是网络问题或更新服务器暂时不可达，不是 DeepSeekGUI 坏了，也不是用户做错了什么。现在的版本照常可用。'
+                : 'This is usually a network problem or a temporarily unreachable update server — DeepSeekGUI is not broken and the user did nothing wrong. The current version keeps working.',
             ],
           ],
         }, zhUpdate)
@@ -4240,7 +4240,7 @@ void app.whenReady().then(async () => {
 
   /** 首条诊断消息：系统上下文（模型不可见性靠正文说明）+ 用户问题 + 诊断包。 */
   const feedbackPromptText = (userText: string): string => [
-    '你是 DeepCode 的诊断助手。用户正在报告一个问题。',
+    '你是 DeepSeekGUI 的诊断助手。用户正在报告一个问题。',
     '以下是自动收集的诊断信息（已脱敏）。帮助用户准确描述问题，并生成一份适合提交到 GitHub issue 的报告。',
     '要求：你的回答第一行必须写 `**标题：** <一句话标题>`，空一行后写排查分析与建议的 issue 正文（正文里不要重复粘贴诊断包全文，用"诊断包已随 issue 附上"代替）。',
     // 以下两条是 P8-D30 加的，起因是住户实测：AI 洋洋洒洒写完一大篇，末尾却写
@@ -4439,11 +4439,11 @@ void app.whenReady().then(async () => {
         if (body !== null) {
           appendDesktopEvent(homePath, {
             at: formatStampLocal(new Date().toISOString()),
-            title: zhSkew ? 'DSH 包版本与 DeepCode 自带的不一致' : 'DSH package versions differ from the ones DeepCode ships',
+            title: zhSkew ? 'DSH 包版本与 DeepSeekGUI 自带的不一致' : 'DSH package versions differ from the ones DeepSeekGUI ships',
             sections: [[zhSkew ? '发生了什么' : 'What happened', body]],
           }, zhSkew)
         }
-        // 第二件事，主题不同所以单独记一条：DeepCode 对 Existing Home 一向
+        // 第二件事，主题不同所以单独记一条：DeepSeekGUI 对 Existing Home 一向
         // 只读，唯一的例外在上游 credentials-local——它认出旧版 flat 布局
         // 会就地改写（值不变，只换外层结构）。承诺过不改，就该在改之前把
         // 这一次说清楚，而不是让用户事后发现自己的文件被动过。
@@ -4539,7 +4539,7 @@ void app.whenReady().then(async () => {
         type: 'info',
         noLink: true,
         title: dictText(stringsFor(localeOf()), 'menu.about'),
-        message: `DeepCode ${versionInfo.appVersion}`,
+        message: `DeepSeekGUI ${versionInfo.appVersion}`,
         detail,
       }).catch(() => undefined)
     },
@@ -4557,7 +4557,7 @@ void app.whenReady().then(async () => {
           uiStore?.write({ ...ui, acknowledgedRecoveryHash: recoveryNotice.ackKey })
         } catch (error) {
           // 确认落盘失败只记诊断：同一条提示可能再次出现，无害。
-          console.error(`[deepcode] UI 状态写入失败: ${String(error instanceof Error ? error.message : error)}`)
+          console.error(`[deepseekgui] UI 状态写入失败: ${String(error instanceof Error ? error.message : error)}`)
         }
       }
       recoveryNotice = null
@@ -4697,11 +4697,11 @@ void app.whenReady().then(async () => {
   const fromChrome = (sender: Electron.WebContents): boolean =>
     chromeView !== undefined && sender.id === chromeView.webContents.id
 
-  ipcMain.handle('deepcode:get-control-model', (event) => {
+  ipcMain.handle('deepseekgui:get-control-model', (event) => {
     if (!fromChrome(event.sender)) throw new Error('拒绝：非 Desktop Chrome 来源')
     return buildModel()
   })
-  ipcMain.handle('deepcode:run-control-command', async (event, raw: unknown) => {
+  ipcMain.handle('deepseekgui:run-control-command', async (event, raw: unknown) => {
     const command = parseControlCommand(raw)
     if (command === null) throw new Error('拒绝：未知或非法的控制命令')
     // 浮动反馈层已删（P8-D13 终章）：控制命令重新只认 Desktop Chrome 一个来源。
@@ -4710,13 +4710,13 @@ void app.whenReady().then(async () => {
     }
     await runCommand(command)
   })
-  ipcMain.handle('deepcode:set-chrome-expanded', (event, expanded: unknown) => {
+  ipcMain.handle('deepseekgui:set-chrome-expanded', (event, expanded: unknown) => {
     if (!fromChrome(event.sender)) throw new Error('拒绝：非 Desktop Chrome 来源')
     chromeExpanded = expanded === true
     if (mainWindow !== undefined) layoutViews(mainWindow)
   })
 
-  // ---- D39 控制桥：官方设置页里的 DeepCode 分区（settings-plugin）→ main ----
+  // ---- D39 控制桥：官方设置页里的 DeepSeekGUI 分区（settings-plugin）→ main ----
   //
   // compat view 刻意无 preload（安全边界，不破），设置插件跑在官方页面里,
   // 唯一能走的通道是本机回环 HTTP——与目录选择桥同一个模式：端口只绑
@@ -4733,7 +4733,7 @@ void app.whenReady().then(async () => {
     const controlOrigin = `http://${DEFAULT_HOST}:${DEFAULT_PORT}`
     const corsHeaders = {
       'access-control-allow-origin': controlOrigin,
-      'access-control-allow-headers': 'content-type, x-deepcode-control-token',
+      'access-control-allow-headers': 'content-type, x-deepseekgui-control-token',
       'access-control-allow-methods': 'GET, POST, OPTIONS',
     }
     const controlServer = createServer((request, response) => {
@@ -4751,7 +4751,7 @@ void app.whenReady().then(async () => {
       // 两条通道各自一把钥匙：pane 路由认 browserPaneToken，其余认
       // controlToken（前者发给 agent 所在进程，绝不能开命令面的门）。
       const paneRoute = request.method === 'POST' && request.url === '/control/browser-pane'
-      if (request.headers['x-deepcode-control-token'] !== (paneRoute ? browserPaneToken : controlToken)) {
+      if (request.headers['x-deepseekgui-control-token'] !== (paneRoute ? browserPaneToken : controlToken)) {
         reply(404, { error: 'not found' })
         return
       }
@@ -4862,7 +4862,7 @@ void app.whenReady().then(async () => {
       // B3-11：桥地址+**pane 专用**凭证经 env 注入我们自己 spawn 的 DSH 子进程
       // （dsh-service 的 inheritedEnv 透传 process.env），browser-plugin 由此
       // 找到 pane 通道。只进子进程环境，不落盘、不进任何窗口。
-      process.env.DEEPCODE_BROWSER_BRIDGE = `127.0.0.1:${String(controlAddress.port)}#${browserPaneToken}`
+      process.env.DEEPSEEKGUI_BROWSER_BRIDGE = `127.0.0.1:${String(controlAddress.port)}#${browserPaneToken}`
     }
     controlServer.unref()
   }
@@ -4873,7 +4873,7 @@ void app.whenReady().then(async () => {
     terminalWindow !== undefined && sender.id === terminalWindow.webContents.id
 
 
-  ipcMain.handle('deepcode-terminal:send', (event, data: unknown) => {
+  ipcMain.handle('deepseekgui-terminal:send', (event, data: unknown) => {
     if (!fromTerminal(event.sender)) throw new Error('拒绝：非 DSH Terminal 来源')
     if (typeof data !== 'string') throw new Error('拒绝：非法终端输入')
     // 曾经的静默吞键点：host 不在时 optional chaining 把键入无声扔掉——
@@ -4887,7 +4887,7 @@ void app.whenReady().then(async () => {
   // P8-D47：renderer fit 出的真实尺寸 → 私有 OSC 帧走 host stdin →
   // host 剥帧调 pty.resize。pty 与 xterm 列数一致后 PSReadLine 的重绘
   // 定位才对得上（否则输入行叠影）。帧一次 write 写全，host 侧不拼接。
-  ipcMain.on('deepcode-terminal:resize', (event, cols: unknown, rows: unknown) => {
+  ipcMain.on('deepseekgui-terminal:resize', (event, cols: unknown, rows: unknown) => {
     if (!fromTerminal(event.sender)) return
     if (typeof cols !== 'number' || typeof rows !== 'number') return
     if (!Number.isInteger(cols) || !Number.isInteger(rows)) return
@@ -4904,7 +4904,7 @@ void app.whenReady().then(async () => {
   // 启动完成后结算恢复通知：上次失败已回退 LKG 且本次成功启动时提示一次。
   settleRecoveryNotice()
   // 权限事实：boot 完成后从官方 settings 读取并显示（fail closed）；Managed
-  // Home 无明确 preset 时补 DeepCode 推荐默认（官方唯一写路径，绝不暗改
+  // Home 无明确 preset 时补 DeepSeekGUI 推荐默认（官方唯一写路径，绝不暗改
   // Existing Home）。
   void refreshPermissions().then(() => ensureManagedPermissionDefault())
   // 插件事务结算：pending journal + 本次 boot 的结果 → verified（健康）或
@@ -4919,7 +4919,7 @@ void app.whenReady().then(async () => {
     const zhFail = desktopLocaleZh()
     const failedStage = status.failure.stage
     // 起不来这件事必须留下记录：这条路径有一半是直接退出的，用户下次开
-    // DeepCode 时想问"上次怎么回事"，DS 手里得有东西可看。
+    // DeepSeekGUI 时想问"上次怎么回事"，DS 手里得有东西可看。
     appendDesktopEvent(resolveHarnessHome(launcher.read().active.home, userDataDir), {
       at: formatStampLocal(new Date().toISOString()),
       title: zhFail ? 'Harness 没能启动' : 'The harness failed to start',
@@ -4927,8 +4927,8 @@ void app.whenReady().then(async () => {
         [
           zhFail ? '发生了什么' : 'What happened',
           zhFail
-            ? `DeepCode 启动内部服务时失败，卡在「${failedStage}」这一步：${redactSecrets(status.failure.message)}`
-            : `DeepCode failed to start its internal service, stopping at the "${failedStage}" stage: ${redactSecrets(status.failure.message)}`,
+            ? `DeepSeekGUI 启动内部服务时失败，卡在「${failedStage}」这一步：${redactSecrets(status.failure.message)}`
+            : `DeepSeekGUI failed to start its internal service, stopping at the "${failedStage}" stage: ${redactSecrets(status.failure.message)}`,
         ],
         [
           zhFail ? '这通常意味着什么' : 'What this usually means',
@@ -4947,10 +4947,10 @@ void app.whenReady().then(async () => {
         [
           zhFail ? '如果用户问起' : 'If the user asks',
           zhFail
-            ? '照上面的事实说明就好，这是 DeepCode 侧的启动问题，不是用户操作错误。'
-              + '如果刚装过插件，优先怀疑那次安装；DeepCode 的设置页里有恢复入口。'
-            : 'State the facts above. This is a DeepCode startup problem, not something the user did wrong. '
-              + 'If a plugin was installed recently, suspect that first; the DeepCode settings page offers a restore entry.',
+            ? '照上面的事实说明就好，这是 DeepSeekGUI 侧的启动问题，不是用户操作错误。'
+              + '如果刚装过插件，优先怀疑那次安装；DeepSeekGUI 的设置页里有恢复入口。'
+            : 'State the facts above. This is a DeepSeekGUI startup problem, not something the user did wrong. '
+              + 'If a plugin was installed recently, suspect that first; the DeepSeekGUI settings page offers a restore entry.',
         ],
       ],
     }, zhFail)
@@ -4966,7 +4966,7 @@ void app.whenReady().then(async () => {
       )
       return
     }
-    console.error(`[deepcode] Harness 启动失败，插件恢复需要人工处理（保持窗口存活）: ${status.failure.stage}: ${status.failure.message}`)
+    console.error(`[deepseekgui] Harness 启动失败，插件恢复需要人工处理（保持窗口存活）: ${status.failure.stage}: ${status.failure.message}`)
   }
   // 启动尾部只构建一份模型：先广播（此时托盘还没建），托盘建好后用
   // 同一份重建菜单。中间的 refresh-profiles 是异步的，其结果要到自己
@@ -5003,14 +5003,14 @@ void app.whenReady().then(async () => {
     const trayIcon = nativeImage.createFromPath(trayIconPath)
     if (trayIcon.isEmpty()) throw new Error(`托盘图标资产解码为空：${trayIconPath}`)
     tray = new Tray(trayIcon)
-    tray.setToolTip('DeepCode')
+    tray.setToolTip('DeepSeekGUI')
     tray.on('click', () => {
       mainWindow?.show()
       mainWindow?.focus()
     })
     rebuildTrayMenu(bootModel)
   } catch (error) {
-    console.error(`[deepcode] 系统托盘创建失败（常驻入口缺失，关窗后需重开快捷方式唤醒）: ${String(error instanceof Error ? error.message : error)}`)
+    console.error(`[deepseekgui] 系统托盘创建失败（常驻入口缺失，关窗后需重开快捷方式唤醒）: ${String(error instanceof Error ? error.message : error)}`)
   }
 
   // M2 single-slot 落盘恢复：重启后读 verified 记录（文件存在才恢复；
@@ -5041,7 +5041,7 @@ void app.whenReady().then(async () => {
   }
 
   if (SMOKE) {
-    console.log('[deepcode] window loaded')
+    console.log('[deepseekgui] window loaded')
     // smoke：跳过常驻与确认流程，直接真实关窗退出。
     quitting = true
     win.close()

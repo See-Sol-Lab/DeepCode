@@ -1,7 +1,7 @@
 /**
  * Permission-gate matrix tests (菲博 §7.3.2): read-only session × every tool
  * allow/deny table, L2 through approval, approval missing fails closed.
- * @module @see-sol-lab/deepcode-browser/tests/gate
+ * @module @see-sol-lab/deepseekgui-browser/tests/gate
  */
 
 import { describe, expect, it } from 'vitest'

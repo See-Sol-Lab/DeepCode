@@ -6,14 +6,14 @@
  * confirm/cancel/spawn failure、orderly cleanup 全部有行为级测试。
  *
  * 铁律：
- * - 比较对象只能是 DeepCode app version；
+ * - 比较对象只能是 DeepSeekGUI app version；
  * - manifest 抓取经 {@link fetchManifestText}（非 2xx/重定向/超大小/取消
  *   全部明确报错）；
  * - 下载上限 = min(asset.size, UPDATE_SIZE_LIMIT)，结束时比对实际字节数；
  * - digest 不匹配绝不执行；
  * - handoff 先 spawn 确认成功，失败时当前应用保持可用。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/update-runner
+ * @module @see-sol-lab/deepseekgui/update-runner
  */
 
 import { closeSync, openSync, unlinkSync, writeSync } from 'node:fs'
@@ -94,12 +94,12 @@ export type CheckOutcome =
   | { kind: 'error'; message: string }
 
 /**
- * 检查更新：比较对象只能是 DeepCode app version。未配置 → unconfigured；
+ * 检查更新：比较对象只能是 DeepSeekGUI app version。未配置 → unconfigured；
  * 网络/解析错误 → error（消息可重试）；只有 strictly newer stable 才
  * available。
  * @param deps - 注入面。
  * @param feedUrl - 配置的 feed URL（null = 未配置）。
- * @param currentVersion - 当前 DeepCode app version。
+ * @param currentVersion - 当前 DeepSeekGUI app version。
  * @returns 判定。
  */
 export async function runUpdateCheck(

@@ -2,7 +2,7 @@
  * feedback-issue 单测：标题提取（AI 格式 / 回退截断 / 双空回退）、正文
  * 模板（AI 路径含排查节 / 降级路径恰为静态模板）、GitHub URL 组装与
  * 编码。零后端零 Token：正文走剪贴板（本模块只产出文本）。
- * @module @see-sol-lab/deepcode/tests/feedback-issue
+ * @module @see-sol-lab/deepseekgui/tests/feedback-issue
  */
 
 import { describe, expect, it } from 'vitest'
@@ -20,7 +20,7 @@ const input = (overrides: Partial<FeedbackIssueInput> = {}): FeedbackIssueInput 
   homeKind: 'managed',
   userText: '保存的时候没反应，点了三次都没反应',
   reply: null,
-  diagnostics: 'DeepCode: 1.0.0\nLog tail: nothing interesting',
+  diagnostics: 'DeepSeekGUI: 1.0.0\nLog tail: nothing interesting',
   ...overrides,
 })
 
@@ -43,7 +43,7 @@ describe('issueTitle', () => {
   })
 
   it('用户文本也空 → 固定回退标题（跳转绝不被标题卡死）', () => {
-    expect(issueTitle(null, '   ')).toBe('DeepCode bug report')
+    expect(issueTitle(null, '   ')).toBe('DeepSeekGUI bug report')
   })
 })
 
@@ -51,14 +51,14 @@ describe('buildIssueBody', () => {
   it('降级路径（reply=null）：静态模板，字段与 bug_report.md 一致，无 AI 节', () => {
     const body = buildIssueBody(input())
     expect(body).toContain('## Bug Report')
-    expect(body).toContain('**DeepCode Version:** 1.0.0')
+    expect(body).toContain('**DeepSeekGUI Version:** 1.0.0')
     expect(body).toContain('**DSH Version:** 0.1.0-rc.5')
     expect(body).toContain('**Windows Version:** Windows 11 Home')
     expect(body).toContain('**Home Type:** Managed')
     expect(body).toContain('### What happened')
     expect(body).toContain('保存的时候没反应，点了三次都没反应')
     expect(body).toContain('### Diagnostics')
-    expect(body).toContain('DeepCode: 1.0.0')
+    expect(body).toContain('DeepSeekGUI: 1.0.0')
     expect(body).not.toContain('### AI 排查摘要')
   })
 

@@ -1,11 +1,11 @@
-// DeepCode 设置分区的客户端产物（P8-D39）。
+// DeepSeekGUI 设置分区的客户端产物（P8-D39）。
 //
 // **形状是官方 client 运行时的契约**（与 theme-plugin 同则）：产物必须经
 // window.__ModuleLoader__ 自注册，factory 收到 loader 的 require，从中取
 // react 与官方服务。手写产物，不接打包器；改动前对照
 // packages/client/ui-settings 的 slot 契约（settings.section）。
 //
-// 职责：在官方设置页注册两个 DeepCode 分区——「Harness（桌面）」与
+// 职责：在官方设置页注册两个 DeepSeekGUI 分区——「Harness（桌面）」与
 // 「插件管理（本地）」。分区内一切动作经本机回环控制桥（main 的
 // /control/model、/control/command）回到与 Chrome 菜单同一个命令出口，
 // 没有第二事实源。页面 URL 没有控制桥参数（外部浏览器打开 3080）时，
@@ -13,7 +13,7 @@
 //
 // 文案字典集中在 STRINGS（zh/en 同键；D29 双语化时英文由 DS 重审）。
 window.__ModuleLoader__.load({
-  id: '@see-sol-lab/deepcode-settings',
+  id: '@see-sol-lab/deepseekgui-settings',
   factory: (require) => {
     var module = { exports: {} }
     var exports = module.exports
@@ -23,14 +23,14 @@ window.__ModuleLoader__.load({
     var h = React.createElement
 
     /** 本插件的 locale namespace（官方 locale 服务按 NS 分发字典）。 */
-    var NS = 'deepcode.desktop'
+    var NS = 'deepseekgui.desktop'
 
     var STRINGS = {
       zh: {
         'nav.harness': 'Harness（桌面）',
         'nav.plugins': '插件管理（本地）',
         'browser.toggle': '浏览器面板',
-        'bridge.error': '无法连接 DeepCode 桌面控制通道：',
+        'bridge.error': '无法连接 DeepSeekGUI 桌面控制通道：',
         'bridge.loading': '正在读取桌面状态…',
         'busy': '执行中…',
         'harness.status': '运行状态',
@@ -145,7 +145,7 @@ window.__ModuleLoader__.load({
         'nav.harness': 'Harness (Desktop)',
         'nav.plugins': 'Plugins (Local)',
         'browser.toggle': 'Browser Panel',
-        'bridge.error': 'Could not reach the DeepCode desktop control channel: ',
+        'bridge.error': 'Could not reach the DeepSeekGUI desktop control channel: ',
         'bridge.loading': 'Loading desktop state…',
         'busy': 'Working…',
         'harness.status': 'Status',
@@ -256,7 +256,7 @@ window.__ModuleLoader__.load({
     // ---- 控制桥（main 的回环 HTTP；参数经页面 URL 下发，见 main.ts D39 段） ----
 
     function readBridge() {
-      var match = /[?&]deepcode-control=([^&#]+)/.exec(window.location.search)
+      var match = /[?&]deepseekgui-control=([^&#]+)/.exec(window.location.search)
       if (match === null) return null
       var value = decodeURIComponent(match[1])
       var dot = value.indexOf('.')
@@ -266,14 +266,14 @@ window.__ModuleLoader__.load({
       var base = 'http://127.0.0.1:' + port
       return {
         async model() {
-          var r = await fetch(base + '/control/model', { headers: { 'x-deepcode-control-token': token } })
+          var r = await fetch(base + '/control/model', { headers: { 'x-deepseekgui-control-token': token } })
           if (!r.ok) throw new Error('HTTP ' + String(r.status))
           return (await r.json()).model
         },
         async run(command) {
           var r = await fetch(base + '/control/command', {
             method: 'POST',
-            headers: { 'content-type': 'application/json', 'x-deepcode-control-token': token },
+            headers: { 'content-type': 'application/json', 'x-deepseekgui-control-token': token },
             body: JSON.stringify({ command: command }),
           })
           var body = await r.json().catch(function () { return {} })
@@ -321,18 +321,18 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * 分区里的按钮。`props.testId` 会落成 `data-deepcode` 属性——打包 e2e
+     * 分区里的按钮。`props.testId` 会落成 `data-deepseekgui` 属性——打包 e2e
      * 的唯一稳定抓手：文案随 locale 变、样式是内联对象、类名没有，只有这个
      * 属性是契约。加新按钮时请一并给 testId（tests-e2e/chrome-driver.ts 的
-     * clickDeepCodeButton 按它定位）。
+     * clickDeepSeekGUIButton 按它定位）。
      */
     function btn(props, label) {
       var disabled = props.disabled === true
       var style = Object.assign({}, S.button, props.active === true ? S.buttonActive : null, disabled ? S.buttonDisabled : null)
       return h('button', {
         type: 'button', style: style, disabled: disabled, key: props.key,
-        'data-deepcode': props.testId,
-        'data-deepcode-active': props.active === true ? 'true' : undefined,
+        'data-deepseekgui': props.testId,
+        'data-deepseekgui-active': props.active === true ? 'true' : undefined,
         onClick: disabled ? undefined : props.onClick,
       }, label)
     }
@@ -361,7 +361,7 @@ window.__ModuleLoader__.load({
     }
 
     function line(label, value, title, colon, testId) {
-      return h('div', { style: S.row, 'data-deepcode': testId },
+      return h('div', { style: S.row, 'data-deepseekgui': testId },
         h('span', { style: S.title }, label + colon),
         h('span', { style: Object.assign({}, S.value), title: title }, value))
     }
@@ -450,7 +450,7 @@ window.__ModuleLoader__.load({
 
         var recovery = null
         if (m.recovery !== null) {
-          recovery = labeled(t, 'recovery.title', h('div', { style: S.group, 'data-deepcode': 'harness-recovery' },
+          recovery = labeled(t, 'recovery.title', h('div', { style: S.group, 'data-deepseekgui': 'harness-recovery' },
             h('div', { style: S.note }, t('recovery.stage') + '：' + m.recovery.stage),
             h('div', { style: S.note }, t('recovery.message') + '：' + m.recovery.message),
             h('div', { style: S.note }, t('recovery.recovered-to') + '：' + m.recovery.recoveredTo)))
@@ -468,10 +468,10 @@ window.__ModuleLoader__.load({
               m.permissions.mode !== 'sandbox' && m.permissions.mode !== 'full-access' && m.permissions.preset !== null
                 ? h('span', { style: S.note }, m.permissions.mode + ' · ' + m.permissions.preset)
                 : null),
-            // 「你当前没在用推荐预设」——这句是 DeepCode 独有的提醒（官方那边
+            // 「你当前没在用推荐预设」——这句是 DeepSeekGUI 独有的提醒（官方那边
             // 不会说），面板迁进设置页时跟着旧 renderer 一起丢了，补回来。
             m.permissions.mode !== 'sandbox' && m.permissions.mode !== 'unavailable'
-              ? h('div', { style: S.error, 'data-deepcode': 'permission-not-recommended' }, t('permission.not-recommended'))
+              ? h('div', { style: S.error, 'data-deepseekgui': 'permission-not-recommended' }, t('permission.not-recommended'))
               : null)
         }
 
@@ -480,7 +480,7 @@ window.__ModuleLoader__.load({
           // 只陈述事实与后果，不提供"一键清理"——删的是用户自己的对话，
           // 该由他在官方界面里逐个决定，而不是我们代劳。
           m.sessionPressure !== null
-            ? h('div', { style: S.warnBox, 'data-deepcode': 'session-pressure' }, t('sessions.warn'))
+            ? h('div', { style: S.warnBox, 'data-deepseekgui': 'session-pressure' }, t('sessions.warn'))
             : null,
           d.error !== null ? h('div', { style: S.error }, t('bridge.error'), d.error) : null,
           busy ? h('div', { style: S.note }, t('busy')) : null,
@@ -492,10 +492,10 @@ window.__ModuleLoader__.load({
           labeled(t, 'harness.permission', permission),
           // PS7 只影响用户自己的终端，绝不影响 Agent sandbox（P6-E）——提示
           // 随面板迁移丢过一次，补回来并让 powerShell7Available 重新有消费者。
-          m.powerShell7Available === false ? h('div', { style: S.note, 'data-deepcode': 'term-ps7-note' }, t('term.ps7.note')) : null,
+          m.powerShell7Available === false ? h('div', { style: S.note, 'data-deepseekgui': 'term-ps7-note' }, t('term.ps7.note')) : null,
           candidate,
           recovery,
-          // 终端入口刻意不在这里（住户定）：DSH 终端留在左上角 DeepCode 菜单。
+          // 终端入口刻意不在这里（住户定）：DSH 终端留在左上角 DeepSeekGUI 菜单。
           h('div', { style: Object.assign({}, S.row, { flexWrap: 'wrap' }) },
             btn({ testId: 'harness-refresh', disabled: busy, onClick: function () { d.run({ type: 'refresh-profiles' }) } }, t('action.refresh')),
             btn({ testId: 'harness-restart', disabled: busy, onClick: function () { d.run({ type: 'restart-harness' }) } }, t('action.restart')),
@@ -530,7 +530,7 @@ window.__ModuleLoader__.load({
         // 验证中**挡住新请求，终态（done/failed/cancelled）允许发起下一次
         // （main 的原话：「终态允许开始下一次操作（先清掉旧视图）」）。
         // 写成 `operation === null` 会把「这一轮里操作过一次」也算成忙——
-        // 装完一个插件想再装或删第二个时，执行钮是灰的，只能重启 DeepCode。
+        // 装完一个插件想再装或删第二个时，执行钮是灰的，只能重启 DeepSeekGUI。
         // P8-D39 迁移时收严了这个条件；同一段里取消钮用的判据反而是对的。
         // 2026-08-24 由 plugin-manager 的 remove 步骤抓出（60 秒等满，执行钮
         // 始终禁用）。
@@ -543,13 +543,13 @@ window.__ModuleLoader__.load({
           var op = pm.operation
           var running = op.step === 'running' || op.step === 'post-check'
           opBlock = h('div', { style: S.group },
-            h('div', { style: S.row, 'data-deepcode': 'plugin-operation' },
+            h('div', { style: S.row, 'data-deepseekgui': 'plugin-operation' },
               h('span', null, t('plugins.action.' + op.action) + ' · ' + op.profile + (op.spec === null ? '' : ' · ' + op.spec)),
               h('span', { style: S.note }, t('plugins.step.' + op.step)),
               running ? btn({ testId: 'plugin-op-cancel', disabled: busy, onClick: function () { d.run({ type: 'plugin-op-cancel' }) } }, t('plugins.cancel')) : null),
             op.message !== null ? h('div', { style: S.note }, op.message) : null,
             op.postCheck !== null ? h('div', { style: S.note }, op.postCheck.evidence) : null,
-            op.output.length > 0 ? h('pre', { style: S.output, 'data-deepcode': 'plugin-operation-output' }, op.output.join('\n')) : null)
+            op.output.length > 0 ? h('pre', { style: S.output, 'data-deepseekgui': 'plugin-operation-output' }, op.output.join('\n')) : null)
         }
 
         var handoff = null
@@ -566,7 +566,7 @@ window.__ModuleLoader__.load({
           var recoveryKey = pm.recovery.state === 'drift' ? 'plugins.recovery.drift'
             : pm.recovery.state === 'recovery-needed' ? 'plugins.recovery.needed'
               : pm.recovery.state === 'recovered' ? 'plugins.recovery.recovered' : 'plugins.recovery.pending'
-          recovery = h('div', { style: S.group, 'data-deepcode': 'plugin-recovery-block' },
+          recovery = h('div', { style: S.group, 'data-deepseekgui': 'plugin-recovery-block' },
             h('div', { style: S.error }, t(recoveryKey) + '（' + pm.recovery.profile + '）'),
             pm.recovery.failure !== null ? h('div', { style: S.note }, pm.recovery.failure) : null,
             h('div', { style: Object.assign({}, S.row, { flexWrap: 'wrap' }) },
@@ -589,7 +589,7 @@ window.__ModuleLoader__.load({
         } else {
           inventory = pm.profiles.map(function (entry) {
             var deps = entry.inventory.dependencies
-            return h('div', { style: S.group, key: entry.name, 'data-deepcode': 'plugin-inventory-' + entry.name },
+            return h('div', { style: S.group, key: entry.name, 'data-deepseekgui': 'plugin-inventory-' + entry.name },
               h('div', { style: S.title }, entry.name + (entry.name === m.activeProfile ? ' ✓' : '')),
               entry.inventory.manifestError !== null ? h('div', { style: S.error }, entry.inventory.manifestError) : null,
               deps.length === 0
@@ -614,7 +614,7 @@ window.__ModuleLoader__.load({
             ? h('div', { style: S.group },
               h('div', { style: S.note }, t('plugins.spec.hint')),
               h('input', {
-                style: S.input, 'data-deepcode': 'plugin-spec', value: spec, placeholder: t('plugins.spec.placeholder'),
+                style: S.input, 'data-deepseekgui': 'plugin-spec', value: spec, placeholder: t('plugins.spec.placeholder'),
                 onChange: function (event) { setSpec(event.target.value) },
               }),
               // 住户 2026-08-27 定的「矛盾转移」：与其在这里教用户 pnpm 的写法，
@@ -627,7 +627,7 @@ window.__ModuleLoader__.load({
             btn({ testId: 'plugin-run', disabled: !canRun, onClick: function () {
               d.run({ type: 'plugin-op-request', action: action, profile: effectiveTarget, spec: needsSpec ? spec.trim() : null })
             } }, t('plugins.run'))),
-          h('div', { style: S.note, 'data-deepcode': 'plugin-verify-note' }, t('plugins.verify-note')),
+          h('div', { style: S.note, 'data-deepseekgui': 'plugin-verify-note' }, t('plugins.verify-note')),
           opBlock,
           handoff,
           recovery,
@@ -684,7 +684,7 @@ window.__ModuleLoader__.load({
           h('div', { style: S.group },
             h('div', { style: S.title }, t('fb.prompt')),
             h('textarea', {
-              'data-deepcode': 'feedback-text',
+              'data-deepseekgui': 'feedback-text',
               style: Object.assign({}, S.input, { minHeight: '72px', resize: 'vertical', fontFamily: 'inherit' }),
               value: text, placeholder: t('fb.placeholder'),
               onChange: function (event) { setText(event.target.value) },
@@ -697,14 +697,14 @@ window.__ModuleLoader__.load({
             h('summary', { style: S.title }, t('fb.diagnostics')),
             h('div', { style: S.note }, t('fb.diagnostics.note')),
             h('textarea', {
-              'data-deepcode': 'feedback-diagnostics',
+              'data-deepseekgui': 'feedback-diagnostics',
               style: Object.assign({}, S.input, { minHeight: '120px', resize: 'vertical', fontFamily: 'var(--dsw-font-family-mono, monospace)' }),
               value: diagValue,
               onChange: function (event) { setDiagDraft(event.target.value) },
             })),
           result,
           h('div', { style: S.group },
-            h('div', { style: S.title, 'data-deepcode': 'diag-build-info' }, t('diag.build-info')),
+            h('div', { style: S.title, 'data-deepseekgui': 'diag-build-info' }, t('diag.build-info')),
             // exportOnly 的行只进导出文本，不上界面（更新通道那种「我们的
             // 发行事实」对用户没有可操作性）。标签与部分值走字典；字典缺
             // 键时回退英文 label，宁可露一行英文也不显示一个裸键。
@@ -729,13 +729,13 @@ window.__ModuleLoader__.load({
     /** 装载：控制桥参数在场才注册分区（外部浏览器打开 3080 时不在场）。 */
     var inject = ['slots', 'locale']
     function apply(ctx) {
-      // 整体兜底：本插件坏了只能表现为「设置页少了 DeepCode 分区」，绝不许
+      // 整体兜底：本插件坏了只能表现为「设置页少了 DeepSeekGUI 分区」，绝不许
       // 把整轮 composition 拖死在 boot（D31 的失败形状）。Chrome 菜单是同一
       // 命令出口的另一入口，功能不因此丢失。
       try {
         applyInner(ctx)
       } catch (error) {
-        console.error('[deepcode-settings] apply failed: ' + String(error && error.message || error))
+        console.error('[deepseekgui-settings] apply failed: ' + String(error && error.message || error))
       }
     }
     /**
@@ -782,7 +782,7 @@ window.__ModuleLoader__.load({
     function applyInner(ctx) {
       var bridge = readBridge()
       if (bridge === null) return
-      ctx.effect(function () { return ctx.locale.register(NS, STRINGS) }, 'deepcode-settings: dictionaries')
+      ctx.effect(function () { return ctx.locale.register(NS, STRINGS) }, 'deepseekgui-settings: dictionaries')
       var t = ctx.locale.bind(NS)
       var HarnessSection = makeHarnessSection(bridge)
       var PluginsSection = makePluginsSection(bridge)
@@ -790,7 +790,7 @@ window.__ModuleLoader__.load({
       ctx.slots.inject('settings.section', function () {
         return ctx.slots.register({
           name: 'settings.section',
-          id: 'deepcode-harness',
+          id: 'deepseekgui-harness',
           order: 40,
           label: function () { return t('nav.harness') },
           locale: NS,
@@ -799,7 +799,7 @@ window.__ModuleLoader__.load({
       ctx.slots.inject('settings.section', function () {
         return ctx.slots.register({
           name: 'settings.section',
-          id: 'deepcode-plugins',
+          id: 'deepseekgui-plugins',
           order: 41,
           label: function () { return t('nav.plugins') },
           locale: NS,
@@ -808,7 +808,7 @@ window.__ModuleLoader__.load({
       ctx.slots.inject('settings.section', function () {
         return ctx.slots.register({
           name: 'settings.section',
-          id: 'deepcode-feedback',
+          id: 'deepseekgui-feedback',
           order: 42,
           label: function () { return t('nav.feedback') },
           locale: NS,
@@ -819,7 +819,7 @@ window.__ModuleLoader__.load({
       ctx.slots.inject('conversation.session.header.utilities', function () {
         return ctx.slots.register({
           name: 'conversation.session.header.utilities',
-          id: 'deepcode-browser-pane',
+          id: 'deepseekgui-browser-pane',
           order: 110,
           label: function () { return t('browser.toggle') },
           locale: NS,

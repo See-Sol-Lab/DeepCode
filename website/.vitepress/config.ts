@@ -205,7 +205,7 @@ const base = process.env.DOCS_BASE ?? '/'
 
 /** Site identity shared by the VitePress configuration and the llms.txt index. */
 const siteIdentity = {
-  title: 'DeepCode',
+  title: 'DeepSeekGUI',
   description: 'A DeepSeek-native Agent Workbench for Windows, powered by DeepSeek Harness.',
 }
 
@@ -221,9 +221,9 @@ const siteIdentity = {
  * stay behind a query only Firefox answers.
  */
 const siteStyle = `
-.deepcode-lockup { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
-.deepcode-name { color: var(--vp-c-text-1); font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
-.deepcode-tag {
+.deepseekgui-lockup { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.deepseekgui-name { color: var(--vp-c-text-1); font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+.deepseekgui-tag {
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--vp-c-brand-soft);
@@ -274,7 +274,7 @@ const scrollbarScript = `
 `
 
 /**
- * Navigation-bar title: the DeepCode product name and release tag. VitePress
+ * Navigation-bar title: the DeepSeekGUI product name and release tag. VitePress
  * renders `siteTitle` as HTML; the text lockup keeps the site independent of
  * theme-specific image assets and the upstream DeepSeek wordmark.
  *
@@ -282,7 +282,7 @@ const scrollbarScript = `
  * @returns Markup placed beside the navigation-bar home link.
  */
 function siteTitle(releaseTag: string): string {
-  return `<span class="deepcode-lockup"><span class="deepcode-name">DeepCode</span><span class="deepcode-tag">${releaseTag}</span></span>`
+  return `<span class="deepseekgui-lockup"><span class="deepseekgui-name">DeepSeekGUI</span><span class="deepseekgui-tag">${releaseTag}</span></span>`
 }
 
 export default withMermaid({

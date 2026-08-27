@@ -140,8 +140,8 @@ export abstract class ReleaseFamily {
       const version = requireString(manifest, 'version', normalized)
       if (name === WORKSPACE_ROOT_PACKAGE) throw new Error(`${normalized} selected the workspace root`)
       if (!name.startsWith('@deepseek-ai/')) {
-        // Private community packages (the DeepCode desktop shell,
-        // @see-sol-lab/deepcode) live in the workspace but are not release
+        // Private community packages (the DeepSeekGUI desktop shell,
+        // @see-sol-lab/deepseekgui) live in the workspace but are not release
         // members. A differently scoped package that claims to be publishable
         // is still a mistake.
         if (manifest.private === true) continue

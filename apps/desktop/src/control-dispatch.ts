@@ -4,7 +4,7 @@
  * 依赖全部注入（controller 端口、只读 discover、目录选择、退出、缓存
  * 持有者、模型推送），main 只做接线；单元测试注入 fake 验证
  * "命令 → 唯一路径" 与 Existing Home 两段式零写入语义。
- * @module @see-sol-lab/deepcode/control-dispatch
+ * @module @see-sol-lab/deepseekgui/control-dispatch
  */
 
 import type { DesktopControlCommand } from './control-model.ts'

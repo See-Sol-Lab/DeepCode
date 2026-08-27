@@ -1,6 +1,6 @@
 {
-  "name": "@see-sol-lab/deepcode-settings",
-  "description": "DeepCode desktop control sections inside the official settings page (P8-D39): Harness/profile control and local plugin management, over the loopback control bridge",
+  "name": "@see-sol-lab/deepseekgui-settings",
+  "description": "DeepSeekGUI desktop control sections inside the official settings page (P8-D39): Harness/profile control and local plugin management, over the loopback control bridge",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -21,7 +21,7 @@
       "immediately": true
     }
   },
-  "license": "SEE LICENSE IN ../../../DEEPCODE-LICENSE.md",
+  "license": "SEE LICENSE IN ../../../DEEPSEEKGUI-LICENSE.md",
   "files": [
     "lib/client.js",
     "lib/index.js"

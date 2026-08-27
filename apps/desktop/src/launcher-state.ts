@@ -4,7 +4,7 @@
  * 文件缺失时回退默认值（Managed Home + web），schema/字段无效时抛出明确的
  * LauncherStateError，绝不静默覆盖；写入使用同目录临时文件 + rename 原子替换。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/launcher-state
+ * @module @see-sol-lab/deepseekgui/launcher-state
  */
 
 import { copyFileSync, readFileSync } from 'node:fs'

@@ -12,7 +12,7 @@
   overflow: hidden;
   display: flex;
   align-items: center;
-  /* Host hook (DeepCode D45 续，2026-08-24): the 24px row is figma's single
+  /* Host hook (DeepSeekGUI D45 续，2026-08-24): the 24px row is figma's single
      line for 14/24 text. D45 shrank the text to 11/18 through the font hooks
      but left this box at 24px, so every think/tool row carries 6px of dead
      height. Keep the default at figma; a host that shrinks the type shrinks
@@ -69,7 +69,7 @@ button.leading {
 
 .title {
   flex: none;
-  /* Host hook (DeepCode P8-D45): disclosure chrome (think/tool rows) may
+  /* Host hook (DeepSeekGUI P8-D45): disclosure chrome (think/tool rows) may
      scale down with a smaller transcript body; defaults keep upstream 14/24. */
   font-size: var(--dsh-chrome-row-font-size, 14px);
   line-height: var(--dsh-chrome-row-line-height, 24px);

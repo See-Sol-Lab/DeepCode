@@ -2,7 +2,7 @@
  * 窗口状态纯函数：显示器/DPI/分辨率变化后的几何 clamp、窗口状态落盘
  * 决策与路径紧凑化。全部不依赖 Electron 运行时对象（工作区矩形由
  * 调用方注入），便于单元测试。
- * @module @see-sol-lab/deepcode/window-state
+ * @module @see-sol-lab/deepseekgui/window-state
  */
 
 import type { DesktopUiStateV1 } from './ui-state.ts'

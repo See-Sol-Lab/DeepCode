@@ -7,7 +7,7 @@
  * 无条件写回自己的 panel 就会覆盖它们——真实表现是"点了没反应"：面板
  * 内容已渲染在 DOM 里却被重新藏起（DS 打包态实测抓获）。
  * 本文件钉死"最后一次意图获胜"。
- * @module @see-sol-lab/deepcode/tests/chrome-renderer
+ * @module @see-sol-lab/deepseekgui/tests/chrome-renderer
  */
 
 import { readFileSync } from 'node:fs'
@@ -39,7 +39,7 @@ const model = (): DesktopControlModel => buildControlModel({
   activeDshHome: 'C:/ud/dsh',
   discovery: { schemaVersion: 1, dshHome: 'C:/ud/dsh', profiles: [] },
   discoveryError: null,
-  logPath: 'C:/ud/logs/deepcode.log',
+  logPath: 'C:/ud/logs/deepseekgui.log',
   existingHomeCandidate: null,
   effectiveTheme: 'dark',
   highContrast: false,
@@ -51,12 +51,12 @@ const model = (): DesktopControlModel => buildControlModel({
   },
   diagnostics: {
     buildInfo: [
-      { key: 'diag.build.app', label: 'Version', value: 'DeepCode 1.0.0' },
+      { key: 'diag.build.app', label: 'Version', value: 'DeepSeekGUI 1.0.0' },
       { key: 'diag.build.home', label: 'Home', value: 'managed' },
       { key: 'diag.build.profile', label: 'Profile', value: 'web' },
     ],
     homeDisplay: '<USER_HOME>/ud/dsh',
-    logPath: 'C:/ud/logs/deepcode.log',
+    logPath: 'C:/ud/logs/deepseekgui.log',
     lastExport: null,
     uncleanExit: null,
   },
@@ -82,7 +82,7 @@ beforeAll(async () => {
   // 真实 index.html：renderer 在模块顶层按 id 抓元素，缺一个就整个接线失败。
   const html = readFileSync(join(here, '..', 'src', 'chrome', 'index.html'), 'utf8')
   document.documentElement.innerHTML = html
-  ;(window as unknown as { deepCodeDesktop: unknown }).deepCodeDesktop = {
+  ;(window as unknown as { deepseekGUIDesktop: unknown }).deepseekGUIDesktop = {
     getControlModel: async () => model(),
     runControlCommand: async (command: DesktopControlCommand) => { commands.push(command) },
     onControlModelChanged: (listener: (next: DesktopControlModel) => void) => {
@@ -165,4 +165,4 @@ describe('openMenu 的面板意图（最后一次意图获胜）', () => {
 })
 
 // Feedback 面板用例已随 P8-D39 移除：反馈整体移居官方设置页的
-// DeepCode 分区（settings-plugin），Chrome 不再有对应容器与入口。
+// DeepSeekGUI 分区（settings-plugin），Chrome 不再有对应容器与入口。

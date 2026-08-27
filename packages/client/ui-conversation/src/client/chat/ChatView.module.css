@@ -46,7 +46,7 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  /* Host hook (DeepCode D45 续，2026-08-24): the figma 16px gap between
+  /* Host hook (DeepSeekGUI D45 续，2026-08-24): the figma 16px gap between
      transcript blocks is sized for the 16px body. A host that shrinks the body
      font leaves this gap at full size, so think/tool rows drift apart while
      their own text got smaller — the dominant source of "too airy" after D45.

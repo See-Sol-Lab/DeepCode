@@ -2,7 +2,7 @@
  * control-model 单测：ControlModel 对 Home/Profile/Pending/七相状态/
  * recovery 的映射、boot-failing 标记、脱敏，以及 IPC 命令边界验证
  * （封闭联合：未知类型、多余字段、非法 profile 名一律拒绝）。
- * @module @see-sol-lab/deepcode/tests/control-model
+ * @module @see-sol-lab/deepseekgui/tests/control-model
  */
 
 import { describe, expect, it } from 'vitest'
@@ -221,8 +221,8 @@ describe('parseControlCommand 边界验证', () => {
   })
 
   it('feedback-send：接受合法 text+diagnostics，拒绝空文本/超长/多余字段', () => {
-    expect(parseControlCommand({ type: 'feedback-send', text: '保存没反应', diagnostics: 'DeepCode: 1.0.0' }))
-      .toEqual({ type: 'feedback-send', text: '保存没反应', diagnostics: 'DeepCode: 1.0.0' })
+    expect(parseControlCommand({ type: 'feedback-send', text: '保存没反应', diagnostics: 'DeepSeekGUI: 1.0.0' }))
+      .toEqual({ type: 'feedback-send', text: '保存没反应', diagnostics: 'DeepSeekGUI: 1.0.0' })
     expect(parseControlCommand({ type: 'feedback-send', text: '   ', diagnostics: '' })).toBeNull()
     expect(parseControlCommand({ type: 'feedback-send', text: 'x'.repeat(20_001), diagnostics: '' })).toBeNull()
     expect(parseControlCommand({ type: 'feedback-send', text: 'ok', diagnostics: 'd'.repeat(200_001) })).toBeNull()

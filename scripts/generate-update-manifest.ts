@@ -1,7 +1,7 @@
 /**
  * Generate the public update manifest from a built distribution.
  *
- * DeepCode clients read one JSON document to learn that a newer version
+ * DeepSeekGUI clients read one JSON document to learn that a newer version
  * exists. Every fact in it is derived from the artefacts that were actually
  * built — the size from the installer on disk, the digest from the
  * `SHA256SUMS.txt` the build already produced — because a hand-typed digest
@@ -29,7 +29,7 @@ import { parseUpdateManifest } from '../apps/desktop/src/update-service.ts'
 const RELEASE_REPO = 'See-Sol-Lab/DeepSeekGUI'
 
 /**
- * Release tag convention: `v` + the DeepCode app version. The asset URL must
+ * Release tag convention: `v` + the DeepSeekGUI app version. The asset URL must
  * name the exact release rather than the `latest` alias — `latest` moves with
  * every publish, so a manifest pinned to it would point at the next version's
  * installer under this version's filename and 404.
@@ -101,10 +101,10 @@ function main(): void {
   // version is read back from the artefact rather than from a source file:
   // this manifest must describe what was built, not what was intended.
   const installerLine = sums.split('\n').map(line => line.trim().split(/\s+/)[1] ?? '')
-    .find(name => /^DeepCode-Setup-.+\.exe$/.test(name))
-  if (installerLine === undefined) fail('no DeepCode-Setup-*.exe entry in SHA256SUMS.txt')
+    .find(name => /^DeepSeekGUI-Setup-.+\.exe$/.test(name))
+  if (installerLine === undefined) fail('no DeepSeekGUI-Setup-*.exe entry in SHA256SUMS.txt')
   const filename = installerLine
-  const version = /^DeepCode-Setup-(.+)\.exe$/.exec(filename)?.[1]
+  const version = /^DeepSeekGUI-Setup-(.+)\.exe$/.exec(filename)?.[1]
   if (version === undefined) fail(`cannot read a version out of ${filename}`)
 
   const installerPath = join(DIST_DIR, filename)

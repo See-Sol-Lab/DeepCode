@@ -7,10 +7,10 @@
  * redactUserContext（home/主机名/用户路径用户名段/邮箱/token/密钥赋值），
  * 用户看到的第一个字节就是脱敏后的，不存在"先看明文再打码"的窗口。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/feedback-diagnostics
+ * @module @see-sol-lab/deepseekgui/feedback-diagnostics
  */
 
-import type { DeepCodeVersionInfo } from './version-info.ts'
+import type { DeepSeekGUIVersionInfo } from './version-info.ts'
 import { redactUserContext } from './redact.ts'
 
 /** 日志摘要的尾部行数（规格 §3.4 的"最近 N 条"）。 */
@@ -19,7 +19,7 @@ export const FEEDBACK_LOG_TAIL_LINES = 30
 /** 反馈诊断组装的输入事实（全部由 main 收集，本模块只组装）。 */
 export interface FeedbackDiagnosticsInput {
   /** 四元组版本事实。 */
-  version: DeepCodeVersionInfo
+  version: DeepSeekGUIVersionInfo
   /** Windows 版本文本（如 Windows 11 Home / 10.0.26200）。 */
   windowsVersion: string
   /** Home 类型标签。 */
@@ -52,7 +52,7 @@ export interface FeedbackDiagnosticsInput {
 export function buildFeedbackDiagnostics(input: FeedbackDiagnosticsInput): string {
   const commit = input.version.sourceCommit ?? 'unknown'
   const lines = [
-    `DeepCode: ${input.version.appVersion}`,
+    `DeepSeekGUI: ${input.version.appVersion}`,
     `Embedded DSH: ${input.version.embeddedDshVersion} (source ${commit})`,
     `Electron: ${input.version.electronVersion} · ${input.version.platform}-${input.version.arch}`,
     `Windows: ${input.windowsVersion}`,

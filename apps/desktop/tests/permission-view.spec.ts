@@ -2,7 +2,7 @@
  * permission-view 测试：preset → 展示模式映射、describe 事实解析与
  * fail-closed 语义（permission service 不可用时绝不显示 Sandbox /
  * Full Access）。纯 Node 环境。
- * @module @see-sol-lab/deepcode/tests/permission-view
+ * @module @see-sol-lab/deepseekgui/tests/permission-view
  */
 
 import { describe, expect, it } from 'vitest'

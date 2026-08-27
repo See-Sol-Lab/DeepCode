@@ -5,7 +5,7 @@
  * 官方 CLI 的唯一输出，desktop 只消费它；spawn 失败、非零退出、超时或
  * schema 无效都以明确的 ProfileDiscoveryError 抛出。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/profile-discovery
+ * @module @see-sol-lab/deepseekgui/profile-discovery
  */
 
 import { spawn } from 'node:child_process'

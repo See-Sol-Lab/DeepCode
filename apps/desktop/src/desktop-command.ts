@@ -14,7 +14,7 @@
  *   已有操作时抛 DesktopCommandBusyError；不做队列、重试、watchdog
  *   或后台 worker。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/desktop-command
+ * @module @see-sol-lab/deepseekgui/desktop-command
  */
 
 import { spawn, type ChildProcess } from 'node:child_process'
@@ -115,8 +115,8 @@ export function runDesktopCommand(input: DesktopCommandInput): DesktopOperation 
       run()
     } catch (error) {
       console.error(zh
-        ? `[deepcode] 桌面维护操作${what}回调抛错（已隔离）: ${String(error instanceof Error ? error.message : error)}`
-        : `[deepcode] The desktop ${what} callback threw and was isolated: ${String(error instanceof Error ? error.message : error)}`)
+        ? `[deepseekgui] 桌面维护操作${what}回调抛错（已隔离）: ${String(error instanceof Error ? error.message : error)}`
+        : `[deepseekgui] The desktop ${what} callback threw and was isolated: ${String(error instanceof Error ? error.message : error)}`)
     }
   }
 
@@ -167,8 +167,8 @@ export function runDesktopCommand(input: DesktopCommandInput): DesktopOperation 
         if (error !== null && error !== undefined && !exited) {
           // stdin 写失败（子进程已关闭输入等）：只记诊断，不击穿调用方。
           console.error(zh
-            ? `[deepcode] 桌面维护操作 stdin 写入失败: ${error.message}`
-            : `[deepcode] Writing to the desktop operation stdin failed: ${error.message}`)
+            ? `[deepseekgui] 桌面维护操作 stdin 写入失败: ${error.message}`
+            : `[deepseekgui] Writing to the desktop operation stdin failed: ${error.message}`)
         }
       })
     },
@@ -192,8 +192,8 @@ export function runDesktopCommand(input: DesktopCommandInput): DesktopOperation 
         // 就地结算并把原因如实写进结果——绝不谎称它已经结束。
         const detail = String(error instanceof Error ? error.message : error)
         console.error(zh
-          ? `[deepcode] 桌面维护操作无法终止子进程: ${detail}`
-          : `[deepcode] The desktop operation could not stop the child process: ${detail}`)
+          ? `[deepseekgui] 桌面维护操作无法终止子进程: ${detail}`
+          : `[deepseekgui] The desktop operation could not stop the child process: ${detail}`)
         settle({
           exitCode: null,
           signal: null,

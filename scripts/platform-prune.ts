@@ -1,7 +1,7 @@
 /**
- * Windows x64 platform pruning for the DeepCode runtime payload.
+ * Windows x64 platform pruning for the DeepSeekGUI runtime payload.
  *
- * DeepCode ships Windows x64 only. Two facts drive the rules:
+ * DeepSeekGUI ships Windows x64 only. Two facts drive the rules:
  * - `node-pty` (the PTY backend of the mounted subprocess provider) carries
  *   prebuilds for darwin-arm64/darwin-x64/win32-arm64/win32-x64; only
  *   `win32-x64` can ever load.

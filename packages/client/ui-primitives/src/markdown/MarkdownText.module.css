@@ -2,13 +2,13 @@
    Modules. Cite pills, header anchors, and thinking-small variants are
    intentionally absent (no matching DOM). Token names match that sheet.
 
-   Host hooks (DeepCode D45 续, 2026-08-24): the block rhythm below —
+   Host hooks (DeepSeekGUI D45 续, 2026-08-24): the block rhythm below —
    32px above a heading, 16px between paragraphs and lists — is drawn for
    the 16px figma body. A host that shrinks the body type keeps every one
    of these gaps at full size, and the transcript reads airier the smaller
    the text gets. Each is a var() with the figma value as its fallback, so
    vanilla `dsh web` renders byte-identical; only a host that supplies the
-   variables (DeepCode's theme plugin, via overrideTokens) tightens them. */
+   variables (DeepSeekGUI's theme plugin, via overrideTokens) tightens them. */
 
 .markdown {
   min-width: 0;

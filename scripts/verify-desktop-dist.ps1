@@ -18,14 +18,14 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$exe = Join-Path (Get-Location) 'dist\desktop\win-unpacked\DeepCode.exe'
+$exe = Join-Path (Get-Location) 'dist\desktop\win-unpacked\DeepSeekGUI.exe'
 if (-not (Test-Path $exe)) {
     Write-Error "missing packaged exe: $exe"
     exit 1
 }
 
-# Delivery-identity consistency (version contract, DEEPCODE_VERSIONING.md):
-# 1) exe FileVersion = DeepCode app version (single hand-written source: apps/desktop/package.json).
+# Delivery-identity consistency (version contract, DEEPSEEKGUI_VERSIONING.md):
+# 1) exe FileVersion = DeepSeekGUI app version (single hand-written source: apps/desktop/package.json).
 # 2) resources/dsh/source-commit.txt present and non-empty (packaged builds must be traceable).
 # 3) embedded DSH version read from the actual packaged runtime manifest (no second hand-written constant).
 # NOTE: comments in this script stay ASCII-only — Windows PowerShell 5.1 decodes BOM-less
@@ -34,10 +34,10 @@ $desktopManifestPath = Join-Path (Get-Location) 'apps\desktop\package.json'
 $appVersion = (Get-Content $desktopManifestPath -Raw | ConvertFrom-Json).version
 $fileVersion = (Get-Item $exe).VersionInfo.FileVersion
 if ($fileVersion -ne $appVersion) {
-    Write-Error "exe FileVersion '$fileVersion' != DeepCode app version '$appVersion'"
+    Write-Error "exe FileVersion '$fileVersion' != DeepSeekGUI app version '$appVersion'"
     exit 1
 }
-Write-Output "exe FileVersion matches DeepCode app version: $appVersion"
+Write-Output "exe FileVersion matches DeepSeekGUI app version: $appVersion"
 
 $commitFile = Join-Path (Get-Location) 'dist\desktop\win-unpacked\resources\dsh\source-commit.txt'
 if (-not (Test-Path $commitFile)) {
@@ -78,8 +78,8 @@ Write-Output 'packaged app.asar present (Desktop Chrome assets shipped)'
 # notice must also CONTAIN that license. A rename or a repointed source path
 # would otherwise ship the wrong text under a trusted name and still pass.
 $licenseFiles = @(
-    @{ Path = 'licenses\DeepCode-PolyForm-Perimeter-1.0.1.txt'; Must = @('PolyForm Perimeter License 1.0.1') },
-    @{ Path = 'licenses\DEEPCODE-LICENSE.md'; Must = @('DeepCode') },
+    @{ Path = 'licenses\DeepSeekGUI-PolyForm-Perimeter-1.0.1.txt'; Must = @('PolyForm Perimeter License 1.0.1') },
+    @{ Path = 'licenses\DEEPSEEKGUI-LICENSE.md'; Must = @('DeepSeekGUI') },
     @{ Path = 'licenses\DeepSeek-Harness-MIT.txt'; Must = @('MIT License', 'Permission is hereby granted') },
     @{ Path = 'licenses\THIRD_PARTY_NOTICES.md'; Must = @('Third-party') }
 )
@@ -182,8 +182,8 @@ $env:DSH_DESKTOP_SMOKE = '1'
 
 # Unique per run, so concurrent or aborted runs never collide; removed in finally.
 $stamp = [System.IO.Path]::GetRandomFileName()
-$stdoutFile = Join-Path $env:TEMP "deepcode-verify-out-$stamp.txt"
-$stderrFile = Join-Path $env:TEMP "deepcode-verify-err-$stamp.txt"
+$stdoutFile = Join-Path $env:TEMP "deepseekgui-verify-out-$stamp.txt"
+$stderrFile = Join-Path $env:TEMP "deepseekgui-verify-err-$stamp.txt"
 
 try {
     Write-Output "launching packaged exe with PATH=$cleanPath"
@@ -221,9 +221,9 @@ try {
 
     # The DSH service runs inside the packaged exe process tree; after exit there
     # must be no process still bound to the distribution.
-    $leftover = Get-CimInstance Win32_Process -Filter "Name='DeepCode.exe'" -ErrorAction SilentlyContinue
+    $leftover = Get-CimInstance Win32_Process -Filter "Name='DeepSeekGUI.exe'" -ErrorAction SilentlyContinue
     if ($leftover) {
-        Write-Error 'leftover DeepCode.exe processes'
+        Write-Error 'leftover DeepSeekGUI.exe processes'
         exit 1
     }
     Write-Output 'no leftover processes'
@@ -235,7 +235,7 @@ try {
         $installers = Get-ChildItem (Join-Path (Get-Location) 'dist\desktop') -Filter '*.exe' |
             ForEach-Object { "  $($_.Name)" }
         @(
-            'DeepCode Desktop acceptance report',
+            'DeepSeekGUI Desktop acceptance report',
             "app version: $appVersion",
             "embedded DSH version: $embeddedDshVersion",
             "embedded DSH source/commit: $sourceCommit",

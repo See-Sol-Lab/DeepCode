@@ -122,7 +122,7 @@ export class RepositoryCleaner {
     const pending = [join(this.root, 'tsconfig.json')]
     const visited = new Set<string>()
     const nativeEntryOutput = join(this.root, 'native/landlock-run/packages/entry/lib')
-    // The DeepCode desktop shell emits compiled JS directly into lib (Electron
+    // The DeepSeekGUI desktop shell emits compiled JS directly into lib (Electron
     // loads it as-is; no tsdown bundling step), so its outDir has no /types tail.
     const desktopOutput = join(this.root, 'apps/desktop/lib')
 

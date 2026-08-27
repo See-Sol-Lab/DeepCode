@@ -1,13 +1,13 @@
 /**
  * DSH Terminal renderer：xterm（vendored）渲染 pty 字节流。只消费
- * preload 暴露的 deepCodeTerminal API；不持有任何业务状态。
- * @module @see-sol-lab/deepcode/terminal/renderer
+ * preload 暴露的 deepseekGUITerminal API；不持有任何业务状态。
+ * @module @see-sol-lab/deepseekgui/terminal/renderer
  */
 
 import { Terminal } from '../../src/terminal/vendor/xterm.mjs'
 import { FitAddon } from '../../src/terminal/vendor/addon-fit.mjs'
 
-interface DeepCodeTerminalApi {
+interface DeepSeekGUITerminalApi {
   /** 界面语言（zh/en，main 经 additionalArguments 传入）。 */
   locale: 'zh' | 'en'
   send(data: string): Promise<void>
@@ -17,7 +17,7 @@ interface DeepCodeTerminalApi {
   onError(listener: (message: string) => void): void
 }
 
-const api = (window as unknown as { deepCodeTerminal: DeepCodeTerminalApi }).deepCodeTerminal
+const api = (window as unknown as { deepseekGUITerminal: DeepSeekGUITerminalApi }).deepseekGUITerminal
 
 const container = document.getElementById('terminal') as HTMLElement
 // 终端永远深色（P8-D28 住户定，主题跟随实测被否）：黑底白字是终端这个
@@ -53,11 +53,11 @@ window.addEventListener('resize', () => {
 })
 term.onData((data) => { void api.send(data) })
 api.onData((text) => { term.write(text) })
-api.onError((message) => { term.write(`\r\n[deepcode] ${message}\r\n`) })
+api.onError((message) => { term.write(`\r\n[deepseekgui] ${message}\r\n`) })
 api.onExit((exitCode) => {
   // 退出消息按界面语言选择（P7-H：英文系统不再看到中文方块字）。
   const message = api.locale === 'zh'
     ? `终端已退出（exitCode=${String(exitCode)}）。可关闭此窗口。`
     : `Terminal exited (exitCode=${String(exitCode)}). You can close this window.`
-  term.write(`\r\n[deepcode] ${message}\r\n`)
+  term.write(`\r\n[deepseekgui] ${message}\r\n`)
 })

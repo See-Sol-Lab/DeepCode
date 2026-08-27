@@ -2,7 +2,7 @@
  * control-dispatch 单测：每条命令只调用对应的 controller/discovery 路径、
  * Existing Home 两段式（取消零写入、确认后切换并接管缓存）、切回 Managed
  * 清缓存并 refresh、点已激活 profile 的 no-op 守卫。
- * @module @see-sol-lab/deepcode/tests/control-dispatch
+ * @module @see-sol-lab/deepseekgui/tests/control-dispatch
  */
 
 import { describe, expect, it, vi } from 'vitest'

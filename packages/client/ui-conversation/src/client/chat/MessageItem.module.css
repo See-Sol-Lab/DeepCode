@@ -22,8 +22,8 @@
   background: var(--dsw-specific-bubble);
   border-radius: 22px;
   /* 44px single-line bubble: 24 line + 10 vertical padding each side.
-     Host hook (DeepCode P8-D25): figma 16/24 stays as the var() fallbacks —
-     vanilla dsh web renders unchanged; DeepCode's theme plugin supplies
+     Host hook (DeepSeekGUI P8-D25): figma 16/24 stays as the var() fallbacks —
+     vanilla dsh web renders unchanged; DeepSeekGUI's theme plugin supplies
      smaller values so both sides of the transcript shrink together. */
   padding: 10px 16px;
   font-size: var(--dsh-user-bubble-font-size, 16px);
@@ -51,7 +51,7 @@
   display: flex;
   align-items: center;
   width: 100%;
-  /* Host hook (DeepCode D45 续): same chrome row as think/tool disclosures —
+  /* Host hook (DeepSeekGUI D45 续): same chrome row as think/tool disclosures —
      shares their height token so the marker stays flush with them when a host
      shrinks the transcript type. Default keeps figma's 24px. */
   height: var(--dsh-chrome-row-height, 24px);

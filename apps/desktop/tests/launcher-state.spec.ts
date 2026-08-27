@@ -3,7 +3,7 @@
  * （未知版本/未知字段/非法 profile/非法 home）、spaces/Unicode 路径保留，
  * 以及 Managed/Existing selection 到 resolveDshLaunch 的完整参数向量。
  * 不涉及 Electron，可在普通 Node 环境下运行。
- * @module @see-sol-lab/deepcode/tests/launcher-state
+ * @module @see-sol-lab/deepseekgui/tests/launcher-state
  */
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -472,8 +472,8 @@ describe('parseLauncherState 非法 home', () => {
 
 describe('resolveHarnessHome', () => {
   it('Managed 解析为 join(userData, "dsh")', () => {
-    expect(resolveHarnessHome({ kind: 'managed' }, 'C:\\Users\\alice\\AppData\\Roaming\\DeepCode'))
-      .toBe(join('C:\\Users\\alice\\AppData\\Roaming\\DeepCode', 'dsh'))
+    expect(resolveHarnessHome({ kind: 'managed' }, 'C:\\Users\\alice\\AppData\\Roaming\\DeepSeekGUI'))
+      .toBe(join('C:\\Users\\alice\\AppData\\Roaming\\DeepSeekGUI', 'dsh'))
   })
 
   it('Existing 原样返回显式绝对路径（含 spaces/Unicode），不创建目录', () => {
@@ -487,7 +487,7 @@ describe('resolveHarnessHome', () => {
 describe('Managed/Existing 参数向量（selection → resolveDshLaunch）', () => {
   it('默认 Managed selection：dev 向量带 --profile web 与 userData/dsh 的 DSH_HOME', () => {
     const state = defaultLauncherState()
-    const userData = 'C:\\Users\\alice\\AppData\\Roaming\\DeepCode'
+    const userData = 'C:\\Users\\alice\\AppData\\Roaming\\DeepSeekGUI'
     const { args, env } = resolveDshLaunch({
       packaged: false,
       root: 'R:\\repo',
@@ -505,13 +505,13 @@ describe('Managed/Existing 参数向量（selection → resolveDshLaunch）', ()
     const state = existingState(home)
     const { args, env, command } = resolveDshLaunch({
       packaged: true,
-      packagedExecutable: 'E:\\app\\DeepCode.exe',
+      packagedExecutable: 'E:\\app\\DeepSeekGUI.exe',
       resourcesPath: 'E:\\app\\resources',
       packagedCwd: 'E:\\',
       profile: state.active.profile,
       dshHome: resolveHarnessHome(state.active.home, 'unused-userdata'),
     })
-    expect(command).toBe('E:\\app\\DeepCode.exe')
+    expect(command).toBe('E:\\app\\DeepSeekGUI.exe')
     expect(args).toEqual([
       '--expose-internals',
       'E:\\app\\resources\\dsh\\node_modules\\@deepseek-ai\\dsh\\lib\\bin.js',

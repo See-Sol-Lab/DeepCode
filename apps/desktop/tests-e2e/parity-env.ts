@@ -5,7 +5,7 @@
  * 这里的 APPDATA/LOCALAPPDATA/DSH_HOME 钉扎保留为纵深防御，一切凭据形态
  * 的环境变量（KEY/TOKEN/SECRET/PASSWORD/CREDENTIAL，任意大小写）都不进入
  * 被测进程。
- * @module @see-sol-lab/deepcode/tests-e2e/parity-env
+ * @module @see-sol-lab/deepseekgui/tests-e2e/parity-env
  */
 
 import { mkdirSync } from 'node:fs'

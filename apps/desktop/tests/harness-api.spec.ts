@@ -1,7 +1,7 @@
 /**
  * harness-api 测试：官方 RPC 信封构造、响应严格解析、业务错误与传输
  * 失败的 fail-closed 语义。fake fetch 注入，零网络。
- * @module @see-sol-lab/deepcode/tests/harness-api
+ * @module @see-sol-lab/deepseekgui/tests/harness-api
  */
 
 import { describe, expect, it } from 'vitest'

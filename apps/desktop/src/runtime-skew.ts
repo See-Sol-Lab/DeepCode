@@ -1,9 +1,9 @@
 /**
  * Version skew between an Existing Home's profile modules and the DSH runtime
- * DeepCode ships.
+ * DeepSeekGUI ships.
  *
  * A profile under a user's own `~/.dsh` carries whatever DSH packages the tool
- * that created it installed. DeepCode boots that profile against its own
+ * that created it installed. DeepSeekGUI boots that profile against its own
  * bundled runtime, so the two module trees meet inside one Node realm. When
  * they are the same version this is invisible; when they are not, the failure
  * mode is a tool call dying on `Cannot read properties of undefined` because a
@@ -11,10 +11,10 @@
  * package never produce equal symbols. That crash names nothing that would
  * lead a user (or the agent helping them) back to this directory.
  *
- * So DeepCode reads the skew and states it as a fact. It does not block: the
+ * So DeepSeekGUI reads the skew and states it as a fact. It does not block: the
  * user's own Home is theirs, mixed versions often work, and a modal that fires
  * on a maybe teaches people to dismiss modals. Recording it means the agent
- * inside DeepCode can answer "why did my tool call just die" with the actual
+ * inside DeepSeekGUI can answer "why did my tool call just die" with the actual
  * reason instead of guessing.
  */
 
@@ -27,7 +27,7 @@ export interface RuntimeVersionSkew {
   packageName: string
   /** Version found under the profile's own `node_modules`. */
   profileVersion: string
-  /** Version DeepCode ships in its bundled runtime. */
+  /** Version DeepSeekGUI ships in its bundled runtime. */
   bundledVersion: string
   /**
    * `true` when the versions differ before their prerelease suffix
@@ -124,14 +124,14 @@ export function describeRuntimeVersionSkew(skews: RuntimeVersionSkew[], zh: bool
   const sample = (crossing.length > 0 ? crossing : skews).slice(0, 5)
   const lines = sample.map(
     skew => `- ${skew.packageName}: ${zh ? '这个目录里是' : 'this directory has'} ${skew.profileVersion}, `
-      + `${zh ? 'DeepCode 自带的是' : 'DeepCode ships'} ${skew.bundledVersion}`,
+      + `${zh ? 'DeepSeekGUI 自带的是' : 'DeepSeekGUI ships'} ${skew.bundledVersion}`,
   )
   const more = skews.length > sample.length
     ? [zh ? `- ……另外还有 ${String(skews.length - sample.length)} 个包版本也不一样` : `- …and ${String(skews.length - sample.length)} more packages differ`]
     : []
   if (zh) {
     return [
-      `你选的这个 Harness 目录里装着 ${String(skews.length)} 个和 DeepCode 自带版本不同的 DSH 包`
+      `你选的这个 Harness 目录里装着 ${String(skews.length)} 个和 DeepSeekGUI 自带版本不同的 DSH 包`
       + `${crossing.length > 0 ? `，其中 ${String(crossing.length)} 个连版本号本身都不一样（不是 rc 小改动那种差别）` : ''}：`,
       ...lines, ...more,
       '',
@@ -139,11 +139,11 @@ export function describeRuntimeVersionSkew(skews: RuntimeVersionSkew[], zh: bool
       '一句「Cannot read properties of undefined」这类看不懂的错，多半就是这里：同一个',
       '包存在两份，程序会把它们当成两个不同的东西。',
       '',
-      '想彻底避开的话，有两条路：换回 DeepCode 的托管目录，或者把这个目录里的 DSH 包更新到同一版本。',
+      '想彻底避开的话，有两条路：换回 DeepSeekGUI 的托管目录，或者把这个目录里的 DSH 包更新到同一版本。',
     ].join('\n')
   }
   return [
-    `The Harness directory you selected carries ${String(skews.length)} DSH packages at versions different from the ones DeepCode ships`
+    `The Harness directory you selected carries ${String(skews.length)} DSH packages at versions different from the ones DeepSeekGUI ships`
     + `${crossing.length > 0 ? `, ${String(crossing.length)} of them on a different release line` : ''}:`,
     ...lines, ...more,
     '',
@@ -151,7 +151,7 @@ export function describeRuntimeVersionSkew(skews: RuntimeVersionSkew[], zh: bool
     '"Cannot read properties of undefined", this is the usual cause: two copies of one package are',
     'present, and the program treats them as two unrelated things.',
     '',
-    "To rule it out: switch back to DeepCode's managed directory, or bring this directory's DSH packages to one version.",
+    "To rule it out: switch back to DeepSeekGUI's managed directory, or bring this directory's DSH packages to one version.",
   ].join('\n')
 }
 
@@ -160,9 +160,9 @@ export const CREDENTIALS_FILENAME = '.credentials.yaml'
 
 /**
  * Whether this Home's credentials document still uses the pre-release flat
- * layout that booting DeepCode will rewrite.
+ * layout that booting DeepSeekGUI will rewrite.
  *
- * DeepCode promises never to modify an Existing Home silently, and keeps that
+ * DeepSeekGUI promises never to modify an Existing Home silently, and keeps that
  * promise everywhere it acts itself. Upstream `credentials-local` has one
  * exception: on boot it recognizes the flat layout and upgrades it in place
  * (values carried verbatim, only the enclosing layout changes) so a key stored
@@ -217,20 +217,20 @@ export function hasLegacyCredentialsLayout(homePath: string): boolean {
 export function describeLegacyCredentialsLayout(zh: boolean): string {
   if (zh) {
     return [
-      `这个目录里的 ${CREDENTIALS_FILENAME} 还是旧版格式。DeepCode 启动时会把它就地改成新格式——`,
+      `这个目录里的 ${CREDENTIALS_FILENAME} 还是旧版格式。DeepSeekGUI 启动时会把它就地改成新格式——`,
       '里面的密钥原样保留、一个字都不会变，只是外层结构换了写法。',
       '',
-      '说这件事是因为：DeepCode 对你自己的目录一向是不改的，这里是唯一的例外。',
+      '说这件事是因为：DeepSeekGUI 对你自己的目录一向是不改的，这里是唯一的例外。',
       '改完之后，如果你还用旧版本的 dsh 命令行读这个文件，它可能就不认了。',
       '',
       '不想让它改的话，先把这个文件复制一份留底，再启动。',
     ].join(String.fromCharCode(10))
   }
   return [
-    `The ${CREDENTIALS_FILENAME} in this directory still uses the older layout. DeepCode rewrites it in place on boot —`,
+    `The ${CREDENTIALS_FILENAME} in this directory still uses the older layout. DeepSeekGUI rewrites it in place on boot —`,
     'the stored secrets are carried over verbatim; only the surrounding structure changes.',
     '',
-    'This is worth saying because DeepCode otherwise never modifies your own directory. This is the one exception.',
+    'This is worth saying because DeepSeekGUI otherwise never modifies your own directory. This is the one exception.',
     'After the rewrite, an older dsh build reading this file may no longer recognize it.',
     '',
     'To keep the original, copy the file somewhere safe before starting.',

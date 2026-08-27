@@ -11,7 +11,7 @@
  *
  * Only loopback-bound; no credentials; no request body inspection beyond URL.
  *
- * @module @see-sol-lab/deepcode-browser/proxy
+ * @module @see-sol-lab/deepseekgui-browser/proxy
  */
 
 import { createServer, request as httpRequest, type IncomingMessage, type ServerResponse } from 'node:http'
@@ -102,7 +102,7 @@ function blockedPage(detail: string): string {
     '<!doctype html><html><body style="font-family:system-ui;padding:24px">',
     '<h2>Navigation blocked</h2>',
     `<p>${escapeHtml(detail)}</p>`,
-    '<p>The DeepCode browser refuses targets that resolve to local, private, or reserved networks.</p>',
+    '<p>The DeepSeekGUI browser refuses targets that resolve to local, private, or reserved networks.</p>',
     '</body></html>',
   ].join('')
 }
@@ -274,7 +274,7 @@ async function handleConnect(
   const { host, port } = authority
   const verdict = await validateNavigationTarget(`https://${toUrlAuthority(host)}/`, lookup)
   if (!verdict.ok) {
-    clientSocket.write(`HTTP/1.1 502 Bad Gateway\r\nX-DeepCode-Block: ${escapeHtml(verdict.detail)}\r\n\r\n`)
+    clientSocket.write(`HTTP/1.1 502 Bad Gateway\r\nX-DeepSeekGUI-Block: ${escapeHtml(verdict.detail)}\r\n\r\n`)
     clientSocket.destroy()
     return
   }

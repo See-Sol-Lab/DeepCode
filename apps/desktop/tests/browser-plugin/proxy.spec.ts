@@ -3,7 +3,7 @@
  * request (and every redirect hop) passes through; blocked targets get a
  * 502 + block page / block header, allowed targets are forwarded to the
  * checked IP.
- * @module @see-sol-lab/deepcode-browser/tests/proxy
+ * @module @see-sol-lab/deepseekgui-browser/tests/proxy
  */
 
 import { afterEach, describe, expect, it } from 'vitest'
@@ -111,7 +111,7 @@ describe('CONNECT 隧道', () => {
     const result = await proxiedConnect(proxy.port, 'metadata.test:443')
     expect(result.ok).toBe(false)
     expect(result.statusLine).toContain('502')
-    expect(result.headers).toContain('X-DeepCode-Block')
+    expect(result.headers).toContain('X-DeepSeekGUI-Block')
   })
 
   it('公网 443 放行 → 尝试建立隧道（上游不可达时表现为连接失败而非拦截）', async () => {
@@ -119,7 +119,7 @@ describe('CONNECT 隧道', () => {
     const result = await proxiedConnect(proxy.port, 'public.test:443')
     // 校验通过：要么隧道建立（ok），要么上游连接失败（无 block 头）。
     // 两者都证明 SSRF 校验放行了该目标。
-    expect(result.headers).not.toContain('X-DeepCode-Block')
+    expect(result.headers).not.toContain('X-DeepSeekGUI-Block')
   })
 })
 
@@ -203,13 +203,13 @@ describe('IPv6 目标现在真的会被检查（而不是解析失败）', () =>
     proxy = await startSsrfProxy(lookupOf(['::1']))
     const result = await proxiedConnect(proxy.port, '[::1]:443')
     expect(result.ok).toBe(false)
-    expect(result.headers).toContain('X-DeepCode-Block')
+    expect(result.headers).toContain('X-DeepSeekGUI-Block')
   })
 
   it('CONNECT 到公网 IPv6：放行到转发路径', async () => {
     proxy = await startSsrfProxy(lookupOf(['2606:4700::1111']))
     const result = await proxiedConnect(proxy.port, '[2606:4700::1111]:443')
-    expect(result.headers).not.toContain('X-DeepCode-Block')
+    expect(result.headers).not.toContain('X-DeepSeekGUI-Block')
   })
 })
 

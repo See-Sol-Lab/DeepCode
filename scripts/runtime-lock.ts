@@ -1,5 +1,5 @@
 /**
- * Reproducible runtime install for the DeepCode distribution.
+ * Reproducible runtime install for the DeepSeekGUI distribution.
  *
  * The staging consumer installs local tarballs plus their external registry
  * dependencies. Local tarballs are rebuilt from the repository every run, so

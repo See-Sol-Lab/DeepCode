@@ -4,7 +4,7 @@
  * 解析（Profile 目录 → Harness Home + 说明）、welcome 事实、私有 shim
  * 内容（exact executable 转发、不引用系统安装）与 dsh-wrapper 的真实
  * spawn（注入/不注入/help 透传）。不涉及 Electron。
- * @module @see-sol-lab/deepcode/tests/terminal-service
+ * @module @see-sol-lab/deepseekgui/tests/terminal-service
  */
 
 import { spawnSync } from 'node:child_process'
@@ -146,7 +146,7 @@ describe('resolveTerminalCwd（Profile 目录 → Harness Home + 说明）', () 
 })
 
 describe('buildTerminalWelcome', () => {
-  it('含 DeepCode/DSH/Profile/DSH_HOME/私有 Runtime 来源/宿主/cwd，cwd 回退加说明（zh 原样）', () => {
+  it('含 DeepSeekGUI/DSH/Profile/DSH_HOME/私有 Runtime 来源/宿主/cwd，cwd 回退加说明（zh 原样）', () => {
     const lines = buildTerminalWelcome({
       appVersion: '0.1.0-alpha.1',
       dshVersion: '0.1.0-rc.5',
@@ -158,11 +158,11 @@ describe('buildTerminalWelcome', () => {
       cwd: 'C:\\home',
       cwdNote: '未在 discovery 中找到当前 Profile 目录，已使用 Harness Home 作为工作目录。',
     }, 'zh')
-    expect(lines.join('\n')).toContain('DeepCode 0.1.0-alpha.1')
+    expect(lines.join('\n')).toContain('DeepSeekGUI 0.1.0-alpha.1')
     expect(lines.join('\n')).toContain('DSH 0.1.0-rc.5')
     expect(lines.join('\n')).toContain('Active Profile: web')
     expect(lines.join('\n')).toContain('DSH_HOME: C:\\home')
-    expect(lines.join('\n')).toContain('全部来自 DeepCode 私有 Runtime')
+    expect(lines.join('\n')).toContain('全部来自 DeepSeekGUI 私有 Runtime')
     expect(lines.join('\n')).toContain('Terminal: PowerShell')
     expect(lines.join('\n')).toContain('已使用 Harness Home')
   })
@@ -180,8 +180,8 @@ describe('buildTerminalWelcome', () => {
       cwdNote: null,
     }, 'en')
     const text = lines.join('\n')
-    expect(text).toContain('DeepCode 0.1.0-alpha.1')
-    expect(text).toContain('all from the DeepCode private runtime')
+    expect(text).toContain('DeepSeekGUI 0.1.0-alpha.1')
+    expect(text).toContain('all from the DeepSeekGUI private runtime')
     expect(text).toContain('This command line is pre-configured with the DSH environment')
   })
 
@@ -197,7 +197,7 @@ describe('buildTerminalWelcome', () => {
 
 describe('terminalShimContents（私有 shims）', () => {
   const facts: ShimRuntimeFacts = {
-    nodeExecutable: 'E:\\app\\DeepCode.exe',
+    nodeExecutable: 'E:\\app\\DeepSeekGUI.exe',
     nodePrefixArgs: ['--expose-internals'],
     dshWrapperPath: 'E:\\app\\resources\\app.asar\\src\\terminal\\dsh-wrapper.cjs',
     dshBin: 'E:\\app\\resources\\dsh\\node_modules\\@deepseek-ai\\dsh\\lib\\bin.js',
@@ -210,7 +210,7 @@ describe('terminalShimContents（私有 shims）', () => {
     const files = terminalShimContents(facts)
     expect([...files.keys()].sort()).toEqual(['dsh.cmd', 'node.cmd', 'pnpm.cmd'])
     for (const content of files.values()) {
-      expect(content).toContain('E:\\app\\DeepCode.exe')
+      expect(content).toContain('E:\\app\\DeepSeekGUI.exe')
       // 绝不引用系统 Node/pnpm 或全局 PATH。
       expect(content).not.toMatch(/nodejs/i)
       expect(content).not.toContain('Program Files\\nodejs')
@@ -220,13 +220,13 @@ describe('terminalShimContents（私有 shims）', () => {
   it('dsh.cmd 转发 wrapper 并注入 active Profile 环境（Unicode 原样）', () => {
     const dsh = terminalShimContents(facts).get('dsh.cmd')!
     expect(dsh).toContain('dsh-wrapper.cjs')
-    expect(dsh).toContain('set "DEEPCODE_ACTIVE_PROFILE=深 度 p"')
-    expect(dsh).toContain('set "DEEPCODE_WRAPPER_NODE_ARGS=["--expose-internals"]"')
+    expect(dsh).toContain('set "DEEPSEEKGUI_ACTIVE_PROFILE=深 度 p"')
+    expect(dsh).toContain('set "DEEPSEEKGUI_WRAPPER_NODE_ARGS=["--expose-internals"]"')
   })
 
   it('node.cmd 用 node 形态前缀 args 转发', () => {
     const node = terminalShimContents(facts).get('node.cmd')!
-    expect(node).toContain('"E:\\app\\DeepCode.exe" --expose-internals %*')
+    expect(node).toContain('"E:\\app\\DeepSeekGUI.exe" --expose-internals %*')
   })
 })
 
@@ -240,10 +240,10 @@ describe('dsh-wrapper 真实 spawn（argv 注入语义）', () => {
     const result = spawnSync(process.execPath, [wrapper, ...userArgs], {
       env: {
         ...process.env,
-        DEEPCODE_WRAPPER_EXE: process.execPath,
-        DEEPCODE_WRAPPER_DSH_BIN: echoer,
-        DEEPCODE_WRAPPER_NODE_ARGS: '[]',
-        DEEPCODE_ACTIVE_PROFILE: activeProfile,
+        DEEPSEEKGUI_WRAPPER_EXE: process.execPath,
+        DEEPSEEKGUI_WRAPPER_DSH_BIN: echoer,
+        DEEPSEEKGUI_WRAPPER_NODE_ARGS: '[]',
+        DEEPSEEKGUI_ACTIVE_PROFILE: activeProfile,
       },
       encoding: 'utf8',
     })

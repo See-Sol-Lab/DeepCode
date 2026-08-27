@@ -3,7 +3,7 @@
  * 形态（会话内回退 / 重启后 active 仍为 LKG）下给出；无失败、active
  * 不是 LKG、非 running、已确认同一条时一律 null；ackKey 随失败事实
  * 变化。绝不清理 lastBootFailure（本模块无写入面）。
- * @module @see-sol-lab/deepcode/tests/recovery-notice
+ * @module @see-sol-lab/deepseekgui/tests/recovery-notice
  */
 
 import { describe, expect, it } from 'vitest'

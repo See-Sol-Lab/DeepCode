@@ -6,21 +6,21 @@ English | [中文](2026-08-15-desktop-electron-shell.zh.md)
 
 ## Problem
 
-The repository's only shipped interactive surface is the Web UI, which a user opens in a browser. [DEEPCODE.md](../../../../DEEPCODE.md) targets a Windows desktop client for DeepSeek Harness whose first milestone is a Windows desktop experience: one command, a real application window, no browser and no localhost address. The harness core already proves the needed behavior through the `web` profile; what is missing is a host shell that starts that service and presents it as a standalone window.
+The repository's only shipped interactive surface is the Web UI, which a user opens in a browser. [DEEPSEEKGUI.md](../../../../DEEPSEEKGUI.md) targets a Windows desktop client for DeepSeek Harness whose first milestone is a Windows desktop experience: one command, a real application window, no browser and no localhost address. The harness core already proves the needed behavior through the `web` profile; what is missing is a host shell that starts that service and presents it as a standalone window.
 
 ## Proposal
 
-Add `apps/desktop` (`@see-sol-lab/deepcode`, private, dev-stage only) — an Electron main process that wraps the shipped `web` profile unchanged:
+Add `apps/desktop` (`@see-sol-lab/deepseekgui`, private, dev-stage only) — an Electron main process that wraps the shipped `web` profile unchanged:
 
 - Start the service: spawn `node --import tsx/esm apps/cli/src/bin.ts --profile web --host 127.0.0.1 --port 3080` in the repository root, with stdout/stderr forwarded to the launching terminal. Port `3080` matches the web profile default and stays fixed.
 - Port conflict: a TCP probe runs before spawning. An occupied port shows an understandable error dialog and exits with code 1 — no silent port switch, no retry loop.
 - Readiness: poll `http://127.0.0.1:3080/` until an HTTP response arrives (60s cap), then create the window.
-- Window: `BrowserWindow` with `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`; new windows are denied and in-window navigation is restricted to the local DSH origin, fixed `DeepCode` title. `http`/`https` links outside that origin open in the system default browser; no remote page ever loads inside the window.
+- Window: `BrowserWindow` with `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`; new windows are denied and in-window navigation is restricted to the local DSH origin, fixed `DeepSeekGUI` title. `http`/`https` links outside that origin open in the system default browser; no remote page ever loads inside the window.
 - Shutdown: closing the last window quits the app; the child process is terminated and its exit awaited. An unexpected DSH crash shows an error dialog and exits.
 - Wiring: root scripts `build:desktop` (`tsc -b apps/desktop`) and `dev:desktop` (build then `electron apps/desktop`); `electron` is the only new dependency (root devDependency, like typescript). The package is added to `tsconfig.host.json`; the root tsdown workspace list already excludes it from bundling.
-- Verification: unit tests for command assembly, port probing, readiness waiting, and process stopping (no Electron import); `DSH_DESKTOP_SMOKE=1` runs the same startup path without GUI dialogs, prints `[deepcode] window loaded` on page load, closes the window, and exits — scriptable keyless smoke.
+- Verification: unit tests for command assembly, port probing, readiness waiting, and process stopping (no Electron import); `DSH_DESKTOP_SMOKE=1` runs the same startup path without GUI dialogs, prints `[deepseekgui] window loaded` on page load, closes the window, and exits — scriptable keyless smoke.
 
-Out of scope for this stage, per DEEPCODE milestone scoping: installer, auto-update, tray, global shortcuts, auto-start, account system, and window branding (icon stays Electron default; the page carries the repository's whale favicon).
+Out of scope for this stage, per DEEPSEEKGUI milestone scoping: installer, auto-update, tray, global shortcuts, auto-start, account system, and window branding (icon stays Electron default; the page carries the repository's whale favicon).
 
 ## Alternatives considered
 

@@ -1,5 +1,5 @@
 /**
- * 桌面端事件日志：把 DeepCode 这一侧发生的、用户和 Profile 里的 AI 都
+ * 桌面端事件日志：把 DeepSeekGUI 这一侧发生的、用户和 Profile 里的 AI 都
  * 需要知道的事，如实写进一个文件。
  *
  * 为什么要有这个文件：插件装失败、恢复被拒这类事发生在桌面端，而用户
@@ -13,15 +13,15 @@
  *   都不背不该背的锅。
  *
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/desktop-events
+ * @module @see-sol-lab/deepseekgui/desktop-events
  */
 
 import { mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { atomicWriteFile } from './atomic-write.ts'
 
-/** 事件文件所在目录名（DSH_HOME 下 DeepCode 自己的地盘，不碰 Profile 内部）。 */
-export const EVENTS_DIRNAME = 'deepcode'
+/** 事件文件所在目录名（DSH_HOME 下 DeepSeekGUI 自己的地盘，不碰 Profile 内部）。 */
+export const EVENTS_DIRNAME = 'deepseekgui'
 
 /** 事件文件名。 */
 export const EVENTS_FILENAME = 'events.md'
@@ -68,20 +68,20 @@ export function renderDesktopEvent(event: DesktopEvent, zh = true): string {
 export function foldDesktopEvent(existing: string, entry: string, maxBytes = EVENTS_MAX_BYTES, zh = true): string {
   const header = (zh
     ? [
-      '# DeepCode 桌面端事件',
+      '# DeepSeekGUI 桌面端事件',
       '',
-      '这个文件记录 DeepCode 桌面端发生的、你可能需要知道的事：最新的在最上面。',
+      '这个文件记录 DeepSeekGUI 桌面端发生的、你可能需要知道的事：最新的在最上面。',
       '如果用户问起某次失败，这里的事实就是答案，照实说即可。',
       '',
     ]
     : [
-      '# DeepCode Desktop Events',
+      '# DeepSeekGUI Desktop Events',
       '',
-      'This file records DeepCode Desktop events that may matter to you, with the newest event first.',
+      'This file records DeepSeekGUI Desktop events that may matter to you, with the newest event first.',
       'If the user asks about a failure, explain the facts recorded here accurately.',
       '',
     ]).join('\n')
-  const body = existing.startsWith('# DeepCode ')
+  const body = existing.startsWith('# DeepSeekGUI ')
     ? existing.slice(existing.indexOf('\n## ') + 1)
     : existing
   let merged = `${entry}${body.startsWith('##') ? body : ''}`
@@ -119,8 +119,8 @@ export function appendDesktopEvent(homePath: string, event: DesktopEvent, zh = t
     return file
   } catch (error) {
     console.error(zh
-      ? `[deepcode] 事件日志写入失败: ${String(error instanceof Error ? error.message : error)}`
-      : `[deepcode] Writing the event log failed: ${String(error instanceof Error ? error.message : error)}`)
+      ? `[deepseekgui] 事件日志写入失败: ${String(error instanceof Error ? error.message : error)}`
+      : `[deepseekgui] Writing the event log failed: ${String(error instanceof Error ? error.message : error)}`)
     return null
   }
 }

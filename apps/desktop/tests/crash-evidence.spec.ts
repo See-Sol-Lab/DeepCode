@@ -2,7 +2,7 @@
  * crash-evidence 测试：active-run marker 序列化/严格解析（损坏回 null、
  * 绝不挡启动）、dump 收集计划（新→旧、budget 有界、超限如实跳过）。
  * 纯 Node 环境。
- * @module @see-sol-lab/deepcode/tests/crash-evidence
+ * @module @see-sol-lab/deepseekgui/tests/crash-evidence
  */
 
 import { describe, expect, it } from 'vitest'

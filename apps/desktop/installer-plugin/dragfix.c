@@ -1,5 +1,5 @@
 /*
- * dragfix —— DeepCode 安装器卡片的拖动支持（P8-D40）。
+ * dragfix —— DeepSeekGUI 安装器卡片的拖动支持（P8-D40）。
  *
  * 深海卡片是无标题栏窗口，Win32 只有命中标题栏（HTCAPTION）才给系统拖动。
  * 纯 NSIS 脚本挂不了窗口过程，所以用这个 ~30 行的微型插件：子类化安装器

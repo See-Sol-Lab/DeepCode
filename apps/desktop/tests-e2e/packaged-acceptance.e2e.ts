@@ -1,10 +1,10 @@
 /**
- * P6 打包验收（Case A–F）：直接驱动 dist/desktop/win-unpacked/DeepCode.exe，
+ * P6 打包验收（Case A–F）：直接驱动 dist/desktop/win-unpacked/DeepSeekGUI.exe，
  * 在带 spaces 与 Unicode 的临时根内隔离 APPDATA/LOCALAPPDATA、launcher
  * state、Managed Home 与 Existing Home，剔除一切 credential-shaped env。
  * 切换/重启通过 production control entry（Desktop Chrome 的状态胶囊 →
  * Harness 面板 → 真实 DOM 点击）触发；全程不调用模型、不需要 API key。
- * @module @see-sol-lab/deepcode/tests-e2e/packaged-acceptance
+ * @module @see-sol-lab/deepseekgui/tests-e2e/packaged-acceptance
  */
 
 import { spawnSync } from 'node:child_process'
@@ -25,20 +25,20 @@ import {
 } from './fixtures.ts'
 import {
   portConnectable as portOpen,
-  clickDeepCodeButton,
-  deepCodeSectionText,
+  clickDeepSeekGUIButton,
+  deepseekGUISectionText,
   dumpChromeButtons,
-  openDeepCodeSection,
+  openDeepSeekGUISection,
   openHarnessPanel,
   shutdownApp,
   waitForCompMount,
-  waitForDeepCodeElement,
+  waitForDeepSeekGUIElement,
   waitForWindow,
 } from './chrome-driver.ts'
 
 /** P5 的第三方 fixture：非 workspace 包，只在测试 Home 里以 profile-local 形态存在。 */
 const FIXTURE_DIR = fileURLToPath(new URL('../tests/fixtures/native-proof-plugin/', import.meta.url))
-const PLUGIN_PACKAGE_NAME = 'deepcode-native-proof-plugin'
+const PLUGIN_PACKAGE_NAME = 'deepseekgui-native-proof-plugin'
 
 interface Marker {
   nonce: string
@@ -132,7 +132,7 @@ async function waitForMarker(path: string, timeoutMs = 60_000): Promise<Marker> 
 }
 
 describe('打包产物门禁', () => {
-  it('dist/desktop/win-unpacked/DeepCode.exe 存在（成品验收入口不得假绿）', () => {
+  it('dist/desktop/win-unpacked/DeepSeekGUI.exe 存在（成品验收入口不得假绿）', () => {
     expect(packagedExists, `缺少 ${EXE}；先运行 \`pnpm run build:desktop-dist\` 再执行打包验收`).toBe(true)
   })
 })
@@ -185,11 +185,11 @@ describe.runIf(packagedExists)('Packaged Acceptance（Case A–F）', () => {
         // production 代码零测试后门，被替换的只是对话框本身。
         await stubDialogs(app)
         await waitForCompMount(app)
-        // production 控制入口（P8-D39）：官方设置页 → DeepCode「Harness（桌面）」
+        // production 控制入口（P8-D39）：官方设置页 → DeepSeekGUI「Harness（桌面）」
         // 分区 → profile 行上的切换钮（真实 DOM 点击；两级子视图已取消）。
         try {
           await openHarnessPanel(app)
-          await clickDeepCodeButton(app, 'profile-switch-web-two')
+          await clickDeepSeekGUIButton(app, 'profile-switch-web-two')
         } catch (error) {
           throw new Error(`${String(error)}
 --- Chrome 按钮 dump ---
@@ -199,7 +199,7 @@ ${await dumpChromeButtons(app)}`)
         await waitForCompMount(app)
         // restart：不改变 selection（同一 production 入口）。
         await openHarnessPanel(app)
-        await clickDeepCodeButton(app, 'harness-restart')
+        await clickDeepSeekGUIButton(app, 'harness-restart')
         await waitForCompMount(app)
         expect(readLauncherState(temp).active.profile).toBe('web-two')
         expect(readLauncherState(temp).lastBootFailure).toBeNull()
@@ -286,7 +286,7 @@ ${await dumpChromeButtons(app)}`)
         await waitForCompMount(app)
         try {
           await openHarnessPanel(app)
-          await clickDeepCodeButton(app, 'profile-switch-web-bad')
+          await clickDeepSeekGUIButton(app, 'profile-switch-web-bad')
         } catch (error) {
           throw new Error(`${String(error)}
 --- Chrome 按钮 dump ---
@@ -301,7 +301,7 @@ ${await dumpChromeButtons(app)}`)
         // fallback 成功后 Harness 面板出现恢复详情区（证据跨重启保留）。
         await waitForCompMount(app)
         await openHarnessPanel(app)
-        await waitForDeepCodeElement(app, 'harness-recovery')
+        await waitForDeepSeekGUIElement(app, 'harness-recovery')
       } finally {
         await shutdownApp(app)
       }
@@ -363,7 +363,7 @@ ${await dumpChromeButtons(app)}`)
         // 2026-08-24 六套件跑齐时一并抓到）；基线放在它之后取反而更严格——
         // 这次 discovery 本身也被纳入了「不得触碰用户文件」的覆盖范围。
         await openHarnessPanel(app)
-        await clickDeepCodeButton(app, 'harness-refresh')
+        await clickDeepSeekGUIButton(app, 'harness-refresh')
         // 等的是「discovery 完成、列表里有 web-one」，**不能**等
         // profile-switch-web-one：那个按钮只给可切换的 profile，而 active
         // 的那个按设计不带（settings-plugin 的 switchable 明确排除
@@ -371,11 +371,11 @@ ${await dumpChromeButtons(app)}`)
         // 永远不会出现（2026-08-24 现场：同屏锚点齐全，唯独没有任何
         // profile-switch-*）。
         await expect.poll(
-          async () => (await deepCodeSectionText(app)).includes('web-one'),
+          async () => (await deepseekGUISectionText(app)).includes('web-one'),
           { timeout: 90_000, message: 'discovery 后 Profile 列表里没有 web-one' },
         ).toBe(true)
         // 基线：真实 boot 已完成后（官方 Harness 可以维护它自己的 cordis.yml
-        // 与 profiles/node_modules fallback），记录 DeepCode 不得触碰的文件与
+        // 与 profiles/node_modules fallback），记录 DeepSeekGUI 不得触碰的文件与
         // 目录集合。
         const ownedFiles = [
           join(dir, 'package.json'),
@@ -401,16 +401,16 @@ ${await dumpChromeButtons(app)}`)
         // discovery-only：只读发现必须完全零写入（production 刷新入口）。
         // 同上：等列表里有 web-one，不等 profile-switch-*——active 的那个
         // 按设计不带切换钮。
-        await clickDeepCodeButton(app, 'harness-refresh')
+        await clickDeepSeekGUIButton(app, 'harness-refresh')
         await expect.poll(
-          async () => (await deepCodeSectionText(app)).includes('web-one'),
+          async () => (await deepseekGUISectionText(app)).includes('web-one'),
           { timeout: 90_000, message: 'refresh 后 Profile 列表里没有 web-one' },
         ).toBe(true)
         expect(tree()).toEqual(treeBefore)
         for (const { file, content } of bytes) {
           expect(readFileSync(file, 'utf8'), file).toBe(content)
         }
-        // DeepCode 不往 Existing Home 写自己的状态；sentinel 绝不进入 Managed。
+        // DeepSeekGUI 不往 Existing Home 写自己的状态；sentinel 绝不进入 Managed。
         expect(existsSync(join(home, 'launcher-state.json'))).toBe(false)
         expect(existsSync(join(userDataDir(temp), 'dsh', 'sentinel.txt'))).toBe(false)
         expect(existsSync(sentinel)).toBe(true)
@@ -441,8 +441,8 @@ ${await dumpChromeButtons(app)}`)
       // 分区，chrome 侧的 menu-diagnostics 与 #diagnostics-panel 都已不存在。
       // 用例要证的东西没变——**入口能打开面板，且反馈输入真的渲染**（D13
       // 终态守的就是「不是一个空壳菜单项」）——只是入口换了地方。
-      await openDeepCodeSection(app, 'feedback')
-      await waitForDeepCodeElement(app, 'feedback-text')
+      await openDeepSeekGUISection(app, 'feedback')
+      await waitForDeepSeekGUIElement(app, 'feedback-text')
     } finally {
       await shutdownApp(app)
     }
@@ -482,8 +482,8 @@ ${await dumpChromeButtons(app)}`)
         await shutdownApp(app)
       }
       await expect.poll(() => portOpen(3080), { timeout: 15_000 }).toBe(false)
-      const tasklist = spawnSync('tasklist', ['/FI', 'IMAGENAME eq DeepCode.exe'], { encoding: 'utf8' })
-      expect(tasklist.stdout).not.toContain('DeepCode.exe')
+      const tasklist = spawnSync('tasklist', ['/FI', 'IMAGENAME eq DeepSeekGUI.exe'], { encoding: 'utf8' })
+      expect(tasklist.stdout).not.toContain('DeepSeekGUI.exe')
     } finally {
       rmSync(join(temp, '..'), { recursive: true, force: true })
     }

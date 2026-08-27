@@ -10,7 +10,7 @@ The [Electron desktop shell](2026-08-15-desktop-electron-shell.md) runs only fro
 
 ## Proposal
 
-Add `pnpm run build:desktop-dist` (`scripts/build-desktop-dist.ts`), which produces `dist/desktop/win-unpacked/` containing `DeepCode.exe`:
+Add `pnpm run build:desktop-dist` (`scripts/build-desktop-dist.ts`), which produces `dist/desktop/win-unpacked/` containing `DeepSeekGUI.exe`:
 
 - **Pack**: both release families (`dsh`, `vendor`) through the same per-member checks as `release/pack.ts` (pnpm pack + payload validation), into `dist/npm-dsh` and `dist/npm-vendor`.
 - **Install**: a staging consumer manifest listing the [runtime closure's](2026-08-15-desktop-runtime-closure-and-volume.md) tarballs as relative `file:` dependencies, then `npm install` — the mechanism `release/verify-packed-install.ts` proves, without its `--omit=optional`: the Windows ACL sandbox's `koffi` and the Landlock platform packages ship prebuilt binaries as optionalDependencies, and skipping them would force a source build. Registry traffic is limited to external dependencies (commander, js-yaml, koffi, opentelemetry, …), pinned by the committed `apps/desktop/runtime.package-lock.json` (seeded into the staging install and written back, so external drift shows up as a git diff; a lockfile carrying any machine-absolute path fails the build).
@@ -33,7 +33,7 @@ Scope boundaries: no installer, auto-update, tray, auto-start, signing, or accou
 
 ## Acceptance criteria
 
-- `pnpm run build:desktop-dist` produces `dist/desktop/win-unpacked/DeepCode.exe`.
+- `pnpm run build:desktop-dist` produces `dist/desktop/win-unpacked/DeepSeekGUI.exe`.
 - The packaged exe shows the official Web UI when launched (smoke mode), with the development machine's Node/pnpm removed from PATH.
 - Closing the window ends the DSH child and releases port 3080.
 - The distribution contains no `.git`, `.env`, session logs, user paths, or API keys.

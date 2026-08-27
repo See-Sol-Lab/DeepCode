@@ -3,7 +3,7 @@
  * 语义（缺失/非法 manifest、打包态 source-commit 文件缺失）、dev 态 git
  * 回退 null、以及 buildVersionInfo 的打包/开发两条组装路径。
  * 不涉及 Electron，可在普通 Node 环境下运行。
- * @module @see-sol-lab/deepcode/tests/version-info
+ * @module @see-sol-lab/deepseekgui/tests/version-info
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'

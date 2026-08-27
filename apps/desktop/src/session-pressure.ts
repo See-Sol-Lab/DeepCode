@@ -8,7 +8,7 @@
  * upstream has a report of the cache growing until V8 ran out of memory on
  * every boot, which the reporter escaped by renaming the file.
  *
- * DeepCode does not clean up on the user's behalf. It counts, and when the
+ * DeepSeekGUI does not clean up on the user's behalf. It counts, and when the
  * count crosses the threshold it says so where the user will see it. What to
  * do about it is theirs to decide — these are their conversations.
  */
@@ -17,7 +17,7 @@ import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 /**
- * Session count past which DeepCode starts warning.
+ * Session count past which DeepSeekGUI starts warning.
  *
  * Not a cliff — nothing breaks at 50,000. It is the order of magnitude where
  * the cache reaches the hundreds of megabytes that have actually broken
@@ -31,7 +31,7 @@ const SESSIONS_DIRNAME = 'sessions'
 /** How long a count stays good enough to reuse. */
 const COUNT_CACHE_MS = 5 * 60 * 1000
 
-/** The pressure reading DeepCode shows in the settings page. */
+/** The pressure reading DeepSeekGUI shows in the settings page. */
 export interface SessionPressure {
   /** Sessions counted under this Home. */
   count: number

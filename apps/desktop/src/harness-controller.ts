@@ -7,7 +7,7 @@
  * boot/fallback：用户关窗不记 failure、不 fallback、不晋升、不继续 boot，
  * 已写入的 pending 保留给下次启动的 interrupted-switch 规则，进程树只
  * 清理一次。
- * @module @see-sol-lab/deepcode/harness-controller
+ * @module @see-sol-lab/deepseekgui/harness-controller
  */
 
 import {
@@ -25,7 +25,7 @@ export interface ResolvedSelection {
   /**
    * 这次启动用的是不是托管 Home。
    *
-   * 只影响宿主凭据的透传：Managed Home 是「DeepCode 自己管的干净目录」，
+   * 只影响宿主凭据的透传：Managed Home 是「DeepSeekGUI 自己管的干净目录」，
    * 宿主环境里的 `DEEPSEEK_API_KEY` 不该漏进去（漏进去官方 UI 会把密钥输入框
    * 锁成只读，用户在界面上永远改不了 key）。Existing Home 是接管用户自己的
    * DSH Home，行为要和他自己跑 `dsh web` 一致，照旧透传。
@@ -228,8 +228,8 @@ export class HarnessController {
         this.setStatus({ phase: 'failed', failure })
         this.options.store.write({ ...before, pending: null, lastBootFailure: failure })
         this.options.log?.(this.zh()
-          ? `[deepcode] 切换失败（${failure.stage}）: ${failure.message}`
-          : `[deepcode] Switch failed (${failure.stage}): ${failure.message}`)
+          ? `[deepseekgui] 切换失败（${failure.stage}）: ${failure.message}`
+          : `[deepseekgui] Switch failed (${failure.stage}): ${failure.message}`)
         // 4. 单次 lastKnownGood 回退；为空则停在 failed。
         const fallback = before.lastKnownGood
         if (fallback === null) return
@@ -247,16 +247,16 @@ export class HarnessController {
             lastBootFailure: failure,
           })
           this.options.log?.(this.zh()
-            ? '[deepcode] 已回退到 lastKnownGood（recovered）'
-            : '[deepcode] Recovered by returning to lastKnownGood')
+            ? '[deepseekgui] 已回退到 lastKnownGood（recovered）'
+            : '[deepseekgui] Recovered by returning to lastKnownGood')
         } catch (fallbackError) {
           if (fallbackError instanceof ShutdownAbort) return
           const fallbackFailure = (fallbackError as BootAttemptError).failure
           this.setStatus({ phase: 'failed', failure: fallbackFailure })
           this.options.store.write({ ...before, pending: null, lastBootFailure: fallbackFailure })
           this.options.log?.(this.zh()
-            ? `[deepcode] 回退失败（${fallbackFailure.stage}）: ${fallbackFailure.message}`
-            : `[deepcode] Recovery fallback failed (${fallbackFailure.stage}): ${fallbackFailure.message}`)
+            ? `[deepseekgui] 回退失败（${fallbackFailure.stage}）: ${fallbackFailure.message}`
+            : `[deepseekgui] Recovery fallback failed (${fallbackFailure.stage}): ${fallbackFailure.message}`)
         }
         return
       }
@@ -300,8 +300,8 @@ export class HarnessController {
         this.setStatus({ phase: 'failed', failure })
         this.options.store.write({ ...state, lastBootFailure: failure })
         this.options.log?.(this.zh()
-          ? `[deepcode] 重启失败（${failure.stage}）: ${failure.message}`
-          : `[deepcode] Restart failed (${failure.stage}): ${failure.message}`)
+          ? `[deepseekgui] 重启失败（${failure.stage}）: ${failure.message}`
+          : `[deepseekgui] Restart failed (${failure.stage}): ${failure.message}`)
       }
     })
   }
@@ -348,8 +348,8 @@ export class HarnessController {
       if (this.runtimeStatus.phase !== 'running') return Promise.resolve()
       this.setStatus({ phase: 'failed', failure })
       this.options.log?.(this.zh()
-        ? `[deepcode] DSH 服务意外退出: ${failure.message}`
-        : `[deepcode] The DSH service exited unexpectedly: ${failure.message}`)
+        ? `[deepseekgui] DSH 服务意外退出: ${failure.message}`
+        : `[deepseekgui] The DSH service exited unexpectedly: ${failure.message}`)
       return Promise.resolve()
     })
   }
@@ -370,8 +370,8 @@ export class HarnessController {
       this.setStatus({ phase: 'failed', failure })
       this.options.store.write({ ...state, lastBootFailure: failure })
       this.options.log?.(this.zh()
-        ? `[deepcode] 启动失败（${failure.stage}）: ${failure.message}`
-        : `[deepcode] Startup failed (${failure.stage}): ${failure.message}`)
+        ? `[deepseekgui] 启动失败（${failure.stage}）: ${failure.message}`
+        : `[deepseekgui] Startup failed (${failure.stage}): ${failure.message}`)
     }
   }
 
@@ -399,8 +399,8 @@ export class HarnessController {
       // 能用它替换掉真正该报给用户的那个失败原因。
       await this.options.runtime.stopProcess().catch((stopError: unknown) => {
         console.error(this.zh()
-          ? `[deepcode] 清理子进程失败: ${String(stopError instanceof Error ? stopError.message : stopError)}`
-          : `[deepcode] Failed to clean up the child process: ${String(stopError instanceof Error ? stopError.message : stopError)}`)
+          ? `[deepseekgui] 清理子进程失败: ${String(stopError instanceof Error ? stopError.message : stopError)}`
+          : `[deepseekgui] Failed to clean up the child process: ${String(stopError instanceof Error ? stopError.message : stopError)}`)
       })
       throw new BootAttemptError(toBootFailure('spawn', error, this.zh(), target))
     }
@@ -420,8 +420,8 @@ export class HarnessController {
       // 能用它替换掉真正该报给用户的那个失败原因。
       await this.options.runtime.stopProcess().catch((stopError: unknown) => {
         console.error(this.zh()
-          ? `[deepcode] 清理子进程失败: ${String(stopError instanceof Error ? stopError.message : stopError)}`
-          : `[deepcode] Failed to clean up the child process: ${String(stopError instanceof Error ? stopError.message : stopError)}`)
+          ? `[deepseekgui] 清理子进程失败: ${String(stopError instanceof Error ? stopError.message : stopError)}`
+          : `[deepseekgui] Failed to clean up the child process: ${String(stopError instanceof Error ? stopError.message : stopError)}`)
       })
       throw new BootAttemptError(toBootFailure('readiness', error, this.zh(), target))
     }
@@ -434,8 +434,8 @@ export class HarnessController {
       // 能用它替换掉真正该报给用户的那个失败原因。
       await this.options.runtime.stopProcess().catch((stopError: unknown) => {
         console.error(this.zh()
-          ? `[deepcode] 清理子进程失败: ${String(stopError instanceof Error ? stopError.message : stopError)}`
-          : `[deepcode] Failed to clean up the child process: ${String(stopError instanceof Error ? stopError.message : stopError)}`)
+          ? `[deepseekgui] 清理子进程失败: ${String(stopError instanceof Error ? stopError.message : stopError)}`
+          : `[deepseekgui] Failed to clean up the child process: ${String(stopError instanceof Error ? stopError.message : stopError)}`)
       })
       throw new BootAttemptError(toBootFailure('page-load', error, this.zh(), target))
     }

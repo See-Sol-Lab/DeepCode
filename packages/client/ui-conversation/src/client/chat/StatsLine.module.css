@@ -6,7 +6,7 @@
      an overlong line ends in … instead of a mid-glyph clip. */
   display: block;
   text-align: center;
-  /* Host hooks (DeepCode P8-D33 third ruling): the backing may be reshaped
+  /* Host hooks (DeepSeekGUI P8-D33 third ruling): the backing may be reshaped
      into a centered pill hugging the text (width fit-content + radius +
      tight padding) instead of the full-width band. Every default keeps the
      upstream geometry exactly; only a host theme layer changes anything. */
@@ -16,7 +16,7 @@
   box-sizing: border-box;
   border-radius: var(--dsh-statsline-radius, 0);
   padding: var(--dsh-statsline-padding, 4px var(--dsh-statsline-side-pad, calc(var(--dsh-composer-side-clearance) + 16px)) 0px);
-  /* Host hook (DeepCode P8-D45): meta text may scale down with a smaller
+  /* Host hook (DeepSeekGUI P8-D45): meta text may scale down with a smaller
      transcript body. */
   font-size: var(--dsh-statsline-font-size, 12px);
   line-height: var(--dsh-statsline-line-height, 20px);
@@ -24,7 +24,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  /* Host hook (DeepCode P8-D33): long replies scroll under this row and the
+  /* Host hook (DeepSeekGUI P8-D33): long replies scroll under this row and the
      two text layers collide. A host theme layer may supply an opaque backing;
      the transparent fallback keeps vanilla dsh web pixel-identical. */
   background: var(--dsh-statsline-bg, transparent);

@@ -1,5 +1,5 @@
 /**
- * P3 打包插件验收（Plugin Manager）：直接驱动打包 DeepCode.exe，经
+ * P3 打包插件验收（Plugin Manager）：直接驱动打包 DeepSeekGUI.exe，经
  * production 控制入口（状态胶囊 → Harness 面板 → Plugin Manager 的真实
  * DOM 点击）完成 add/remove，并用一个真 Cordis bundle fixture 证明
  * restart handoff 的语义：Later 时新 composition 尚未生效（marker 不
@@ -12,7 +12,7 @@
  * 原生确认对话框由测试侧 stub（dialog.showMessageBox → 确认）：production
  * 代码不含任何测试后门，被 stub 的只是 OS 对话框本身，按钮 → 确认 → 执行
  * 的产品路径照常跑。
- * @module @see-sol-lab/deepcode/tests-e2e/plugin-manager
+ * @module @see-sol-lab/deepseekgui/tests-e2e/plugin-manager
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -33,21 +33,21 @@ import {
 import {
   CHROME_URL_PREFIX,
   COMP_URL_PREFIX,
-  clickDeepCodeButton,
+  clickDeepSeekGUIButton,
   dumpChromeButtons,
   ensureCleanStage,
   evalInView,
-  fillDeepCodeInput,
-  openDeepCodeSection,
-  readDeepCodeText,
+  fillDeepSeekGUIInput,
+  openDeepSeekGUISection,
+  readDeepSeekGUIText,
   shutdownApp,
   waitForCompMount,
-  waitForDeepCodeElement,
+  waitForDeepSeekGUIElement,
   waitForWindow,
 } from './chrome-driver.ts'
 
 /** fixture 包名（repo-local 动态创建，非 workspace 包）。 */
-const FIXTURE_PACKAGE = 'deepcode-packaged-bundle-fixture'
+const FIXTURE_PACKAGE = 'deepseekgui-packaged-bundle-fixture'
 
 /** 本套件的隔离根：Unicode 但**不含空格**——官方 CLI 的 Windows shell 转发无法携带含空格的路径参数。 */
 const isolationRoot = (suffix: string): string => sharedIsolationRoot(`dsh-plugin-${suffix}-`, '深度plugin')
@@ -165,7 +165,7 @@ async function waitHarnessRunning(app: ElectronApplication, timeoutMs = 120_000)
  * @param profile - 目标 profile。
  */
 async function openPluginManager(app: ElectronApplication, profile: string): Promise<void> {
-  // P8-D39：插件管理是官方设置页里的 DeepCode 分区。openDeepCodeSection 自身
+  // P8-D39：插件管理是官方设置页里的 DeepSeekGUI 分区。openDeepSeekGUISection 自身
   // 幂等（面板已开/分区已选就不重复点），所以每次操作前直接调即可——不再需要
   // 旧 chrome 面板那套「可见性判据」（那时重启会顺手 closeMenu，驱动会对着
   // 隐藏的树空点）。
@@ -173,8 +173,8 @@ async function openPluginManager(app: ElectronApplication, profile: string): Pro
   // 目标 profile 不再需要选：单 profile 现状下目标区整块不显示，写操作固定
   // 落在 active profile（settings-plugin 的 effectiveTarget）。参数保留是为了
   // 让用例读起来仍然说得清它在操作谁，并在这里断言它就是 active。
-  await openDeepCodeSection(app, 'plugins')
-  await waitForDeepCodeElement(app, `plugin-inventory-${profile}`)
+  await openDeepSeekGUISection(app, 'plugins')
+  await waitForDeepSeekGUIElement(app, `plugin-inventory-${profile}`)
 }
 
 /** 选动作 + 填 spec（真实 input 事件）+ 点执行。 */
@@ -183,10 +183,10 @@ async function runPluginOperation(
   action: 'add' | 'remove' | 'install',
   spec: string | null,
 ): Promise<void> {
-  await clickDeepCodeButton(app, `plugin-action-${action}`)
+  await clickDeepSeekGUIButton(app, `plugin-action-${action}`)
   if (spec !== null) {
-    await waitForDeepCodeElement(app, 'plugin-spec')
-    await fillDeepCodeInput(app, 'plugin-spec', spec)
+    await waitForDeepSeekGUIElement(app, 'plugin-spec')
+    await fillDeepSeekGUIInput(app, 'plugin-spec', spec)
     // 输入后"执行"必须变为可用：渲染期算出的 disabled 由输入事件就地
     // 同步（否则用户只能靠回车执行——打包验收抓获过这个真实 bug）。
     //
@@ -198,18 +198,18 @@ async function runPluginOperation(
       () => evalInView<boolean>(
         app,
         COMP_URL_PREFIX,
-        "document.querySelector('[data-deepcode=\"plugin-run\"]')?.disabled === false",
+        "document.querySelector('[data-deepseekgui=\"plugin-run\"]')?.disabled === false",
       ),
       { timeout: 60_000 },
     ).toBe(true)
   }
-  await clickDeepCodeButton(app, 'plugin-run')
+  await clickDeepSeekGUIButton(app, 'plugin-run')
 }
 
 /** 轮询插件操作视图的 step 文本（done/failed/cancelled 由 UI 呈现）。 */
 async function pluginOperationText(app: ElectronApplication): Promise<string> {
   try {
-    return await readDeepCodeText(app, 'plugin-operation')
+    return await readDeepSeekGUIText(app, 'plugin-operation')
   } catch {
     return ''
   }
@@ -275,13 +275,13 @@ describe.runIf(packagedExists)('Packaged Plugin Manager（P3）', () => {
         // 而没有 catch，所以它里面抛出的异常既不弹失败框也不改视图，
         // 在任何产品表面上都看不见。这里把它接住。
         await app.evaluate(() => {
-          const box = globalThis as { __deepcodeErrors?: string[] }
-          box.__deepcodeErrors = []
+          const box = globalThis as { __deepseekguiErrors?: string[] }
+          box.__deepseekguiErrors = []
           process.on('unhandledRejection', (reason) => {
-            box.__deepcodeErrors?.push('unhandledRejection: ' + String(reason instanceof Error ? reason.stack : reason))
+            box.__deepseekguiErrors?.push('unhandledRejection: ' + String(reason instanceof Error ? reason.stack : reason))
           })
           process.on('uncaughtException', (error: Error) => {
-            box.__deepcodeErrors?.push('uncaughtException: ' + String(error.stack ?? error.message))
+            box.__deepseekguiErrors?.push('uncaughtException: ' + String(error.stack ?? error.message))
           })
         })
         // 启动时 web-one 尚未含 fixture：composition marker 必须不存在。
@@ -306,8 +306,8 @@ describe.runIf(packagedExists)('Packaged Plugin Manager（P3）', () => {
         expect(manifest.dsh?.profile?.bundles).toContain(FIXTURE_PACKAGE)
 
         // handoff：Later 只关提示，绝不重启——composition 因此仍未生效。
-        await waitForDeepCodeElement(app, 'plugin-handoff-later')
-        await clickDeepCodeButton(app, 'plugin-handoff-later')
+        await waitForDeepSeekGUIElement(app, 'plugin-handoff-later')
+        await clickDeepSeekGUIButton(app, 'plugin-handoff-later')
         expect(existsSync(markerPath)).toBe(false)
 
         // Restart Now：真正重启 Harness，新 composition 生效（fixture 挂载写
@@ -318,9 +318,9 @@ describe.runIf(packagedExists)('Packaged Plugin Manager（P3）', () => {
         await openPluginManager(app, 'web-one')
         // 重启按钮住在 Harness 分区（P8-D39）：切过去即可，不再需要旧两级
         // 面板那套「关面板→开菜单→点 Harness」的重置动作。
-        await openDeepCodeSection(app, 'harness')
-        await waitForDeepCodeElement(app, 'harness-restart')
-        await clickDeepCodeButton(app, 'harness-restart')
+        await openDeepSeekGUISection(app, 'harness')
+        await waitForDeepSeekGUIElement(app, 'harness-restart')
+        await clickDeepSeekGUIButton(app, 'harness-restart')
         await expect.poll(() => existsSync(markerPath), { timeout: 150_000 }).toBe(true)
         // marker 是 fixture apply 在 boot 早期写的；settle 的 verified（删
         // journal）发生在 boot 完成之后——remove 之前必须等这个真实相位，
@@ -356,7 +356,7 @@ describe.runIf(packagedExists)('Packaged Plugin Manager（P3）', () => {
         const samples: string[] = []
         for (let i = 0; i < 30; i += 1) {
           const modelOp = String(await evalInView<string>(app, CHROME_URL_PREFIX,
-            'window.deepCodeDesktop.getControlModel().then(m => JSON.stringify(m.pluginManager.operation))')
+            'window.deepseekGUIDesktop.getControlModel().then(m => JSON.stringify(m.pluginManager.operation))')
             .catch((cause: unknown) => `<unreadable: ${String(cause)}>`) ?? '<undefined>')
           samples.push(`${String(i * 200)}ms model=${modelOp.slice(0, 120)} dom=${JSON.stringify((await pluginOperationText(app)).slice(0, 40))}`)
           await new Promise(resolve => setTimeout(resolve, 200))
@@ -377,7 +377,7 @@ ${manifestNow}
 --- DIAG journal.json 存在 ---
 ${String(journalNow)}
 --- DIAG main 未捕获错误 ---
-${(await app.evaluate(() => (globalThis as { __deepcodeErrors?: string[] }).__deepcodeErrors ?? []).catch(() => ['<main unreachable>'])).join(String.fromCharCode(10))}
+${(await app.evaluate(() => (globalThis as { __deepseekguiErrors?: string[] }).__deepseekguiErrors ?? []).catch(() => ['<main unreachable>'])).join(String.fromCharCode(10))}
 --- DIAG remove 后前 6 秒采样 ---
 ${samples.join(String.fromCharCode(10))}
 --- DIAG chrome 全文 ---
@@ -435,7 +435,7 @@ ${await dumpChromeButtons(app)}`)
         await runPluginOperation(app, 'add', fixture)
         // 尽快取消（按钮只在 running 期间出现；已完成则跳过取消）。
         const cancelClicked = await evalInView<boolean>(app, COMP_URL_PREFIX, `(() => {
-          const button = document.querySelector('[data-deepcode="plugin-op-cancel"]')
+          const button = document.querySelector('[data-deepseekgui="plugin-op-cancel"]')
           if (button === null || button.disabled) return false
           button.click()
           return true

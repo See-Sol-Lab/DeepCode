@@ -2,7 +2,7 @@
  * diagnostics-service 与 log-rotation 测试：Build Info allowlist、
  * 路径归一化、bundle manifest/文件过滤、日志轮转份数与 budget、
  * 最老先删与 crash 证据保留。纯 Node 环境。
- * @module @see-sol-lab/deepcode/tests/diagnostics-rotation
+ * @module @see-sol-lab/deepseekgui/tests/diagnostics-rotation
  */
 
 import { describe, expect, it } from 'vitest'
@@ -23,9 +23,9 @@ import {
   planLogRotation,
   type LogFileFact,
 } from '../src/log-rotation.ts'
-import type { DeepCodeVersionInfo } from '../src/version-info.ts'
+import type { DeepSeekGUIVersionInfo } from '../src/version-info.ts'
 
-const VERSION: DeepCodeVersionInfo = {
+const VERSION: DeepSeekGUIVersionInfo = {
   appVersion: '0.1.0-alpha.1',
   embeddedDshVersion: '0.1.0-rc.5',
   sourceCommit: 'abc123',
@@ -47,7 +47,7 @@ describe('buildInfoLines / buildInfoText（allowlist 事实）', () => {
     })
     const text = buildInfoText(lines)
     expect(lines).toHaveLength(9)
-    expect(text).toContain('DeepCode: 0.1.0-alpha.1')
+    expect(text).toContain('DeepSeekGUI: 0.1.0-alpha.1')
     expect(text).toContain('Embedded DSH: 0.1.0-rc.5 (source abc123)')
     expect(text).toContain('Harness Home: Existing')
     expect(text).toContain('Active Profile: web')
@@ -207,7 +207,7 @@ describe('assembleDiagnosticsBundle（归一化作用于写盘正文）', () => 
         { name: 'dsh-service.log', content: `boot ok, home=${home}\\dsh\n`, source: `${home}\\dsh-service.log` },
         { name: 'dsh-service.log.1', content: `crash log at ${home}/dsh\n`, source: `${home}\\dsh-service.log.1` },
       ],
-      buildInfo: `DeepCode: ${VERSION.appVersion}\nDiagnostics Log: ${home}\\dsh-service.log`,
+      buildInfo: `DeepSeekGUI: ${VERSION.appVersion}\nDiagnostics Log: ${home}\\dsh-service.log`,
       exportedAt: '2026-08-17T00:00:00Z',
     })
     expect(files.size).toBe(4)

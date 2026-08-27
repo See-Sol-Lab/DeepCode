@@ -5,7 +5,7 @@
  *
  * 纯函数：只计算 rename/delete 计划，不执行任何文件操作——main 持
  * 行执行并处理失败；不建日志数据库、不建后台清理服务。
- * @module @see-sol-lab/deepcode/log-rotation
+ * @module @see-sol-lab/deepseekgui/log-rotation
  */
 
 /** 保留份数上限（current + 历史）。 */

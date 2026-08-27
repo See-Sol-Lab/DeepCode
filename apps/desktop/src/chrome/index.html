@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  DeepCode Desktop Chrome：顶栏 + 菜单面板 + Harness 控制面。
+  DeepSeekGUI Desktop Chrome：顶栏 + 菜单面板 + Harness 控制面。
   作为置顶 WebContentsView 渲染：平时只占顶栏高度，菜单展开时由 main
   扩展到全窗（本页背景透明，只有绘制的表面不透明）。
   Compatibility View（官方 Web UI）在它下方，永不被注入。
@@ -9,7 +9,7 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:">
-  <title>DeepCode</title>
+  <title>DeepSeekGUI</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
@@ -19,7 +19,7 @@
     </button>
     <div id="brand" aria-hidden="true">
       <img id="brand-icon" src="./icon.png" alt="">
-      <span id="brand-name">DeepCode</span>
+      <span id="brand-name">DeepSeekGUI</span>
     </div>
     <div id="recovery-banner" role="status" hidden>
       <span id="recovery-banner-text"></span>
@@ -39,13 +39,13 @@
   </header>
 
   <div id="overlay" hidden>
-    <div id="main-menu" class="panel" role="menu" aria-label="DeepCode 菜单" data-i18n-aria="menu.aria" hidden>
+    <div id="main-menu" class="panel" role="menu" aria-label="DeepSeekGUI 菜单" data-i18n-aria="menu.aria" hidden>
       <!-- 状态区（只读）：菜单一打开就看得见「它活着吗 / 跑的哪套 / 家在哪 / 什么
            权限」，不必先点进 Harness（P8-D19 信息区上提）。这里只陈述事实，动作
            全留在 Harness 二级面板里。 -->
       <div id="menu-status"><!-- 状态行由 renderer 填充 --></div>
       <!-- Harness 控制面 / 插件管理 / BUG 诊断与反馈已移居官方设置页的
-           DeepCode 分区（P8-D39 第二批，住户 2026-08-23 定稿）：本菜单只剩
+           DeepSeekGUI 分区（P8-D39 第二批，住户 2026-08-23 定稿）：本菜单只剩
            状态区与桌面壳自己的事。 -->
       <div class="separator" role="separator"></div>
       <!-- 重启 Harness（B3-15，住户 2026-08-24 批准）：Harness 崩掉时设置页
@@ -67,8 +67,8 @@
       <button class="menu-item" role="menuitem" id="menu-browser-pane" data-command="browser-pane" hidden>浏览器面板</button>
       <button class="menu-item" role="menuitem" id="menu-check-updates" data-command="check-updates" data-i18n="menu.update">检查更新</button>
       <div class="separator" role="separator"></div>
-      <button class="menu-item" role="menuitem" id="menu-about" data-command="about" data-i18n="menu.about">关于 DeepCode</button>
-      <!-- 「退出 DeepCode」已按 P8-D19 移除：退出走托盘右键，与菜单这条本来就是
+      <button class="menu-item" role="menuitem" id="menu-about" data-command="about" data-i18n="menu.about">关于 DeepSeekGUI</button>
+      <!-- 「退出 DeepSeekGUI」已按 P8-D19 移除：退出走托盘右键，与菜单这条本来就是
            同一条 requestQuit 路径（main 的注释原话：「显式 Quit 的唯一入口，
            Chrome 菜单与 Tray 共用」）。人不会为了退出专门钻进菜单，而窗口的 X
            是隐藏不是退出，关窗时那条一次性提示已经把托盘那条路说清楚了。 -->

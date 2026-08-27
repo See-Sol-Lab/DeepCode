@@ -4,4 +4,4 @@
 # readiness 失败。这是 Plugin Mutation Recovery 要兜住的真实失败链。
 - insert:
     - id: recovery-bad-plugin
-      name: 'deepcode-recovery-bad-plugin'
+      name: 'deepseekgui-recovery-bad-plugin'

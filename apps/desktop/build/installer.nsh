@@ -1,4 +1,4 @@
-﻿# DeepCode 的 NSIS 自定义片段（P8-D4 / P8-D21 / P8-D31）。
+# DeepSeekGUI 的 NSIS 自定义片段（P8-D4 / P8-D21 / P8-D31）。
 # electron-builder 经 electron-builder.yml 的 nsis.include 把本文件 !include
 # 进它生成的安装脚本（拼在最终脚本最前部）。
 #
@@ -42,12 +42,12 @@
 !macroend
 
 # ── P8-D31 深海卡片安装皮肤（Sol 复核后的终版路线，2026-08-23）──
-# 视觉：整窗深蓝海流底图（Sol 供图，「DeepCode／正在安装…」两行字已在生成
+# 视觉：整窗深蓝海流底图（Sol 供图，「DeepSeekGUI／正在安装…」两行字已在生成
 # 图时烙入，抗锯齿）＋圆角无边框卡片＋底部细进度条。
 #
 # 路线（候选 D，Sol 拍板）：**不创建 SpiderBanner，让 MUI InstFiles 主窗直接
 # 露脸**。pnpm patch（patches/app-builder-lib@26.15.3.patch）给模板加了编译期
-# 开关——定义 DEEPCODE_USE_MUI_INSTFILES 时 installSection 跳过
+# 开关——定义 DEEPSEEKGUI_USE_MUI_INSTFILES 时 installSection 跳过
 # SpiderBanner::Show，改为 ShowWindow $HWNDPARENT。主窗上的皮肤钩子
 # （MUI_PAGE_CUSTOMFUNCTION_SHOW，UI 线程，2026-08-23 4:58 版日志全程验证过）
 # 因此画在用户真正看到的窗口上。oneClick/per-user/自动启动/静默升级全不受影响。
@@ -56,10 +56,10 @@
 # 全部失败——banner 属插件线程，页面钩子够不着、nsDialogs timer 在 MUI 页
 # 不触发、section 线程改不动它也画不上图。别再走回头路。
 
-!define DEEPCODE_USE_MUI_INSTFILES
+!define DEEPSEEKGUI_USE_MUI_INSTFILES
 
 # ── 皮肤本体(安装/卸载共用;BGPREFIX 选带对应文案的底图) ──
-!macro DEEPCODE_SKIN_BODY BGPREFIX
+!macro DEEPSEEKGUI_SKIN_BODY BGPREFIX
   # 系统 DPI → 缩放百分比（ManifestDPIAware true 下坐标即物理像素）
   System::Call 'user32::GetDpiForSystem() i .r2'
   ${if} $2 <= 0
@@ -74,13 +74,13 @@
   # 字体直接以最终大小画，锐利。非常规 DPI 落到最近一档，轻微缩放可接受。
   InitPluginsDir
   ${if} $2 >= 200
-    File "/oname=$PLUGINSDIR\deepcode-bg.bmp" "${PROJECT_DIR}\apps\desktop\build\${BGPREFIX}-bg-200.bmp"
+    File "/oname=$PLUGINSDIR\deepseekgui-bg.bmp" "${PROJECT_DIR}\apps\desktop\build\${BGPREFIX}-bg-200.bmp"
   ${elseif} $2 >= 150
-    File "/oname=$PLUGINSDIR\deepcode-bg.bmp" "${PROJECT_DIR}\apps\desktop\build\${BGPREFIX}-bg-150.bmp"
+    File "/oname=$PLUGINSDIR\deepseekgui-bg.bmp" "${PROJECT_DIR}\apps\desktop\build\${BGPREFIX}-bg-150.bmp"
   ${elseif} $2 >= 125
-    File "/oname=$PLUGINSDIR\deepcode-bg.bmp" "${PROJECT_DIR}\apps\desktop\build\${BGPREFIX}-bg-125.bmp"
+    File "/oname=$PLUGINSDIR\deepseekgui-bg.bmp" "${PROJECT_DIR}\apps\desktop\build\${BGPREFIX}-bg-125.bmp"
   ${else}
-    File "/oname=$PLUGINSDIR\deepcode-bg.bmp" "${PROJECT_DIR}\apps\desktop\build\${BGPREFIX}-bg-100.bmp"
+    File "/oname=$PLUGINSDIR\deepseekgui-bg.bmp" "${PROJECT_DIR}\apps\desktop\build\${BGPREFIX}-bg-100.bmp"
   ${endif}
 
   # 卡片尺寸 360×270（与底图 4:3 一致；住户 2026-08-23 定：初版 720 太大，缩半）× DPI
@@ -113,7 +113,7 @@
   System::Call 'user32::SetWindowRgn(p $HWNDPARENT, p r4, i 1)'
 
   # 外窗旧家具全部收起（实测内页置顶盖不全）：header 图标/标题/副标题/
-  # 背景条（1034-1039、1046）、branding 「DeepCode 1.0.0」与分隔线（1256、
+  # 背景条（1034-1039、1046）、branding 「DeepSeekGUI 1.0.0」与分隔线（1256、
   # 1028、1035/1036）、底部「关闭/取消/上一步」按钮（1/2/3）。藏空 id 无害。
   GetDlgItem $0 $HWNDPARENT 1
   ShowWindow $0 0
@@ -164,7 +164,7 @@
   # 底图铺满内页：SS_BITMAP(0xE)|SS_REALSIZECONTROL(0x40)|WS_CHILD|WS_VISIBLE，
   # 压到 Z 序最底，进度条浮在图上。SHOW 在 UI 线程，建子窗合法（4:58 版实证）。
   System::Call 'user32::CreateWindowEx(i 0, t "STATIC", t "", i 0x5000004E, i 0, i 0, i r7, i r8, p r1, i 0, p 0, p 0) p .r3'
-  System::Call 'user32::LoadImage(p 0, t "$PLUGINSDIR\deepcode-bg.bmp", i 0, i 0, i 0, i 0x10) p .r6'
+  System::Call 'user32::LoadImage(p 0, t "$PLUGINSDIR\deepseekgui-bg.bmp", i 0, i 0, i 0, i 0x10) p .r6'
   SendMessage $3 0x0172 0 $6 ; STM_SETIMAGE(IMAGE_BITMAP)
   System::Call 'user32::SetWindowPos(p r3, p 1, i 0, i 0, i 0, i 0, i 0x3)' ; HWND_BOTTOM
 
@@ -199,9 +199,9 @@
 !macroend
 
 !ifndef BUILD_UNINSTALLER
-  !define MUI_PAGE_CUSTOMFUNCTION_SHOW deepcodeSkinShow
-  Function deepcodeSkinShow
-    !insertmacro DEEPCODE_SKIN_BODY "installer"
+  !define MUI_PAGE_CUSTOMFUNCTION_SHOW deepseekguiSkinShow
+  Function deepseekguiSkinShow
+    !insertmacro DEEPSEEKGUI_SKIN_BODY "installer"
   FunctionEnd
 !else
   # 卸载器没有 SpiderBanner,MUI 主窗直接可见,同一套皮肤直接适用。
@@ -209,20 +209,20 @@
   # 先展开、会把 un. 函数吃进永不显示的安装页并编译报错。patch 在两个页面
   # 之间开了 customUnpageInstfilesPre seam,define 在安装页展开之后落地。
   !macro customUnpageInstfilesPre
-    !define MUI_PAGE_CUSTOMFUNCTION_SHOW un.deepcodeSkinShow
+    !define MUI_PAGE_CUSTOMFUNCTION_SHOW un.deepseekguiSkinShow
   !macroend
-  Function un.deepcodeSkinShow
-    !insertmacro DEEPCODE_SKIN_BODY "uninstaller"
+  Function un.deepseekguiSkinShow
+    !insertmacro DEEPSEEKGUI_SKIN_BODY "uninstaller"
   FunctionEnd
 !endif
 
 !macro customUnInstall
   # updater 下载缓存（2026-08-27 人工验收发现）：electron-updater 把下载好的安装包
   # 留在 %LOCALAPPDATA% 下，实测卸载完那儿还躺着 136 MB，而用户根本不会知道它在。
-  # 目录名由 package.json 的 name（@see-sol-lab/deepcode）去掉斜杠再接 -updater 得来，
+  # 目录名由 package.json 的 name（@see-sol-lab/deepseekgui）去掉斜杠再接 -updater 得来，
   # 改包名时这里要跟着改。它是程序的下载缓存、不是用户的东西，所以无条件清掉，
   # 不并进下面那个「要不要删数据目录」的询问。
-  RMDir /r "$LOCALAPPDATA\@see-sol-labdeepcode-updater"
+  RMDir /r "$LOCALAPPDATA\@see-sol-labdeepseekgui-updater"
   # P8-D21：卸载器从来没有交代过用户数据留在哪儿。这里问一次，默认保留。
   #
   # 时机说明（这段是本宏唯一的复杂之处，别照直觉改）：一键卸载器在 un.onInit 里
@@ -241,7 +241,7 @@
   ${if} ${Errors}
     # D29 追加（住户 2026-08-23）：卡片/弹窗中英同屏——安装器没有语言切换，
     # 中文在前英文在后，两边用户都能看懂。
-    MessageBox MB_YESNO|MB_ICONQUESTION "是否同时删除 DeepCode 的数据目录？$\r$\n其中包含 Harness 主目录、会话记录、日志与缓存：$\r$\n$APPDATA\${APP_FILENAME}$\r$\n选「否」会保留这些数据，重新安装后可以接着用。$\r$\n$\r$\nAlso delete DeepCode's data folder (Harness home, sessions, logs, caches)?$\r$\nChoose No to keep the data for a future reinstall." IDNO deepcodeKeepAppData
+    MessageBox MB_YESNO|MB_ICONQUESTION "是否同时删除 DeepSeekGUI 的数据目录？$\r$\n其中包含 Harness 主目录、会话记录、日志与缓存：$\r$\n$APPDATA\${APP_FILENAME}$\r$\n选「否」会保留这些数据，重新安装后可以接着用。$\r$\n$\r$\nAlso delete DeepSeekGUI's data folder (Harness home, sessions, logs, caches)?$\r$\nChoose No to keep the data for a future reinstall." IDNO deepseekguiKeepAppData
       # Electron 的用户数据一律落在当前用户名下，即使程序本身装成 per-machine，
       # 所以删之前把 shell 变量上下文切回 current（与模板同一处理）。
       ${if} $installMode == "all"
@@ -251,7 +251,7 @@
       ${if} $installMode == "all"
         SetShellVarContext all
       ${endif}
-    deepcodeKeepAppData:
+    deepseekguiKeepAppData:
   ${endif}
 !macroend
 
@@ -267,18 +267,18 @@
 # 所以在装之前就拦。此宏在模板的 .onInit 里、initMultiUser 之后展开，$INSTDIR
 # 这时已是终值：默认目录、注册表里记录的旧安装位置、以及 /D= 覆盖都已生效。
 #
-# ${DEEPCODE_MAX_INSTDIR_LEN} 与 scripts/build-desktop-dist.ts 实测的余量绑定：
+# ${DEEPSEEKGUI_MAX_INSTDIR_LEN} 与 scripts/build-desktop-dist.ts 实测的余量绑定：
 # 该脚本每次打包都会读取这里的数字，大于实测余量就让构建失败，两侧不会漂移。
-!define DEEPCODE_MAX_INSTDIR_LEN 85
+!define DEEPSEEKGUI_MAX_INSTDIR_LEN 85
 
 !macro customInit
   # 注意：模板的 .onInit 在本宏之前就执行了 SetOutPath $INSTDIR（installer.nsi），
   # 目录树因此已被建出来。被拒的安装留下的是空目录：没有文件写入，也没有注册表
   # 项。抢在 SetOutPath 之前没有可用挂点，为此再 patch 模板不划算。
   StrLen $0 "$INSTDIR"
-  ${If} $0 > ${DEEPCODE_MAX_INSTDIR_LEN}
+  ${If} $0 > ${DEEPSEEKGUI_MAX_INSTDIR_LEN}
     ${IfNot} ${Silent}
-      MessageBox MB_OK|MB_ICONSTOP "安装目录过深，无法安装到这里：$\r$\n$INSTDIR$\r$\n$\r$\n该路径有 $0 个字符，上限是 ${DEEPCODE_MAX_INSTDIR_LEN} 个。程序内含的第三方 npm 包目录层层嵌套，再加上 Windows 的 260 字符路径上限，安装目录一旦过深，部分程序文件就无法写入，卸载与升级随后会失败。该限制来自 Windows 与这些第三方包，不是 DSH 或 DeepCode 引入的。$\r$\n请改用较浅的目录重新安装，例如 $LocalAppData\Programs\${APP_FILENAME}。$\r$\n$\r$\nThe installation directory is too deep:$\r$\n$INSTDIR$\r$\nIt is $0 characters; the limit is ${DEEPCODE_MAX_INSTDIR_LEN}. Third-party npm packages nest their directories deeply, and with Windows' 260-character path limit a deep installation directory leaves some program files unwritable, so uninstalling and updating fail later. The limit comes from Windows and those third-party packages, not from DSH or DeepCode.$\r$\nPlease install into a shorter directory, for example $LocalAppData\Programs\${APP_FILENAME}."
+      MessageBox MB_OK|MB_ICONSTOP "安装目录过深，无法安装到这里：$\r$\n$INSTDIR$\r$\n$\r$\n该路径有 $0 个字符，上限是 ${DEEPSEEKGUI_MAX_INSTDIR_LEN} 个。程序内含的第三方 npm 包目录层层嵌套，再加上 Windows 的 260 字符路径上限，安装目录一旦过深，部分程序文件就无法写入，卸载与升级随后会失败。该限制来自 Windows 与这些第三方包，不是 DSH 或 DeepSeekGUI 引入的。$\r$\n请改用较浅的目录重新安装，例如 $LocalAppData\Programs\${APP_FILENAME}。$\r$\n$\r$\nThe installation directory is too deep:$\r$\n$INSTDIR$\r$\nIt is $0 characters; the limit is ${DEEPSEEKGUI_MAX_INSTDIR_LEN}. Third-party npm packages nest their directories deeply, and with Windows' 260-character path limit a deep installation directory leaves some program files unwritable, so uninstalling and updating fail later. The limit comes from Windows and those third-party packages, not from DSH or DeepSeekGUI.$\r$\nPlease install into a shorter directory, for example $LocalAppData\Programs\${APP_FILENAME}."
     ${EndIf}
     SetErrorLevel 2
     Quit

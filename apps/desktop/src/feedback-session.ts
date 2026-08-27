@@ -9,7 +9,7 @@
  *   一律返回 null——调用方降级为静态模板，按钮绝不因此不可用；
  * - 诊断会话与故障现场隔离：独立 cwd（调用方给）、新 session（零历史）。
  * 纯 Node 模块，不依赖 Electron；sleep/deadline 注入，便于单元测试。
- * @module @see-sol-lab/deepcode/feedback-session
+ * @module @see-sol-lab/deepseekgui/feedback-session
  */
 
 import type { HarnessApi, SessionEventView } from './harness-api.ts'

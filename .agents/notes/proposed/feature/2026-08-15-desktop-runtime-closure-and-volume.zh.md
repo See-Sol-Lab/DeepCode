@@ -26,7 +26,7 @@ Status: proposed
 
 ## Verification
 
-优化后 runtime 约 190MB（原约 603MB）；完整 win-unpacked 低于 600MB；NSIS 安装包显著变小。打包应用保持：无外部 Node/pnpm/npm/Git/源码、干净 PATH 启动、官方 UI 加载、Models/工作区/会话界面、应用专属 `%APPDATA%\DeepCode\dsh`、无 EPIPE 回归、关窗端口释放、零残留进程、按用户 NSIS 安装（快捷方式与卸载）、净化先于打包、无 key/会话/.env/.git/用户名/私人路径泄漏。
+优化后 runtime 约 190MB（原约 603MB）；完整 win-unpacked 低于 600MB；NSIS 安装包显著变小。打包应用保持：无外部 Node/pnpm/npm/Git/源码、干净 PATH 启动、官方 UI 加载、Models/工作区/会话界面、应用专属 `%APPDATA%\DeepSeekGUI\dsh`、无 EPIPE 回归、关窗端口释放、零残留进程、按用户 NSIS 安装（快捷方式与卸载）、净化先于打包、无 key/会话/.env/.git/用户名/私人路径泄漏。
 
 ## Acceptance criteria
 

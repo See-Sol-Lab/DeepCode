@@ -3,7 +3,7 @@
  * createStreamingRedactor 的核心不变式——任意切分下输出拼接与整段
  * 脱敏完全一致，凭据绝不因 chunk 边界泄漏，正常文本绝不丢失。
  * 所有凭据均为构造的假数据。
- * @module @see-sol-lab/deepcode/tests/redact
+ * @module @see-sol-lab/deepseekgui/tests/redact
  */
 
 import { describe, expect, it } from 'vitest'

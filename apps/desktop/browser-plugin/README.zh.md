@@ -1,14 +1,14 @@
-# @see-sol-lab/deepcode-browser
+# @see-sol-lab/deepseekgui-browser
 
 [English](README.md) | 中文
 
-DeepCode 浏览器插件通过官方 Harness 工具调用循环，向 agent 暴露可见的 Microsoft Edge 浏览器。它组合只读浏览、交互工具、SSRF 防护、权限分级与敏感动作批准。
+DeepSeekGUI 浏览器插件通过官方 Harness 工具调用循环，向 agent 暴露可见的 Microsoft Edge 浏览器。它组合只读浏览、交互工具、SSRF 防护、权限分级与敏感动作批准。
 
 ## 工具
 
 ### 只读（L0）
 
-- `browser_navigate` 在 SSRF 策略允许后打开 URL。本机、内网与保留网段地址都会被拒绝，包括 DeepCode 自己的 loopback 控制服务。
+- `browser_navigate` 在 SSRF 策略允许后打开 URL。本机、内网与保留网段地址都会被拒绝，包括 DeepSeekGUI 自己的 loopback 控制服务。
 - `browser_snapshot` 返回无障碍树与可见文本，并提供稳定 `ref` 供后续交互。
 - `browser_screenshot` 把页面截图保存在本地。模型需要支持视觉才能检查图片本身。
 - `browser_wait` 等待 load、network idle、selector 或有上限的延时。
@@ -31,13 +31,13 @@ Read-only 会话拒绝全部 L1 交互。L2 动作会先通过 read-only 检查�
 
 ## 安装
 
-DeepCode Managed Profile 已包含浏览器 overlay。兼容的自定义 Profile 可以通过官方插件路径安装该包：
+DeepSeekGUI Managed Profile 已包含浏览器 overlay。兼容的自定义 Profile 可以通过官方插件路径安装该包：
 
 ```sh
-dsh plugin add @see-sol-lab/deepcode-browser
+dsh plugin add @see-sol-lab/deepseekgui-browser
 
 # Development tarball
-dsh plugin add ./see-sol-lab-deepcode-browser-0.1.0.tgz
+dsh plugin add ./see-sol-lab-deepseekgui-browser-0.1.0.tgz
 ```
 
 该包声明 `dsh.bundle.patch`，因此 `dsh plugin add` 会把 bundle 插入 Profile 组合，不需要人工编辑 patch。
@@ -46,7 +46,7 @@ dsh plugin add ./see-sol-lab-deepcode-browser-0.1.0.tgz
 
 ## 运行时依赖
 
-`playwright-core` 属于 Profile `node_modules` 下的插件运行时闭包，不会加入 DeepCode 私有运行时或 Electron 载荷。插件复用已安装的 Microsoft Edge channel，不下载浏览器内核。
+`playwright-core` 属于 Profile `node_modules` 下的插件运行时闭包，不会加入 DeepSeekGUI 私有运行时或 Electron 载荷。插件复用已安装的 Microsoft Edge channel，不下载浏览器内核。
 
 ## 安全
 

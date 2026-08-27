@@ -2,7 +2,7 @@
  * feedback-diagnostics 单测：诊断文本组装的结构事实与"规则脱敏不可
  * 跳过"——组装输出的第一个字节就是脱敏后的（用户名段、邮箱、hex
  * token、密钥赋值、home 与主机名原文都不得出现；路径结构保留）。
- * @module @see-sol-lab/deepcode/tests/feedback-diagnostics
+ * @module @see-sol-lab/deepseekgui/tests/feedback-diagnostics
  */
 
 import { describe, expect, it } from 'vitest'
@@ -29,7 +29,7 @@ const base: FeedbackDiagnosticsInput = {
   recoveryJournalState: null,
   logTail: [
     'spawned DSH with sk-abcdefgh12345678 in env',
-    'reading C:\\Users\\Alice\\AppData\\Local\\DeepCode\\logs\\main.log',
+    'reading C:\\Users\\Alice\\AppData\\Local\\DeepSeekGUI\\logs\\main.log',
     'DEEPSEEK_API_KEY=raw-secret-value-here',
     'contact alice@example.com for details',
     'token abcdef0123456789abcdef0123456789abcdef',
@@ -44,7 +44,7 @@ const base: FeedbackDiagnosticsInput = {
 describe('buildFeedbackDiagnostics 结构', () => {
   it('事实清单齐全：版本/Home/权限/插件/退出/日志摘要', () => {
     const text = buildFeedbackDiagnostics(base)
-    expect(text).toContain('DeepCode: 1.0.0')
+    expect(text).toContain('DeepSeekGUI: 1.0.0')
     expect(text).toContain('Embedded DSH: 0.1.0-rc.5 (source abc1234)')
     expect(text).toContain('Windows: Windows 11 Home')
     expect(text).toContain('Harness Home: Managed')

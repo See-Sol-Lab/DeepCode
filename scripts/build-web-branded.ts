@@ -1,9 +1,9 @@
 /**
- * DeepCode 品牌化的 web 前端构建（P8-D34）。
+ * DeepSeekGUI 品牌化的 web 前端构建（P8-D34）。
  *
  * 官方侧栏品牌区在非 official 构建里显示「DSH Local Build + commit hash」
  * fallback；该 fallback 支持 DSH_CLIENT_BRAND_NAME / _BADGE 构建期注入
- * （与所有 DSH_CLIENT_* 值一样由 Vite define 内联）。DeepCode 的发行构建
+ * （与所有 DSH_CLIENT_* 值一样由 Vite define 内联）。DeepSeekGUI 的发行构建
  * 固定显示「DeepSeek Harness」＋「local」徽标——表意"基于 DSH 的本地
  * 发行"，与官方发布版和裸本地构建都区分开（住户 2026-08-23 定）。
  *
@@ -19,7 +19,7 @@ const brandEnvironment = {
   DSH_CLIENT_BRAND_NAME: 'DeepSeek Harness',
   DSH_CLIENT_BRAND_BADGE: 'local',
   // 浏览器标签页标题一并对齐（机制早已存在，官方 official 构建也这么用）。
-  DSH_CLIENT_TITLE: 'DeepCode',
+  DSH_CLIENT_TITLE: 'DeepSeekGUI',
 }
 
 // 品牌串在 **build:lib:client（tsdown）阶段**就被内联进各 client 插件的

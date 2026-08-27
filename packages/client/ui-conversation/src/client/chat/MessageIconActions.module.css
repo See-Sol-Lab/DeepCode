@@ -6,7 +6,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  /* Host hooks (DeepCode P8-D45): the footer row may scale down with a
+  /* Host hooks (DeepSeekGUI P8-D45): the footer row may scale down with a
      smaller transcript body. Defaults keep upstream 28px targets / 14px
      labels / 16px glyphs exactly. */
   height: var(--dsh-iconaction-size, 28px);
@@ -63,7 +63,7 @@
   cursor: pointer;
 }
 
-/* Host hook (DeepCode P8-D45): the fixed 16px glyphs shrink with the row;
+/* Host hook (DeepSeekGUI P8-D45): the fixed 16px glyphs shrink with the row;
    the 16px default is each icon's intrinsic size, so unset hosts render
    pixel-identically. */
 .action svg {

@@ -1,5 +1,5 @@
 {
-  "name": "deepcode-recovery-bad-plugin",
+  "name": "deepseekgui-recovery-bad-plugin",
   "version": "0.0.0",
   "private": true,
   "main": "./plugin.js",

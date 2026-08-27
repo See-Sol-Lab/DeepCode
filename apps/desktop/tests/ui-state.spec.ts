@@ -3,7 +3,7 @@
  * 回退默认不抛错（UI 偏好绝不挡启动）、原子写入、恢复提示标识稳定
  * 与 effectiveTheme 映射。
  * 不涉及 Electron，可在普通 Node 环境下运行。
- * @module @see-sol-lab/deepcode/tests/ui-state
+ * @module @see-sol-lab/deepseekgui/tests/ui-state
  */
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'

@@ -98,7 +98,7 @@ describe('submitFeedbackToGateway', () => {
 describe('feedbackExportFileName', () => {
   it('本地时间戳文件名，可读可排序，精确到毫秒', () => {
     expect(feedbackExportFileName(new Date(2026, 7, 23, 15, 4, 5, 7)))
-      .toBe('deepcode-feedback-20260823-150405-007.md')
+      .toBe('deepseekgui-feedback-20260823-150405-007.md')
   })
 
   it('同一秒内导出两次不会撞名（第二份不会盖掉第一份）', () => {

@@ -14,7 +14,7 @@
  * B2 ships L0 tools only; the L1/L2 policy is fully implemented and tested
  * now so the M3 interaction tools register against an already-proven gate.
  *
- * @module @see-sol-lab/deepcode-browser/gate
+ * @module @see-sol-lab/deepseekgui-browser/gate
  */
 
 /** The capability's internal tool levels. */

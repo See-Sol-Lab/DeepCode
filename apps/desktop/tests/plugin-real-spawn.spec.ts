@@ -7,7 +7,7 @@
  * 本地 link/copy。pnpm 探测顺序：npm_execpath（pnpm script 注入）→
  * corepack 缓存；两者都缺失时整组跳过（机器没有 pnpm 时这些用例不
  * 适用，桌面生产路径由打包门禁与验收方覆盖）。
- * @module @see-sol-lab/deepcode/tests/plugin-real-spawn
+ * @module @see-sol-lab/deepseekgui/tests/plugin-real-spawn
  */
 
 import { execFileSync } from 'node:child_process'
@@ -75,7 +75,7 @@ function runDsh(
  * DSH_HOME 含空格会让本地 spec 的绝对路径被 cmd 拆词（已知官方限制，
  * desktop v1 在 spec 层拒绝空白并在 Agent Note 记录 deferred）。 */
 function makeHome(): { dshHome: string; shimDir: string } {
-  const base = mkdtempSync(join(tmpdir(), 'deepcode-p3-'))
+  const base = mkdtempSync(join(tmpdir(), 'deepseekgui-p3-'))
   const dshHome = join(base, 'dshhome')
   mkdirSync(dshHome, { recursive: true })
   const shimDir = join(base, 'shim')
@@ -102,7 +102,7 @@ function makeFakePackage(parentDir: string, name: string, dirName = 'my-plugin-f
     '# fake bundle patch layer',
     '- id: webserver',
     '  config:',
-    '    deepcodeFakeMarker: true',
+    '    deepseekguiFakeMarker: true',
     '',
   ].join('\n'))
   return dir
@@ -119,7 +119,7 @@ function readProfileManifestText(dshHome: string, profile: string): string {
   return readFileSync(join(dshHome, 'profiles', profile, 'package.json'), 'utf8')
 }
 
-const fakeName = 'deepcode-fake-plugin-fixture'
+const fakeName = 'deepseekgui-fake-plugin-fixture'
 
 describe.skipIf(PNPM_ENTRY === null)('dsh plugin 真实链路（repo-local fake package，无网络）', () => {
   it('add 绝对路径：manifest dependencies 与 bundles 层都出现该包；exit 0', () => {

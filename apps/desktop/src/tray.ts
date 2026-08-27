@@ -4,7 +4,7 @@
  * 到既有 control dispatch/controller 路径，Tray、Chrome 与 Terminal
  * 共用同一份 selection 与 runtime status，绝不建立第二份事实。
  * 纯 Node 模块（不 import Electron），便于单元测试。
- * @module @see-sol-lab/deepcode/tray
+ * @module @see-sol-lab/deepseekgui/tray
  */
 
 import { pillView, stringsFor } from './chrome/view-model.ts'
@@ -33,7 +33,7 @@ export interface TrayMenuItem {
 
 /** Tray 专用文案（zh/en 内联；状态文案复用 chrome 字典）。 */
 const ZH = {
-  'tray.open': '打开 DeepCode',
+  'tray.open': '打开 DeepSeekGUI',
   'tray.profile': '当前 Profile',
   'tray.status': 'Harness 状态',
   'tray.profiles': '切换 Profile',
@@ -41,12 +41,12 @@ const ZH = {
   'tray.terminal': '打开 DSH Terminal',
   'tray.updates': '检查更新',
   'tray.updates.available': '检查更新（有新版本 {version}）',
-  'tray.about': '关于 DeepCode',
-  'tray.quit': '退出 DeepCode',
+  'tray.about': '关于 DeepSeekGUI',
+  'tray.quit': '退出 DeepSeekGUI',
 } as const
 
 const EN = {
-  'tray.open': 'Open DeepCode',
+  'tray.open': 'Open DeepSeekGUI',
   'tray.profile': 'Active Profile',
   'tray.status': 'Harness Status',
   'tray.profiles': 'Profiles',
@@ -54,8 +54,8 @@ const EN = {
   'tray.terminal': 'Open DSH Terminal',
   'tray.updates': 'Check for Updates',
   'tray.updates.available': 'Check for Updates ({version} available)',
-  'tray.about': 'About DeepCode',
-  'tray.quit': 'Quit DeepCode',
+  'tray.about': 'About DeepSeekGUI',
+  'tray.quit': 'Quit DeepSeekGUI',
 } as const
 
 /** trayMenuTemplate 的输入快照（全部来自唯一模型）。 */

@@ -1,7 +1,7 @@
 /**
  * desktop-events 测试：事件渲染、最新在前的折叠、容量上限下的整条淘汰，
  * 以及真实落盘。纯 Node 环境，不涉及 Electron。
- * @module @see-sol-lab/deepcode/tests/desktop-events
+ * @module @see-sol-lab/deepseekgui/tests/desktop-events
  */
 
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
@@ -18,7 +18,7 @@ import {
 
 const roots: string[] = []
 const tempHome = (): string => {
-  const root = mkdtempSync(join(tmpdir(), 'deepcode-events-'))
+  const root = mkdtempSync(join(tmpdir(), 'deepseekgui-events-'))
   roots.push(root)
   return root
 }
@@ -50,7 +50,7 @@ describe('事件渲染', () => {
 describe('折叠：最新的在最上面', () => {
   it('首次写入带上说明头部', () => {
     const out = foldDesktopEvent('', renderDesktopEvent(sample))
-    expect(out.startsWith('# DeepCode 桌面端事件')).toBe(true)
+    expect(out.startsWith('# DeepSeekGUI 桌面端事件')).toBe(true)
     expect(out).toContain('最新的在最上面')
     expect(out).toContain('插件操作失败')
   })
@@ -59,7 +59,7 @@ describe('折叠：最新的在最上面', () => {
     const first = foldDesktopEvent('', renderDesktopEvent({ ...sample, title: '第一件事' }))
     const second = foldDesktopEvent(first, renderDesktopEvent({ ...sample, title: '第二件事' }))
     expect(second.indexOf('第二件事')).toBeLessThan(second.indexOf('第一件事'))
-    expect(second.split('# DeepCode 桌面端事件').length - 1).toBe(1)
+    expect(second.split('# DeepSeekGUI 桌面端事件').length - 1).toBe(1)
   })
 
   it('超过上限时整条淘汰最旧的，绝不留半条记录', () => {
@@ -79,7 +79,7 @@ describe('折叠：最新的在最上面', () => {
 })
 
 describe('落盘', () => {
-  it('写进 <HOME>/deepcode/events.md，并能原样读回', () => {
+  it('写进 <HOME>/deepseekgui/events.md，并能原样读回', () => {
     const home = tempHome()
     const file = appendDesktopEvent(home, sample)
     expect(file).toBe(join(home, EVENTS_DIRNAME, EVENTS_FILENAME))

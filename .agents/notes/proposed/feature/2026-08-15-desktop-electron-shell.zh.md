@@ -6,21 +6,21 @@ Status: proposed
 
 ## Problem
 
-仓库唯一随产品发布的交互界面是 Web UI，用户需要在浏览器中打开。 [DEEPCODE.md](../../../../DEEPCODE.md) 面向 DeepSeek Harness 的 Windows 桌面客户端，其第一里程碑是 Windows 桌面体验：一条命令、一个真正的应用窗口，不需要浏览器、不需要输入 localhost 地址。harness 核心已经通过 `web` profile 证明了所需行为；缺的只是一个宿主壳——启动该服务并以独立窗口呈现。
+仓库唯一随产品发布的交互界面是 Web UI，用户需要在浏览器中打开。 [DEEPSEEKGUI.md](../../../../DEEPSEEKGUI.md) 面向 DeepSeek Harness 的 Windows 桌面客户端，其第一里程碑是 Windows 桌面体验：一条命令、一个真正的应用窗口，不需要浏览器、不需要输入 localhost 地址。harness 核心已经通过 `web` profile 证明了所需行为；缺的只是一个宿主壳——启动该服务并以独立窗口呈现。
 
 ## Proposal
 
-新增 `apps/desktop`（`@see-sol-lab/deepcode`，private，仅开发阶段）——一个原样封装随产品发布的 `web` profile 的 Electron 主进程：
+新增 `apps/desktop`（`@see-sol-lab/deepseekgui`，private，仅开发阶段）——一个原样封装随产品发布的 `web` profile 的 Electron 主进程：
 
 - 启动服务：在仓库根目录 spawn `node --import tsx/esm apps/cli/src/bin.ts --profile web --host 127.0.0.1 --port 3080`，stdout/stderr 转发到启动终端。端口 `3080` 与 web profile 默认一致并保持固定。
 - 端口冲突：spawn 之前先做 TCP 探测。端口被占用时弹出可理解的错误对话框并以退出码 1 结束——不静默换端口、不重试。
 - 就绪等待：轮询 `http://127.0.0.1:3080/` 直到收到 HTTP 响应（60 秒上限），然后创建窗口。
-- 窗口：`BrowserWindow` 使用 `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`；拒绝新窗口，窗口内导航限制在本机 DSH 源内，标题固定为 `DeepCode`。该源之外的 `http`/`https` 链接交给系统默认浏览器打开；远程页面绝不在窗口内加载。
+- 窗口：`BrowserWindow` 使用 `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`；拒绝新窗口，窗口内导航限制在本机 DSH 源内，标题固定为 `DeepSeekGUI`。该源之外的 `http`/`https` 链接交给系统默认浏览器打开；远程页面绝不在窗口内加载。
 - 关闭：关闭最后一个窗口即退出应用；终止子进程并等待其退出。DSH 意外崩溃时显示错误对话框并退出。
 - 接入：根脚本 `build:desktop`（`tsc -b apps/desktop`）与 `dev:desktop`（先构建再 `electron apps/desktop`）；`electron` 是唯一新依赖（根 devDependency，与 typescript 同级）。包加入 `tsconfig.host.json`；根 tsdown workspace 白名单已天然排除它，不会被打包。
-- 验证：针对命令组装、端口探测、就绪等待、进程停止的单元测试（不 import Electron）；`DSH_DESKTOP_SMOKE=1` 走相同启动路径但不弹 GUI 对话框，页面加载后打印 `[deepcode] window loaded`，关闭窗口并退出——可脚本化的无密钥 smoke。
+- 验证：针对命令组装、端口探测、就绪等待、进程停止的单元测试（不 import Electron）；`DSH_DESKTOP_SMOKE=1` 走相同启动路径但不弹 GUI 对话框，页面加载后打印 `[deepseekgui] window loaded`，关闭窗口并退出——可脚本化的无密钥 smoke。
 
-按 DEEPCODE 里程碑边界，本阶段不做：安装器、自动更新、托盘、全局快捷键、开机启动、账号系统，以及窗口品牌化（图标保持 Electron 默认；页面本身携带仓库的鲸鱼 favicon）。
+按 DEEPSEEKGUI 里程碑边界，本阶段不做：安装器、自动更新、托盘、全局快捷键、开机启动、账号系统，以及窗口品牌化（图标保持 Electron 默认；页面本身携带仓库的鲸鱼 favicon）。
 
 ## Alternatives considered
 

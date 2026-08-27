@@ -26,7 +26,7 @@ The [portable distribution](2026-08-16-desktop-portable-distribution.md) shipped
 
 ## Verification
 
-Optimized runtime ~190MB (was ~603MB); full win-unpacked below 600MB; NSIS installer materially smaller. The packaged app keeps: no external Node/pnpm/npm/Git/source, clean-PATH startup, official UI load, Models/workspace/session surfaces, app-scoped `%APPDATA%\DeepCode\dsh`, no EPIPE regression, port release on close, zero leftover processes, per-user NSIS install with shortcuts and uninstall, sanitize-before-package, and no key/session/.env/.git/username/private-path leaks.
+Optimized runtime ~190MB (was ~603MB); full win-unpacked below 600MB; NSIS installer materially smaller. The packaged app keeps: no external Node/pnpm/npm/Git/source, clean-PATH startup, official UI load, Models/workspace/session surfaces, app-scoped `%APPDATA%\DeepSeekGUI\dsh`, no EPIPE regression, port release on close, zero leftover processes, per-user NSIS install with shortcuts and uninstall, sanitize-before-package, and no key/session/.env/.git/username/private-path leaks.
 
 ## Acceptance criteria
 

@@ -2,7 +2,7 @@
  * English failure-copy coverage: every runtime Han literal in the localized
  * desktop modules stays behind an explicit zh branch, and representative
  * public entry points return Han-free English diagnostics.
- * @module @see-sol-lab/deepcode/tests/english-errors
+ * @module @see-sol-lab/deepseekgui/tests/english-errors
  */
 
 import { readFileSync } from 'node:fs'

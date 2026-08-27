@@ -1,6 +1,6 @@
 /**
  * Session pressure: counting a Home's conversations, and the threshold past
- * which DeepCode says something about it.
+ * which DeepSeekGUI says something about it.
  */
 
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
@@ -11,7 +11,7 @@ import { clearSessionPressureCache, countSessions, readSessionPressure, SESSION_
 
 /** Build a Home holding `perWorkspace` sessions in each named workspace. */
 function home(workspaces: Record<string, number>): string {
-  const root = mkdtempSync(join(tmpdir(), 'deepcode-sessions-'))
+  const root = mkdtempSync(join(tmpdir(), 'deepseekgui-sessions-'))
   for (const [workspace, count] of Object.entries(workspaces)) {
     for (let index = 0; index < count; index += 1) {
       const dir = join(root, 'sessions', workspace, `session-${String(index)}`)
@@ -32,7 +32,7 @@ describe('countSessions', () => {
   })
 
   it('treats a home with no sessions directory as zero, not as an error', () => {
-    expect(countSessions(mkdtempSync(join(tmpdir(), 'deepcode-sessions-')))).toBe(0)
+    expect(countSessions(mkdtempSync(join(tmpdir(), 'deepseekgui-sessions-')))).toBe(0)
   })
 
   it('ignores loose files beside the workspace directories', () => {

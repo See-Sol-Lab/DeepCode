@@ -10,7 +10,7 @@
  * Tool copy is model-facing English (official tool convention); no UI copy
  * ships in B2.
  *
- * @module @see-sol-lab/deepcode-browser/tools
+ * @module @see-sol-lab/deepseekgui-browser/tools
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -74,7 +74,7 @@ async function enforceGate(
 /** Register the five read-only tools plus the M3 interaction tools and guidance. */
 export function applyBrowserTools(ctx: Context, facade: BrowserFacade): void {
   ctx.systemPrompt.section({
-    name: 'tool:deepcode-browser',
+    name: 'tool:deepseekgui-browser',
     order: 130,
     text: [
       'The environment has a built-in real-browser toolset (browser_*). It opens a visible Edge window on the user\'s machine; use it for pages that need real rendering, login, or interaction.',

@@ -6,7 +6,7 @@
  * DesktopControlCommand 是封闭联合：parseControlCommand 在 main 侧做
  * IPC 输入边界验证，未知类型、多余字段与非法 profile 名一律拒绝。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/control-model
+ * @module @see-sol-lab/deepseekgui/control-model
  */
 
 import type { HarnessStatus } from './harness-controller.ts'
@@ -142,12 +142,12 @@ export interface DesktopControlModel {
    *
    * 投影缓存每个会话一行且从不删除（删掉的会话也留着行），所以文件只增
    * 不减。几千行时毫无感觉，几万行时上游有人被它撑到每次启动都 V8 OOM。
-   * DeepCode 不替用户清理——那是他自己的对话；只把数字摆出来。
+   * DeepSeekGUI 不替用户清理——那是他自己的对话；只把数字摆出来。
    */
   sessionPressure: SessionPressure | null
   /** Plugin Manager 面板事实（inventory 三分类 + 操作 + handoff）。 */
   pluginManager: PluginManagerView
-  /** Update service 面板事实（比较对象只能是 DeepCode app version）。 */
+  /** Update service 面板事实（比较对象只能是 DeepSeekGUI app version）。 */
   update: UpdateView
   /** Diagnostics Center 面板事实。 */
   diagnostics: DiagnosticsView
@@ -168,7 +168,7 @@ export interface UpdateView {
   state: 'idle' | 'checking' | 'available' | 'downloading' | 'verified' | 'error'
   /** 最近一次 check 的语义结果（文案归 view-model 字典，绝不硬编码进模型）。 */
   result: 'unconfigured' | 'current' | 'error' | null
-  /** provider 声明的 latest DeepCode app version；available/verified 时存在。 */
+  /** provider 声明的 latest DeepSeekGUI app version；available/verified 时存在。 */
   latestVersion: string | null
   /** release note 摘要（纯文本）；available/verified 时可能存在。 */
   releaseNotes: string | null

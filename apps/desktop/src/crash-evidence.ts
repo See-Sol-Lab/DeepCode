@@ -9,7 +9,7 @@
  *   清单里如实记录被跳过者——绝不伪造"全部导出成功"；
  * - 一切证据只在本机磁盘生成，绝不上传。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/crash-evidence
+ * @module @see-sol-lab/deepseekgui/crash-evidence
  */
 
 /** active-run marker 文件名（位于 Electron userData 目录下）。 */

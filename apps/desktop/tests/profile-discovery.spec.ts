@@ -2,7 +2,7 @@
  * profile-discovery 测试：discovery 文档的严格 schema 校验，以及通过真实
  * DSH dev 入口运行 `dsh profiles --json` 的集成路径（真实 tsx 源码启动，
  * 真实官方 bundle 解析）。不涉及 Electron。
- * @module @see-sol-lab/deepcode/tests/profile-discovery
+ * @module @see-sol-lab/deepseekgui/tests/profile-discovery
  */
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'

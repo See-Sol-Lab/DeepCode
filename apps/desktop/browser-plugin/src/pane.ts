@@ -1,17 +1,17 @@
 /**
  * Embedded browser-pane bridge client (B3-11).
  *
- * When the plugin runs inside a DeepCode-spawned harness, the desktop shell
- * passes its loopback control-bridge address via DEEPCODE_BROWSER_BRIDGE
+ * When the plugin runs inside a DeepSeekGUI-spawned harness, the desktop shell
+ * passes its loopback control-bridge address via DEEPSEEKGUI_BROWSER_BRIDGE
  * (`127.0.0.1:<port>#<token>`). Through it the plugin asks Electron to open
  * the in-window browser pane (a WebContentsView beside the official UI,
  * Codex-style split), points the pane's session at the plugin's SSRF proxy,
  * and receives the CDP endpoint to drive the pane via connectOverCDP.
  *
- * Outside DeepCode the variable is absent and the plugin falls back to the
+ * Outside DeepSeekGUI the variable is absent and the plugin falls back to the
  * windowed headed-Edge mode — same tools, same gate, different chrome.
  *
- * @module @see-sol-lab/deepcode-browser/pane
+ * @module @see-sol-lab/deepseekgui-browser/pane
  */
 
 /** Parsed bridge address. */
@@ -23,12 +23,12 @@ export interface PaneBridge {
 }
 
 /**
- * Parse DEEPCODE_BROWSER_BRIDGE from the environment.
+ * Parse DEEPSEEKGUI_BROWSER_BRIDGE from the environment.
  * @param env - process environment.
- * @returns the bridge address, or null when not running inside DeepCode.
+ * @returns the bridge address, or null when not running inside DeepSeekGUI.
  */
 export function paneBridgeFromEnv(env: Record<string, string | undefined>): PaneBridge | null {
-  const raw = env.DEEPCODE_BROWSER_BRIDGE
+  const raw = env.DEEPSEEKGUI_BROWSER_BRIDGE
   if (raw === undefined || raw === '') return null
   const hash = raw.indexOf('#')
   if (hash <= 0 || hash === raw.length - 1) return null
@@ -45,7 +45,7 @@ async function paneCall(bridge: PaneBridge, body: Record<string, unknown>): Prom
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-deepcode-control-token': bridge.token,
+      'x-deepseekgui-control-token': bridge.token,
     },
     body: JSON.stringify(body),
   })

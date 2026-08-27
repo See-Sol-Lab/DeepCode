@@ -1,5 +1,5 @@
 /**
- * Build the portable Windows distribution directory for DeepCode.
+ * Build the portable Windows distribution directory for DeepSeekGUI.
  *
  * Pipeline: pack both release families (dsh + vendor) exactly like
  * `release/pack.ts`, compute the shipped Web profile's runtime closure, npm
@@ -91,7 +91,7 @@ function runPnpm(args: readonly string[], cwd = ROOT): void {
  * @returns The shim directory.
  */
 function pnpmShimDirectory(): string {
-  const dir = join(tmpdir(), 'deepcode-pnpm-shim')
+  const dir = join(tmpdir(), 'deepseekgui-pnpm-shim')
   mkdirSync(dir, { recursive: true })
   // Always rewritten: a shim left by an earlier build may point at a pnpm
   // module path that no longer exists on this machine.
@@ -172,7 +172,7 @@ function requirePrerequisites(): void {
  * Refuse to start while the previous build output is still locked.
  *
  * electron-builder clears `win-unpacked` before repopulating it. A running
- * DeepCode — or a diagnostic script that crashed without closing the app —
+ * DeepSeekGUI — or a diagnostic script that crashed without closing the app —
  * holds its executable open, the delete fails with EPERM, and the build stops
  * having produced nothing new. The old artefacts stay on disk with their old
  * timestamps, so the next investigation happily inspects a stale package and
@@ -183,7 +183,7 @@ function requirePrerequisites(): void {
  * a direct test of the condition rather than a guess from process names.
  */
 function requireUnlockedOutput(): void {
-  const exe = join(WIN_UNPACKED, 'DeepCode.exe')
+  const exe = join(WIN_UNPACKED, 'DeepSeekGUI.exe')
   if (!existsSync(exe)) return
   try {
     closeSync(openSync(exe, 'r+'))
@@ -191,9 +191,9 @@ function requireUnlockedOutput(): void {
     throw new Error(
       `build-desktop-dist: ${exe} is locked by a running process, so this build`
       + ' would fail while clearing the directory and leave the previous package'
-      + ' in place. Close DeepCode (including instances left behind by a crashed'
+      + ' in place. Close DeepSeekGUI (including instances left behind by a crashed'
       + ' diagnostic run) and rebuild:\n'
-      + '  Get-Process -Name DeepCode -ErrorAction SilentlyContinue | Stop-Process -Force',
+      + '  Get-Process -Name DeepSeekGUI -ErrorAction SilentlyContinue | Stop-Process -Force',
     )
   }
 }
@@ -237,7 +237,7 @@ function dropLocalTarballIntegrity(lockPath: string): void {
 function packFamily(familyId: string, out: string): void {
   const family = releaseFamily(familyId)
   const members = family.publishOrder(family.members(ROOT)).order
-  // Official npm releases require the official Client build profile. DeepCode
+  // Official npm releases require the official Client build profile. DeepSeekGUI
   // embeds its own attributed Client, so only member versions and payloads apply.
   family.verifyVersions(members)
   rmSync(out, { recursive: true, force: true })
@@ -348,14 +348,14 @@ function profileRoots(): string[] {
 
 /** Install the closure into the staging consumer and copy its node_modules into the runtime payload. */
 /**
- * Ship DeepCode's skin into the DSH runtime tree.
+ * Ship DeepSeekGUI's skin into the DSH runtime tree.
  *
  * The plugin is loaded by the harness's own Node process, which cannot read
  * the Electron asar — both the package and the overlay have to exist as real
  * files under the runtime directory. Dropping the package into the runtime's
  * `node_modules` also makes it resolvable from every profile without touching
  * any profile's manifest: the skin is applied through a launcher `--patch`
- * overlay, so it exists only for the composition DeepCode starts.
+ * overlay, so it exists only for the composition DeepSeekGUI starts.
  *
  * Fails loud on a missing build: a packaged app whose skin silently vanished
  * looks like the theme code is broken, and that lie costs far more to chase
@@ -376,7 +376,7 @@ function shipThemePlugin(runtimeDir: string): void {
   if (!readFileSync(bundle, 'utf8').includes('__ModuleLoader__.load')) {
     throw new Error(`build-desktop-dist: ${bundle} does not register through __ModuleLoader__ — the client runtime cannot load it`)
   }
-  const target = join(runtimeDir, 'node_modules', '@see-sol-lab', 'deepcode-theme')
+  const target = join(runtimeDir, 'node_modules', '@see-sol-lab', 'deepseekgui-theme')
   mkdirSync(target, { recursive: true })
   cpSync(join(source, 'lib'), join(target, 'lib'), { recursive: true })
   cpSync(join(source, 'package.json'), join(target, 'package.json'))
@@ -387,11 +387,11 @@ function shipThemePlugin(runtimeDir: string): void {
     throw new Error(`build-desktop-dist: theme overlay ${overlay} is missing`)
   }
   cpSync(overlay, join(runtimeDir, THEME_PATCH_FILENAME))
-  console.log(`build-desktop-dist: DeepCode theme plugin + overlay shipped into ${runtimeDir}`)
+  console.log(`build-desktop-dist: DeepSeekGUI theme plugin + overlay shipped into ${runtimeDir}`)
 }
 
 /**
- * Ship DeepCode's directory-picker backend into the DSH runtime tree.
+ * Ship DeepSeekGUI's directory-picker backend into the DSH runtime tree.
  *
  * Same shape and the same reasons as the skin: the harness's Node process
  * cannot read the Electron asar, so both the package and its overlay must
@@ -406,9 +406,9 @@ function shipThemePlugin(runtimeDir: string): void {
  * @param runtimeDir - assembled DSH runtime directory.
  */
 /**
- * Ship DeepCode's settings sections plugin into the DSH runtime tree
+ * Ship DeepSeekGUI's settings sections plugin into the DSH runtime tree
  * (P8-D39). Same shape and reasons as the skin; missing it only removes the
- * DeepCode sections from the official settings page (the chrome menu keeps
+ * DeepSeekGUI sections from the official settings page (the chrome menu keeps
  * working), but a hollow ship would still fail client boot — so fail loud.
  * @param runtimeDir - assembled DSH runtime directory.
  */
@@ -421,7 +421,7 @@ function shipSettingsPlugin(runtimeDir: string): void {
   if (!readFileSync(bundle, 'utf8').includes('__ModuleLoader__.load')) {
     throw new Error(`build-desktop-dist: ${bundle} does not register through __ModuleLoader__ — the client runtime cannot load it`)
   }
-  const target = join(runtimeDir, 'node_modules', '@see-sol-lab', 'deepcode-settings')
+  const target = join(runtimeDir, 'node_modules', '@see-sol-lab', 'deepseekgui-settings')
   mkdirSync(target, { recursive: true })
   cpSync(join(source, 'lib'), join(target, 'lib'), { recursive: true })
   cpSync(join(source, 'package.json'), join(target, 'package.json'))
@@ -430,15 +430,15 @@ function shipSettingsPlugin(runtimeDir: string): void {
     throw new Error(`build-desktop-dist: settings overlay ${overlay} is missing`)
   }
   cpSync(overlay, join(runtimeDir, SETTINGS_PATCH_FILENAME))
-  console.log(`build-desktop-dist: DeepCode settings plugin + overlay shipped into ${runtimeDir}`)
+  console.log(`build-desktop-dist: DeepSeekGUI settings plugin + overlay shipped into ${runtimeDir}`)
 }
 
 /**
- * Ship DeepCode's browser capability into the DSH runtime tree (B3-11).
+ * Ship DeepSeekGUI's browser capability into the DSH runtime tree (B3-11).
  *
  * Unlike the other three, this plugin has a real npm dependency
  * (`playwright-core`), so the dependency ships beside it — a user who installs
- * DeepCode gets browser tools without ever running `dsh plugin add`, which is
+ * DeepSeekGUI gets browser tools without ever running `dsh plugin add`, which is
  * the whole point for people behind a firewall with no registry to reach.
  * The browser kernel itself is NOT bundled: playwright drives the system Edge
  * (`channel: 'msedge'`), so this costs ~12 MB, not ~150.
@@ -450,7 +450,7 @@ function shipBrowserPlugin(runtimeDir: string): void {
   if (!existsSync(entry)) {
     throw new Error(`build-desktop-dist: browser plugin entry ${entry} is missing — run the desktop build first`)
   }
-  const target = join(runtimeDir, 'node_modules', '@see-sol-lab', 'deepcode-browser')
+  const target = join(runtimeDir, 'node_modules', '@see-sol-lab', 'deepseekgui-browser')
   mkdirSync(target, { recursive: true })
   cpSync(join(source, 'lib'), join(target, 'lib'), { recursive: true })
   cpSync(join(source, 'package.json'), join(target, 'package.json'))
@@ -480,7 +480,7 @@ function shipBrowserPlugin(runtimeDir: string): void {
   // any UI exists — the app just says "DSH 服务启动失败" (2026-08-24, caught
   // on the resident's machine: she had installed the plugin during B3-10).
   cpSync(overlay, join(target, 'cordis.patch.yml'))
-  console.log(`build-desktop-dist: DeepCode browser plugin + playwright-core + overlay shipped into ${runtimeDir}`)
+  console.log(`build-desktop-dist: DeepSeekGUI browser plugin + playwright-core + overlay shipped into ${runtimeDir}`)
 }
 
 function shipPickerPlugin(runtimeDir: string): void {
@@ -495,9 +495,9 @@ function shipPickerPlugin(runtimeDir: string): void {
   // harness refusing to boot with our overlay applied.
   const base = join(runtimeDir, 'node_modules', '@deepseek-ai', 'dsh-host-directory-picker')
   if (!existsSync(base)) {
-    throw new Error(`build-desktop-dist: ${base} is missing — the DeepCode picker cannot resolve its base class`)
+    throw new Error(`build-desktop-dist: ${base} is missing — the DeepSeekGUI picker cannot resolve its base class`)
   }
-  const target = join(runtimeDir, 'node_modules', '@see-sol-lab', 'deepcode-directory-picker')
+  const target = join(runtimeDir, 'node_modules', '@see-sol-lab', 'deepseekgui-directory-picker')
   mkdirSync(target, { recursive: true })
   cpSync(join(source, 'lib'), join(target, 'lib'), { recursive: true })
   cpSync(join(source, 'package.json'), join(target, 'package.json'))
@@ -506,7 +506,7 @@ function shipPickerPlugin(runtimeDir: string): void {
     throw new Error(`build-desktop-dist: directory-picker overlay ${overlay} is missing`)
   }
   cpSync(overlay, join(runtimeDir, PICKER_PATCH_FILENAME))
-  console.log(`build-desktop-dist: DeepCode directory picker + overlay shipped into ${runtimeDir}`)
+  console.log(`build-desktop-dist: DeepSeekGUI directory picker + overlay shipped into ${runtimeDir}`)
 }
 
 function assembleRuntime(): void {
@@ -542,7 +542,7 @@ function assembleRuntime(): void {
     if (pnpmPin === null) throw new Error('build-desktop-dist: root package.json lacks a pnpm@<version> packageManager pin')
     dependencies.set('pnpm', pnpmPin)
     writeFileSync(join(STAGING, 'package.json'), `${JSON.stringify({
-      name: 'deepcode-dist',
+      name: 'deepseekgui-dist',
       version: '0.0.0',
       private: true,
       dependencies: Object.fromEntries(dependencies),
@@ -621,21 +621,21 @@ function assembleRuntime(): void {
 
 /** Print the distribution summary. */
 function summarize(): void {
-  const exe = join(WIN_UNPACKED, 'DeepCode.exe')
+  const exe = join(WIN_UNPACKED, 'DeepSeekGUI.exe')
   if (!existsSync(exe)) throw new Error(`build-desktop-dist: ${exe} was not produced`)
   const totalBytes = directoryBytes(WIN_UNPACKED)
   const installers = readdirSync(DIST_ROOT).filter(name => name.endsWith('.exe') && name.includes('Setup'))
-  // 交付身份：installer 文件名必须携带 DeepCode app version（唯一手写源头
+  // 交付身份：installer 文件名必须携带 DeepSeekGUI app version（唯一手写源头
   // 是 apps/desktop/package.json）。文件名与产品版本不一致立即失败。
   let appVersion: unknown
   try {
     appVersion = (JSON.parse(readFileSync(join(ROOT, 'apps', 'desktop', 'package.json'), 'utf8')) as { version?: unknown }).version
   } catch (error) {
-    throw new Error(`build-desktop-dist: cannot read DeepCode app manifest: ${String(error instanceof Error ? error.message : error)}`)
+    throw new Error(`build-desktop-dist: cannot read DeepSeekGUI app manifest: ${String(error instanceof Error ? error.message : error)}`)
   }
   for (const installer of installers) {
     if (!installer.includes(String(appVersion))) {
-      throw new Error(`build-desktop-dist: installer ${installer} does not carry the DeepCode app version ${String(appVersion)}`)
+      throw new Error(`build-desktop-dist: installer ${installer} does not carry the DeepSeekGUI app version ${String(appVersion)}`)
     }
   }
   console.log(`build-desktop-dist: distribution at ${WIN_UNPACKED}`)
@@ -654,7 +654,7 @@ const MAX_PATH = 260
 /**
  * Install directory length that must still work after this build.
  *
- * The per-user default is `%LOCALAPPDATA%\Programs\DeepCode`, which lands
+ * The per-user default is `%LOCALAPPDATA%\Programs\DeepSeekGUI`, which lands
  * around 54 characters for an ordinary account name. 60 is that with a little
  * air: below it, a normal install is already at risk and the build has no
  * business producing an installer.
@@ -664,9 +664,9 @@ const MIN_INSTALL_BUDGET = 60
 /** The installer's own ceiling on `$INSTDIR`, declared in `installer.nsh`. */
 function installerGateLength(): number {
   const nsh = join(ROOT, 'apps', 'desktop', 'build', 'installer.nsh')
-  const declaration = /!define\s+DEEPCODE_MAX_INSTDIR_LEN\s+(\d+)/.exec(readFileSync(nsh, 'utf8'))
+  const declaration = /!define\s+DEEPSEEKGUI_MAX_INSTDIR_LEN\s+(\d+)/.exec(readFileSync(nsh, 'utf8'))
   if (declaration === null) {
-    throw new Error(`build-desktop-dist: ${nsh} no longer declares DEEPCODE_MAX_INSTDIR_LEN; the installer would stop refusing over-long install directories`)
+    throw new Error(`build-desktop-dist: ${nsh} no longer declares DEEPSEEKGUI_MAX_INSTDIR_LEN; the installer would stop refusing over-long install directories`)
   }
   return Number(declaration[1])
 }
@@ -712,7 +712,7 @@ function requirePathLengthHeadroom(unpackedDir: string): void {
   if (gate > budget) {
     throw new Error(
       `build-desktop-dist: installer.nsh admits install directories up to ${String(gate)} characters, but this`
-      + ` payload only leaves ${String(budget)}. Lower DEEPCODE_MAX_INSTDIR_LEN in`
+      + ` payload only leaves ${String(budget)}. Lower DEEPSEEKGUI_MAX_INSTDIR_LEN in`
       + ' apps/desktop/build/installer.nsh to match, or the installer will accept a directory it cannot install into.',
     )
   }
@@ -728,7 +728,7 @@ function requirePathLengthHeadroom(unpackedDir: string): void {
 /**
  * Files that exist in the runtime tree but never run.
  *
- * Installing DeepCode is slow, and the cost is dominated by file *count*, not
+ * Installing DeepSeekGUI is slow, and the cost is dominated by file *count*, not
  * bytes: NSIS unpacks single-threaded and Defender scans every write. The DSH
  * runtime ships 23771 files, and nearly half of them cannot execute — 8897
  * `.d.ts` declarations exist for a compiler that is not present, plus package
@@ -799,13 +799,13 @@ function* countTree(directory: string): Generator<number> {
   }
 }
 
-/** Chromium locale packs kept in the distribution: the two languages DeepCode ships. */
+/** Chromium locale packs kept in the distribution: the two languages DeepSeekGUI ships. */
 const SHIPPED_LOCALES = new Set(['en-US.pak', 'zh-CN.pak'])
 
 /**
- * Drop the Chromium locale packs DeepCode never displays.
+ * Drop the Chromium locale packs DeepSeekGUI never displays.
  *
- * Electron ships all 55 locales (47 MB); DeepCode's own chrome is zh/en only
+ * Electron ships all 55 locales (47 MB); DeepSeekGUI's own chrome is zh/en only
  * and the official web surface carries its own i18n, so the rest is dead
  * weight in every installer and on every user's disk. Chromium falls back to
  * en-US for any system language whose pack is absent, which is exactly the
@@ -885,11 +885,11 @@ if (import.meta.main) {
   // （打包必须发生在 git checkout 里，产物必须可溯源）。
   const sourceCommit = readDevSourceCommit(ROOT)
   if (sourceCommit === null) {
-    throw new Error('build-desktop-dist: git HEAD is unavailable; a packaged DeepCode must carry its source/commit identifier')
+    throw new Error('build-desktop-dist: git HEAD is unavailable; a packaged DeepSeekGUI must carry its source/commit identifier')
   }
   writeFileSync(join(WIN_UNPACKED, 'resources', SOURCE_COMMIT_FILENAME), `${sourceCommit}\n`, 'utf8')
   console.log(`build-desktop-dist: source/commit identifier ${sourceCommit} written to resources/${SOURCE_COMMIT_FILENAME}`)
-  // （终端 shims 在运行时由 main 生成到 userData/deepcode-bin——转发当前
+  // （终端 shims 在运行时由 main 生成到 userData/deepseekgui-bin——转发当前
   // exact executable，见 apps/desktop/src/terminal-service.ts。）
   // Sanitize and verify BEFORE building the installer: any finding fails the
   // build here, so the NSIS package can only ever wrap a sanitized payload.
@@ -899,17 +899,17 @@ if (import.meta.main) {
     throw new Error(`build-desktop-dist: distribution leaked sensitive content:\n${findings.join('\n')}`)
   }
   console.log('build-desktop-dist: sanitize and leak scan passed')
-  // DeepCode 自带插件必须以**文件级**存在于即将打包的 payload 里。
+  // DeepSeekGUI 自带插件必须以**文件级**存在于即将打包的 payload 里。
   // 2026-08-23 实机灾难：win-unpacked 里这两个目录被清空（清空者未查明——
   // 目录还在、内容没了，overlay yml 无恙，目录级检查全部通过），打出的
   // 安装包带着空插件，用户装完首启必崩 page-load，现场没有任何线索指向
   // 这里。装配段的 shipThemePlugin/shipPickerPlugin 检查的是装配时刻；
   // 这里是打包时刻，中间的空窗期发生过什么没人担保。断言放在离打包最近处。
   for (const [plugin, entry] of [
-    ['deepcode-theme', join('lib', 'client.js')],
-    ['deepcode-directory-picker', join('lib', 'index.js')],
-    ['deepcode-settings', join('lib', 'client.js')],
-    ['deepcode-browser', join('lib', 'index.js')],
+    ['deepseekgui-theme', join('lib', 'client.js')],
+    ['deepseekgui-directory-picker', join('lib', 'index.js')],
+    ['deepseekgui-settings', join('lib', 'client.js')],
+    ['deepseekgui-browser', join('lib', 'index.js')],
   ] as const) {
     const file = join(WIN_UNPACKED, 'resources', 'dsh', 'node_modules', '@see-sol-lab', plugin, entry)
     if (!existsSync(file) || statSync(file).size === 0) {
@@ -930,7 +930,7 @@ if (import.meta.main) {
   // installed it once) reads the overlay from there, and its absence kills
   // boot with ENOENT before any window exists. Assert the file the manifest
   // promises (2026-08-24 field failure).
-  const shippedBundlePatch = join(WIN_UNPACKED, 'resources', 'dsh', 'node_modules', '@see-sol-lab', 'deepcode-browser', 'cordis.patch.yml')
+  const shippedBundlePatch = join(WIN_UNPACKED, 'resources', 'dsh', 'node_modules', '@see-sol-lab', 'deepseekgui-browser', 'cordis.patch.yml')
   if (!existsSync(shippedBundlePatch) || statSync(shippedBundlePatch).size === 0) {
     throw new Error(`build-desktop-dist: ${shippedBundlePatch} is missing — a profile carrying this package in its bundle layer would fail to boot`)
   }
@@ -965,10 +965,10 @@ if (import.meta.main) {
  * 按同一约定解析——两端共用一套路径约定，绝不各写各的。 */
 function writeSha256Manifest(): void {
   const lines: string[] = []
-  const installer = readdirSync(DIST_ROOT).find(name => /^DeepCode-Setup-.*\.exe$/.test(name))
+  const installer = readdirSync(DIST_ROOT).find(name => /^DeepSeekGUI-Setup-.*\.exe$/.test(name))
   const targets: { rel: string; abs: string }[] = [
     ...installer === undefined ? [] : [{ rel: installer, abs: join(DIST_ROOT, installer) }],
-    { rel: 'win-unpacked/DeepCode.exe', abs: join(WIN_UNPACKED, 'DeepCode.exe') },
+    { rel: 'win-unpacked/DeepSeekGUI.exe', abs: join(WIN_UNPACKED, 'DeepSeekGUI.exe') },
   ]
   for (const target of targets) {
     if (!existsSync(target.abs)) {

@@ -1,6 +1,6 @@
 /**
- * DeepCode 对官方 Harness HTTP RPC 的最小客户端：settings.describe /
- * settings.mutate 走官方 settings service（唯一写路径），DeepCode 绝不
+ * DeepSeekGUI 对官方 Harness HTTP RPC 的最小客户端：settings.describe /
+ * settings.mutate 走官方 settings service（唯一写路径），DeepSeekGUI 绝不
  * 直接编辑 settings.yaml 来实现设置切换。
  *
  * 传输契约（官方 client-connection + apiproxy fetch carrier）：
@@ -8,12 +8,12 @@
  *   `{ type: 'client-request', rpcId, method, payload }`；
  * - 响应 `{ type: 'server-response', rpcId, result: { ok, value | error } }`，
  *   业务错误恒为 HTTP 200 + `ok: false`；
- * - 这类方法在官方是 loopback-privileged：DeepCode 只向
+ * - 这类方法在官方是 loopback-privileged：DeepSeekGUI 只向
  *   `127.0.0.1:3080` 发，绝不移用其他方法。
  *
  * 所有解析严格：响应形状不符按错误处理（fail closed），绝不猜测降级。
  * 纯 Node 模块，fetch 经注入面传入（单测用 fake），不依赖 Electron。
- * @module @see-sol-lab/deepcode/harness-api
+ * @module @see-sol-lab/deepseekgui/harness-api
  */
 
 import { randomUUID } from 'node:crypto'
@@ -54,7 +54,7 @@ export interface HarnessApiOptions {
   zh?: () => boolean
 }
 
-/** 官方 RPC 客户端：只暴露 DeepCode 需要的 settings 与 session 方法。 */
+/** 官方 RPC 客户端：只暴露 DeepSeekGUI 需要的 settings 与 session 方法。 */
 export interface HarnessApi {
   settingsDescribe(): Promise<SettingsDescribeValue>
   settingsMutate(ns: string, ops: SettingsPathOp[], expectedRevision?: number): Promise<SettingsNamespaceView>
@@ -180,7 +180,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * 严格解析 session.list 的一行摘要。只校验 DeepCode 消费的受信字段
+ * 严格解析 session.list 的一行摘要。只校验 DeepSeekGUI 消费的受信字段
  * （sessionId / updatedAt / running / blank），未知字段容忍（上游扩展
  * 不破坏本客户端）；形状不符按错误处理（fail closed），绝不猜测降级。
  * @param raw - 一行原始值。

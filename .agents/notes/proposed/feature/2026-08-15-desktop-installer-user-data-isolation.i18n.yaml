@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-08-15-desktop-installer-user-data-isolation.md
-2026-08-15-desktop-installer-user-data-isolation.md: 42d139c51ef79d4abca7d619e8bf3c19a783f8e6
-2026-08-15-desktop-installer-user-data-isolation.zh.md: b8c975e842e7435561e57391cd658fa2e3c37f12
+2026-08-15-desktop-installer-user-data-isolation.md: 848d72cbecb649cc67fe55f66142630c05460366
+2026-08-15-desktop-installer-user-data-isolation.zh.md: 4e9997933d53a152e15f175e559f5dc7d9a0358d

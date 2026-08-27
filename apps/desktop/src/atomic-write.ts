@@ -5,7 +5,7 @@
  *
  * rename 在同一文件系统上是原子的：读方要么看到旧内容，要么看到新内容，
  * 绝不会看到写了一半的文件。
- * @module @see-sol-lab/deepcode/atomic-write
+ * @module @see-sol-lab/deepseekgui/atomic-write
  */
 
 import { randomUUID } from 'node:crypto'

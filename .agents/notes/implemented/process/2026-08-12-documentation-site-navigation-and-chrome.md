@@ -22,7 +22,7 @@ Subsystem pages are grouped by concern — overview, core and scopes, sessions a
 
 `projectedPageContent` in [scripts/project-doc-site.ts](../../../../scripts/project-doc-site.ts) drops the language-switcher line and the repository badge. The switcher match is confined to the first eight lines so a tutorial that shows the convention still renders its example.
 
-The navigation-bar title is a text DeepCode lockup with a release tag, returned by `siteTitle` as the HTML VitePress renders. It needs no theme-specific image asset and keeps the documentation site distinct from the upstream DeepSeek wordmark. The sidebar scrollbar rests invisible and appears while scrolling, marked by a `data-` attribute rather than a class because Vue rewrites `class` wholesale when it patches the element.
+The navigation-bar title is a text DeepSeekGUI lockup with a release tag, returned by `siteTitle` as the HTML VitePress renders. It needs no theme-specific image asset and keeps the documentation site distinct from the upstream DeepSeek wordmark. The sidebar scrollbar rests invisible and appears while scrolling, marked by a `data-` attribute rather than a class because Vue rewrites `class` wholesale when it patches the element.
 
 ## Alternatives considered
 

@@ -1,23 +1,23 @@
 /**
- * About 内容的组装：只从受控事实拼文本——DeepCode app version、embedded
+ * About 内容的组装：只从受控事实拼文本——DeepSeekGUI app version、embedded
  * DSH version/source、Electron、platform/arch、Active Home kind、Active
  * Profile、license summary 与 project repository。函数签名不接触任何
  * 环境变量、凭据或会话内容，因此 API key、credential、session 正文与
  * 完整环境变量在结构上不可能进入 About。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/about
+ * @module @see-sol-lab/deepseekgui/about
  */
 
-import type { DeepCodeVersionInfo } from './version-info.ts'
+import type { DeepSeekGUIVersionInfo } from './version-info.ts'
 
-/** license summary 与项目仓库（交付身份常量，与 DEEPCODE_VERSIONING.md 同源）。 */
-export const ABOUT_LICENSE_SUMMARY = 'DeepCode product layer: PolyForm Perimeter 1.0.1 · DeepSeek Harness runtime: MIT'
+/** license summary 与项目仓库（交付身份常量，与 DEEPSEEKGUI_VERSIONING.md 同源）。 */
+export const ABOUT_LICENSE_SUMMARY = 'DeepSeekGUI product layer: PolyForm Perimeter 1.0.1 · DeepSeek Harness runtime: MIT'
 export const ABOUT_REPOSITORY = 'https://github.com/See-Sol-Lab/DeepSeekGUI'
 
 /** About 详情的输入事实（全部受控来源）。 */
 export interface AboutDetailInput {
   /** 版本四元组（app/DSH/source/Electron/arch）。 */
-  version: DeepCodeVersionInfo
+  version: DeepSeekGUIVersionInfo
   /** Active Home kind（managed/existing），绝不含路径。 */
   homeKind: 'managed' | 'existing'
   /** Active Profile 名。 */
@@ -55,7 +55,7 @@ export function aboutDetailText(input: AboutDetailInput): string {
     : (zh ? '已有目录' : 'Existing')
   const lines = zh
     ? [
-      `DeepCode 版本：${version.appVersion}`,
+      `DeepSeekGUI 版本：${version.appVersion}`,
       `内嵌 DSH 版本：${version.embeddedDshVersion}（source ${commit}）`,
       `Electron：${version.electronVersion} · ${version.platform}-${version.arch}`,
       `Harness Home：${homeLabel}`,
@@ -64,7 +64,7 @@ export function aboutDetailText(input: AboutDetailInput): string {
       `项目仓库：${ABOUT_REPOSITORY}`,
     ]
     : [
-      `DeepCode version: ${version.appVersion}`,
+      `DeepSeekGUI version: ${version.appVersion}`,
       `Embedded DSH version: ${version.embeddedDshVersion} (source ${commit})`,
       `Electron: ${version.electronVersion} · ${version.platform}-${version.arch}`,
       `Harness Home: ${homeLabel}`,

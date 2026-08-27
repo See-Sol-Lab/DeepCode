@@ -4,19 +4,19 @@
  * network + Edge on the host; the sandbox blocks outbound HTTPS, so this
  * suite runs in the acceptance environment (dev here, packaged parity later).
  * Uses headless Edge so it can run anywhere with Edge installed.
- * @module @see-sol-lab/deepcode-browser/tests/smoke
+ * @module @see-sol-lab/deepseekgui-browser/tests/smoke
  */
 
 import { describe, expect, it } from 'vitest'
-import { DeepCodeBrowser } from '../../browser-plugin/src/browser.ts'
+import { DeepSeekGUIBrowser } from '../../browser-plugin/src/browser.ts'
 import { nodeLookup } from '../../browser-plugin/src/ssrf.ts'
 
 describe('browser capability smoke（真 Edge + 公网页）', () => {
   it('navigate 公网页 → snapshot 返回 a11y 树与文本（SSRF 门禁先行）', async () => {
-    const browser = new DeepCodeBrowser({
+    const browser = new DeepSeekGUIBrowser({
       lookup: { lookup: nodeLookup },
       headless: true,
-      screenshotDir: `${process.env.TEMP ?? process.cwd()}/deepcode-browser-smoke`,
+      screenshotDir: `${process.env.TEMP ?? process.cwd()}/deepseekgui-browser-smoke`,
     })
     try {
       const nav = await browser.navigate('https://example.com/', 30_000)
@@ -33,10 +33,10 @@ describe('browser capability smoke（真 Edge + 公网页）', () => {
   }, 60_000)
 
   it('内网目标在导航前被 SSRF 拒绝（本地 3080 控制桥就是拦截目标）', async () => {
-    const browser = new DeepCodeBrowser({
+    const browser = new DeepSeekGUIBrowser({
       lookup: { lookup: nodeLookup },
       headless: true,
-      screenshotDir: `${process.env.TEMP ?? process.cwd()}/deepcode-browser-smoke`,
+      screenshotDir: `${process.env.TEMP ?? process.cwd()}/deepseekgui-browser-smoke`,
     })
     try {
       await expect(browser.navigate('http://127.0.0.1:3080/', 5_000)).rejects.toThrow(/blocked/)
@@ -48,10 +48,10 @@ describe('browser capability smoke（真 Edge + 公网页）', () => {
 
 describe('browser 交互冒烟（M3：进程内注入，不动物理鼠标）', () => {
   it('click 链接（text 定位）→ URL 变化；scroll/keyboard 不抛错', async () => {
-    const browser = new DeepCodeBrowser({
+    const browser = new DeepSeekGUIBrowser({
       lookup: { lookup: nodeLookup },
       headless: true,
-      screenshotDir: `${process.env.TEMP ?? process.cwd()}/deepcode-browser-smoke`,
+      screenshotDir: `${process.env.TEMP ?? process.cwd()}/deepseekgui-browser-smoke`,
     })
     try {
       await browser.navigate('https://example.com/', 30_000)

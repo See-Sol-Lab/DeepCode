@@ -3,7 +3,7 @@
  * 防护、spec 锚定（spaces/Unicode/绝对路径）、post-check 判定、target
  * 校验与 restart handoff 判定。纯 Node 环境，无 Electron、无模型、
  * 无凭据、无真实 npm。
- * @module @see-sol-lab/deepcode/tests/plugin-service
+ * @module @see-sol-lab/deepseekgui/tests/plugin-service
  */
 
 import { describe, expect, it } from 'vitest'
@@ -184,7 +184,7 @@ describe('validatePluginRequest / buildPluginOperationArgs（exact argv，无 sh
   })
 
   it('spec 始终是单个 argv 元素（argv 数组形态，无跨参数拆分）', () => {
-    // 只断言 DeepCode 自己的 argv 形态；安全结论由 validatePluginRequest
+    // 只断言 DeepSeekGUI 自己的 argv 形态；安全结论由 validatePluginRequest
     // 的字符拒绝测试承担——本层 argv 单项 ≠ 全链路安全（下游官方 CLI
     // 在 Windows 上经 shell 转发）。
     const evil = 'pkg"; rm -rf C:\\; "x'
@@ -322,8 +322,8 @@ describe('本地路径 add 的 post-check（回归：曾因包名提取错误永
   it('路径 spec + manifest 出现新依赖 = 通过，证据点名真实包名', () => {
     const before = { dependencies: {}, bundles: [], staticStatus: 'candidate' as const }
     const after = {
-      dependencies: { 'deepcode-bundle-fixture': 'link:../bundle-fixture' },
-      bundles: ['deepcode-bundle-fixture'],
+      dependencies: { 'deepseekgui-bundle-fixture': 'link:../bundle-fixture' },
+      bundles: ['deepseekgui-bundle-fixture'],
       staticStatus: 'candidate' as const,
     }
     const result = verifyPluginPostCheck(before, after, {
@@ -333,7 +333,7 @@ describe('本地路径 add 的 post-check（回归：曾因包名提取错误永
       anchorDir: null,
     })
     expect(result.ok).toBe(true)
-    expect(result.evidence).toContain('deepcode-bundle-fixture')
+    expect(result.evidence).toContain('deepseekgui-bundle-fixture')
   })
 
   it('路径 spec 但 manifest 无任何新增 = 明确失败（不谎报成功）', () => {
@@ -468,11 +468,11 @@ describe('main 接线形态（plugin argv 经 resolveDshCommand 组装）', () =
       packaged: true,
       resourcesPath: 'E:\\res',
       packagedCwd: 'C:\\home',
-      packagedExecutable: 'E:\\DeepCode.exe',
+      packagedExecutable: 'E:\\DeepSeekGUI.exe',
       dshHome: 'C:\\dsh home',
       args: buildPluginOperationArgs({ action: 'add', profile: 'web', spec: 'my-plugin', anchorDir: null }),
     })
-    expect(launch.command).toBe('E:\\DeepCode.exe')
+    expect(launch.command).toBe('E:\\DeepSeekGUI.exe')
     expect(launch.args).toEqual([
       '--expose-internals',
       'E:\\res\\dsh\\node_modules\\@deepseek-ai\\dsh\\lib\\bin.js',
@@ -495,7 +495,7 @@ describe('main 接线形态（plugin argv 经 resolveDshCommand 组装）', () =
       packaged: true,
       resourcesPath: 'E:\\res',
       packagedCwd: 'C:\\home',
-      packagedExecutable: 'E:\\DeepCode.exe',
+      packagedExecutable: 'E:\\DeepSeekGUI.exe',
       dshHome: 'C:\\dsh home',
       args: buildPluginOperationArgs({ action: 'remove', profile: 'web', spec: 'some-plugin', anchorDir: null }),
     })

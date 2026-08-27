@@ -6,7 +6,7 @@
  * acknowledgedRecoveryHash 传入，本模块绝不清理 launcher state 的
  * lastBootFailure / interruptedSwitch、绝不伪造 recovery。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/recovery-notice
+ * @module @see-sol-lab/deepseekgui/recovery-notice
  */
 
 import { homeKindLabel, selectionLabel } from './control-model.ts'

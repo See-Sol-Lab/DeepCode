@@ -1,4 +1,4 @@
-// DeepCode 皮肤的客户端产物。
+// DeepSeekGUI 皮肤的客户端产物。
 //
 // **形状是官方 client 运行时的契约，不是随便一种打包格式。** 官方的
 // __ModuleLoader__ 负责加载并解析包间依赖，产物必须自注册进它；直接输出
@@ -13,17 +13,17 @@
 // 改动前请对照 packages/client/ui-theme/lib/types/client/index.d.ts：
 // overrideTokens 的签名与「每个 token 必须同时给出 light/dark」都在那里。
 window.__ModuleLoader__.load({
-  id: '@see-sol-lab/deepcode-theme',
+  id: '@see-sol-lab/deepseekgui-theme',
   factory: () => {
     var module = { exports: {} }
     var exports = module.exports
     Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
 
     /** 覆盖层身份：一个来源一层，重复调用替换本层而非叠加。 */
-    var OVERRIDE_SOURCE = '@see-sol-lab/deepcode-theme'
+    var OVERRIDE_SOURCE = '@see-sol-lab/deepseekgui-theme'
 
     /**
-     * 表面 token 覆盖 + DeepCode 宿主变量。文字**色**与边框语义仍然不碰
+     * 表面 token 覆盖 + DeepSeekGUI 宿主变量。文字**色**与边框语义仍然不碰
      * （官方的可读性契约），但正文字号/行高/承托自 2026-08-23 起是我们的
      * 合法地盘——住户当晚纠偏：「零注入」护的是 harness 技术层，官方 UI
      * 的视觉层允许改（P8 文档 §0.3）。宿主变量走 var(--dsh-*, 官方原值)
@@ -31,8 +31,8 @@ window.__ModuleLoader__.load({
      * 这些值先以注入 CSS 的形式在打包实机上验证过，再原样搬进官方扩展点，
      * 不是纸面设计：纸上分辨不出「透」与「漏」。
      */
-    var DEEPCODE_TOKEN_OVERRIDES = {
-      // 页面底透明，DeepCode 宿主层的深海/海雾底图才透得上来。整套的地基。
+    var DEEPSEEKGUI_TOKEN_OVERRIDES = {
+      // 页面底透明，DeepSeekGUI 宿主层的深海/海雾底图才透得上来。整套的地基。
       '--dsw-alias-bg-base': { light: 'transparent', dark: 'transparent' },
       // 模块面板（侧栏、工作区）：浅底要更实，否则云会把文字吃掉。
       //
@@ -84,7 +84,7 @@ window.__ModuleLoader__.load({
         light: 'rgba(249, 248, 248, 0.38)',
         dark: 'rgba(16, 20, 26, 0.42)',
       },
-      // ── 以下是 DeepCode 自己的宿主变量（P8-D25），不是官方 token。──
+      // ── 以下是 DeepSeekGUI 自己的宿主变量（P8-D25），不是官方 token。──
       // 官方 AssistantMarkdown.module.css 把 figma 的 16/28 与「无气泡」写成
       // var(--dsh-assistant-*, 原值) 的回退形式：原版 dsh web 里这些变量不存在,
       // 样式与官方完全一致；只有这里供值时才生效。overrideTokens 落在 <body>
@@ -207,24 +207,24 @@ window.__ModuleLoader__.load({
      * 装载皮肤：叠一层 token 覆盖，别的什么都不做。
      * 不注册 root、不接管 layout、不写 data-ds-dark-theme、不与官方 React
      * 抢状态。明暗仍由官方 ui-theme preference 决定——Harness 管「现在是明
-     * 是暗」，DeepCode 管「明和暗长什么样」。
+     * 是暗」，DeepSeekGUI 管「明和暗长什么样」。
      * 生命周期交给 ctx.effect：插件卸载时官方自动移除该层，界面回到原样。
      *
-     * 顺带承担 DeepCode 的 client settle 标记（P6 下一代健康证据）：
-     * 本插件是 --patch 层进入 composition 的唯一 DeepCode client 插件，
-     * apply 成功 = 官方 loader 接受了这一轮 composition 里的 DeepCode 层；
+     * 顺带承担 DeepSeekGUI 的 client settle 标记（P6 下一代健康证据）：
+     * 本插件是 --patch 层进入 composition 的唯一 DeepSeekGUI client 插件，
+     * apply 成功 = 官方 loader 接受了这一轮 composition 里的 DeepSeekGUI 层；
      * 失败或 loader 拒绝本行时标记缺失/为 false，宿主据此判 boot 失败。
      * 只报告 { healthy / failed + reason } 级别事实，不送任何会话内容。
      */
     function apply(ctx) {
       try {
         ctx.effect(function () {
-          return ctx.theme.overrideTokens(OVERRIDE_SOURCE, DEEPCODE_TOKEN_OVERRIDES)
+          return ctx.theme.overrideTokens(OVERRIDE_SOURCE, DEEPSEEKGUI_TOKEN_OVERRIDES)
         })
-        window.__deepcodeClientSettled = true
+        window.__deepseekguiClientSettled = true
       } catch (error) {
-        window.__deepcodeClientSettled = false
-        window.__deepcodeClientSettleReason = String((error && error.message) || error)
+        window.__deepseekguiClientSettled = false
+        window.__deepseekguiClientSettleReason = String((error && error.message) || error)
       }
     }
 

@@ -1,7 +1,7 @@
 /**
  * Parity 隔离环境测试：凭据形态变量（任意大小写）不进入被测环境，
  * APPDATA/LOCALAPPDATA/DSH_HOME 全部落在测试临时根内。
- * @module @see-sol-lab/deepcode/tests/parity-env
+ * @module @see-sol-lab/deepseekgui/tests/parity-env
  */
 
 import { mkdtempSync, rmSync } from 'node:fs'

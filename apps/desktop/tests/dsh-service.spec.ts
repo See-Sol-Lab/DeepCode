@@ -1,7 +1,7 @@
 /**
  * dsh-service 纯逻辑测试：命令组装、仓库根解析、端口探测、就绪等待、进程停止。
  * 不涉及 Electron，可在普通 Node 环境下运行。
- * @module @see-sol-lab/deepcode/tests/dsh-service
+ * @module @see-sol-lab/deepseekgui/tests/dsh-service
  */
 
 import { spawn, type ChildProcess } from 'node:child_process'
@@ -126,14 +126,14 @@ describe('resolveDshLaunch', () => {
   it('打包态用自身可执行文件充当 Node，运行发行目录内的 bin.js', () => {
     const { command, args, cwd, env } = resolveDshLaunch({
       packaged: true,
-      packagedExecutable: 'C:\\dist\\DeepCode.exe',
+      packagedExecutable: 'C:\\dist\\DeepSeekGUI.exe',
       resourcesPath: 'C:\\dist\\resources',
       packagedCwd: 'C:\\Users\\alice',
       profile: 'web',
-      dshHome: 'C:\\Users\\alice\\AppData\\Roaming\\DeepCode\\dsh',
+      dshHome: 'C:\\Users\\alice\\AppData\\Roaming\\DeepSeekGUI\\dsh',
       port: DEFAULT_PORT,
     })
-    expect(command).toBe('C:\\dist\\DeepCode.exe')
+    expect(command).toBe('C:\\dist\\DeepSeekGUI.exe')
     expect(args).toEqual([
       '--expose-internals',
       'C:\\dist\\resources\\dsh\\node_modules\\@deepseek-ai\\dsh\\lib\\bin.js',
@@ -150,10 +150,10 @@ describe('resolveDshLaunch', () => {
     const { env } = resolveDshLaunch({
       packaged: true,
       profile: 'web',
-      dshHome: 'C:\\Users\\alice\\AppData\\Roaming\\DeepCode\\dsh',
+      dshHome: 'C:\\Users\\alice\\AppData\\Roaming\\DeepSeekGUI\\dsh',
       resourcesPath: 'C:\\dist\\resources',
     })
-    expect(env.DSH_HOME).toBe('C:\\Users\\alice\\AppData\\Roaming\\DeepCode\\dsh')
+    expect(env.DSH_HOME).toBe('C:\\Users\\alice\\AppData\\Roaming\\DeepSeekGUI\\dsh')
   })
 
   it('DSH_HOME 显式覆盖环境（dev 与 packaged 一致）', () => {
@@ -457,16 +457,16 @@ describe('内置浏览器 overlay 与 profile bundles 互斥', () => {
    * 浏览器插件是唯一有两条进入 composition 的路的自带插件：随包内置走
    * launcher 的 `--patch`，用户手动安装走 profile 的 bundles 层（插件的
    * package.json 声明了 `dsh.bundle.patch`）。两条同时生效会插入同一个
-   * loader id，官方 loader 抛 `duplicate loader entry id: deepcode-browser`
+   * loader id，官方 loader 抛 `duplicate loader entry id: deepseekgui-browser`
    * 硬退出——用户看到的只是"DSH 服务启动失败"，没有任何线索指向这里。
    * 住户 2026-08-24 实机撞上：她在 B3-10 用插件管理装过一次。
    */
   /** 开发态仓库骨架：browser 插件目录 + 它自带的 overlay。 */
   function stageBrowserRepo(): string {
-    const root = mkdtempSync(join(tmpdir(), 'deepcode-browser-root-'))
+    const root = mkdtempSync(join(tmpdir(), 'deepseekgui-browser-root-'))
     const dir = join(root, 'apps', 'desktop', 'browser-plugin')
     mkdirSync(dir, { recursive: true })
-    writeFileSync(join(dir, 'cordis.patch.yml'), '- insert:\n    - id: deepcode-browser\n')
+    writeFileSync(join(dir, 'cordis.patch.yml'), '- insert:\n    - id: deepseekgui-browser\n')
     return root
   }
 
@@ -488,7 +488,7 @@ describe('内置浏览器 overlay 与 profile bundles 互斥', () => {
 
   it('profile 没列这个包时照常带 overlay（全新安装：内置那条路）', () => {
     const root = stageBrowserRepo()
-    const home = mkdtempSync(join(tmpdir(), 'deepcode-browser-home-'))
+    const home = mkdtempSync(join(tmpdir(), 'deepseekgui-browser-home-'))
     stageProfile(home, 'web', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
 
     const { args } = resolveDshLaunch({
@@ -502,7 +502,7 @@ describe('内置浏览器 overlay 与 profile bundles 互斥', () => {
 
   it('profile 已把这个包列进 bundles 时不带 overlay：重复 id 会让 Harness 起不来', () => {
     const root = stageBrowserRepo()
-    const home = mkdtempSync(join(tmpdir(), 'deepcode-browser-home-'))
+    const home = mkdtempSync(join(tmpdir(), 'deepseekgui-browser-home-'))
     stageProfile(home, 'web', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', BROWSER_PLUGIN_PACKAGE])
 
     const { args } = resolveDshLaunch({
@@ -515,7 +515,7 @@ describe('内置浏览器 overlay 与 profile bundles 互斥', () => {
   })
 
   it('清单缺失或读不动时按"没列"处理：与全新安装同形，不因读文件失败丢掉浏览器', () => {
-    const home = mkdtempSync(join(tmpdir(), 'deepcode-browser-home-'))
+    const home = mkdtempSync(join(tmpdir(), 'deepseekgui-browser-home-'))
     expect(profileBundlesInclude(home, 'web', BROWSER_PLUGIN_PACKAGE)).toBe(false)
     const dir = join(home, 'profiles', 'web')
     mkdirSync(dir, { recursive: true })
@@ -530,7 +530,7 @@ describe('内置浏览器 overlay 与 profile bundles 互斥', () => {
 describe('皮肤 overlay（--patch）与模块 fallback', () => {
   /**
    * 皮肤走 launcher 层而不是 `dsh plugin add`：合成顺序里 --patch 落在最后，
-   * 只影响 DeepCode 启动的这一轮，用户 profile 的清单一个字节都不改。
+   * 只影响 DeepSeekGUI 启动的这一轮，用户 profile 的清单一个字节都不改。
    */
   it('打包态指向 DSH 运行时目录内的 overlay（那个 Node 进程读不到 asar）', () => {
     const file = resolveThemePatchFile({ packaged: true, resourcesPath: 'C:\\app\\resources' })
@@ -552,10 +552,10 @@ describe('皮肤 overlay（--patch）与模块 fallback', () => {
   it('插件目录不存在时不带 overlay：加载不了的插件会让整个 Harness 起不来', () => {
     const { args } = resolveDshLaunch({
       packaged: false,
-      root: join(tmpdir(), 'deepcode-no-such-repo'),
+      root: join(tmpdir(), 'deepseekgui-no-such-repo'),
       nodeExecutable: 'node',
       profile: 'web',
-      dshHome: join(tmpdir(), 'deepcode-no-such-home'),
+      dshHome: join(tmpdir(), 'deepseekgui-no-such-home'),
     })
     expect(args).not.toContain('--patch')
     expect(args).toContain('--profile')
@@ -565,8 +565,8 @@ describe('皮肤 overlay（--patch）与模块 fallback', () => {
     // dsh 的用法是 `dsh [options] [command] [args...]`：自身选项之后的一切
     // 原样转交给 profile 的 app。--patch 排到 --host/--port 后面就会被当成
     // 给 web app 的参数转走，启动时 `unknown option '--patch'`（实机抓获）。
-    const root = mkdtempSync(join(tmpdir(), 'deepcode-root-'))
-    const home = mkdtempSync(join(tmpdir(), 'deepcode-home-'))
+    const root = mkdtempSync(join(tmpdir(), 'deepseekgui-root-'))
+    const home = mkdtempSync(join(tmpdir(), 'deepseekgui-home-'))
     const pluginDir = join(root, 'apps', 'desktop', 'theme-plugin')
     mkdirSync(pluginDir, { recursive: true })
     writeFileSync(join(pluginDir, THEME_PATCH_FILENAME), '- insert: []\n')
@@ -584,7 +584,7 @@ describe('皮肤 overlay（--patch）与模块 fallback', () => {
 
     // 链接落在**安装级 fallback**里，不是任何 profile 的清单：
     // profile 目录本身必须仍然干净。
-    const link = join(home, 'profiles', 'node_modules', '@see-sol-lab', 'deepcode-theme')
+    const link = join(home, 'profiles', 'node_modules', '@see-sol-lab', 'deepseekgui-theme')
     expect(existsSync(link)).toBe(true)
     expect(realpathSync(link)).toBe(realpathSync(pluginDir))
     expect(existsSync(join(home, 'profiles', 'web'))).toBe(false)
@@ -605,11 +605,11 @@ describe('皮肤 overlay（--patch）与模块 fallback', () => {
     // 必然失败，插件从此永远解析不了：皮肤 overlay 不传、client 标记不置位、
     // Harness 每次启动都以 page-load 超时收场，错误文案还完全不指向这里。
     // 住户 2026-08-22 实机撞上：卸载 Program Files 版之后改用 win-unpacked。
-    const root = mkdtempSync(join(tmpdir(), 'deepcode-root-'))
-    const home = mkdtempSync(join(tmpdir(), 'deepcode-home-'))
+    const root = mkdtempSync(join(tmpdir(), 'deepseekgui-root-'))
+    const home = mkdtempSync(join(tmpdir(), 'deepseekgui-home-'))
     const gone = join(root, 'old-install', 'theme-plugin')
     mkdirSync(gone, { recursive: true })
-    const link = join(home, 'profiles', 'node_modules', '@see-sol-lab', 'deepcode-theme')
+    const link = join(home, 'profiles', 'node_modules', '@see-sol-lab', 'deepseekgui-theme')
     mkdirSync(dirname(link), { recursive: true })
     symlinkSync(gone, link, 'junction')
     // 模拟卸载：链接的目标整个消失，链接本身留在原地。

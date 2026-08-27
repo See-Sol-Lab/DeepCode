@@ -2,7 +2,7 @@
  * 发行构建入口的 freshness 门禁：公开的 `build:desktop-dist` 必须先从
  * 当前源码重建全部输入（lib:host、web、desktop），再进入内部 assemble；
  * 否则会重演"源码已改、包里还是旧 lib"的事故。
- * @module @see-sol-lab/deepcode/tests/build-scripts
+ * @module @see-sol-lab/deepseekgui/tests/build-scripts
  */
 
 import { readFileSync } from 'node:fs'

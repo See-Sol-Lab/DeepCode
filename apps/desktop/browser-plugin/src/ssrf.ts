@@ -1,15 +1,15 @@
 /**
- * SSRF-safe navigation gate for the DeepCode browser capability.
+ * SSRF-safe navigation gate for the DeepSeekGUI browser capability.
  *
  * Pure, network-free half: URL hygiene, IP classification, and the
  * resolve-then-check decision every navigation target must pass BEFORE any
  * network byte moves. The proxy layer (browser-proxy.ts) is the enforcement
  * point: it resolves through this module, connects to the checked IP, and
  * re-checks every redirect hop. No localhost/private/link-local/metadata
- * target is ever reachable — including DeepCode's own 3080/control bridge,
+ * target is ever reachable — including DeepSeekGUI's own 3080/control bridge,
  * which is a feature, not an exception (菲博 §7.1.5).
  *
- * @module @see-sol-lab/deepcode-browser/ssrf
+ * @module @see-sol-lab/deepseekgui-browser/ssrf
  */
 
 /** A blocked target classification, for machine-readable reasons. */

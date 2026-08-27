@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-16-deepseekgui-b2-p2-resident-host-terminal.md
+2026-08-16-deepseekgui-b2-p2-resident-host-terminal.md: 869c78f2cf11fb4074284ff4ca3539f03f0f5853
+2026-08-16-deepseekgui-b2-p2-resident-host-terminal.zh.md: be54eed02c01388cff6b197cdebd991d2ee9d59d

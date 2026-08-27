@@ -1,7 +1,7 @@
 version: 2
 
-# DeepCode receives dependency versions through upstream Harness synchronization.
-# Raise these limits only when DeepCode starts maintaining dependencies independently.
+# DeepSeekGUI receives dependency versions through upstream Harness synchronization.
+# Raise these limits only when DeepSeekGUI starts maintaining dependencies independently.
 updates:
   - package-ecosystem: "npm"
     directory: "/"

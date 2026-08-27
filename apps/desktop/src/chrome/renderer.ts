@@ -1,9 +1,9 @@
 /**
  * Desktop Chrome renderer：顶栏、汉堡菜单、Harness 面板与状态胶囊的 DOM
- * 接线。只消费 preload 暴露的 deepCodeDesktop API；不持有业务状态——
+ * 接线。只消费 preload 暴露的 deepseekGUIDesktop API；不持有业务状态——
  * 唯一的本地状态是"哪个面板打开/焦点该还给谁"这类纯 UI 状态。
  * 所有动态文本一律 textContent 写入，绝不 innerHTML。
- * @module @see-sol-lab/deepcode/chrome/renderer
+ * @module @see-sol-lab/deepseekgui/chrome/renderer
  */
 
 import type { DesktopControlCommand, DesktopControlModel } from '../control-model.ts'
@@ -16,7 +16,7 @@ import {
 } from './view-model.ts'
 
 /** preload 暴露的窄 API（形状与 preload.cts 一致）。 */
-interface DeepCodeDesktopApi {
+interface DeepSeekGUIDesktopApi {
   getControlModel(): Promise<DesktopControlModel>
   runControlCommand(command: DesktopControlCommand): Promise<void>
   onControlModelChanged(listener: (model: DesktopControlModel) => void): () => void
@@ -24,7 +24,7 @@ interface DeepCodeDesktopApi {
   onOpenUpdatePanel(listener: () => void): () => void
 }
 
-const api = (window as unknown as { deepCodeDesktop: DeepCodeDesktopApi }).deepCodeDesktop
+const api = (window as unknown as { deepseekGUIDesktop: DeepSeekGUIDesktopApi }).deepseekGUIDesktop
 
 const el = {
   hamburger: document.getElementById('hamburger') as HTMLButtonElement,
@@ -47,7 +47,7 @@ const el = {
  * 纯 UI 状态：当前打开的面板与焦点归还目标。菜单瘦身后（P8-D39 第二批，
  * 住户 2026-08-23 定稿）Chrome 只剩两个面板：一级菜单与检查更新——
  * Harness 控制面、插件管理、BUG 诊断与反馈全部移居官方设置页的
- * DeepCode 分区（settings-plugin，经控制桥走同一命令出口）。
+ * DeepSeekGUI 分区（settings-plugin，经控制桥走同一命令出口）。
  */
 type OpenPanel = 'none' | 'main' | 'update'
 let openPanel: OpenPanel = 'none'

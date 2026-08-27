@@ -2,7 +2,7 @@
  * plugin-recovery 测试：白名单快照/哈希/drift/恢复计划/执行、journal
  * 严格解析（损坏抛错绝不猜测）、pending 判定与事务清理。纯 Node 环境，
  * 全部在临时目录内，绝不触碰真实 Profile/Home。
- * @module @see-sol-lab/deepcode/tests/plugin-recovery
+ * @module @see-sol-lab/deepseekgui/tests/plugin-recovery
  */
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
@@ -339,7 +339,7 @@ describe('journal 解析的严格性（被篡改或损坏的 journal 绝不能�
 
 describe('快照必须与记录的事实逐字节相符', () => {
   it('记录的 hash 与实际文件对不上 → 抛错，一个字节都不写进事务', () => {
-    const root = mkdtempSync(join(tmpdir(), 'deepcode-snapshot-'))
+    const root = mkdtempSync(join(tmpdir(), 'deepseekgui-snapshot-'))
     try {
       const profileDir = join(root, 'profile')
       const snapshotDir = join(root, 'snapshot')
@@ -359,7 +359,7 @@ describe('快照必须与记录的事实逐字节相符', () => {
   })
 
   it('事实相符时正常落盘', () => {
-    const root = mkdtempSync(join(tmpdir(), 'deepcode-snapshot-ok-'))
+    const root = mkdtempSync(join(tmpdir(), 'deepseekgui-snapshot-ok-'))
     try {
       const profileDir = join(root, 'profile')
       const snapshotDir = join(root, 'snapshot')

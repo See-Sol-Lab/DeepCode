@@ -1,7 +1,7 @@
 /**
- * Update service v1 的纯逻辑层：DeepCode app version 的语义比较、
+ * Update service v1 的纯逻辑层：DeepSeekGUI app version 的语义比较、
  * update manifest 的严格解析与校验、资产 URL/filename 卫生、摘要验证
- * 与 installer handoff 决策。比较对象**只能是 DeepCode app version**，
+ * 与 installer handoff 决策。比较对象**只能是 DeepSeekGUI app version**，
  * 绝不是 embedded DSH version。
  *
  * 铁律：
@@ -11,14 +11,14 @@
  *   不得假装 private Release 是可用 public feed——未配置时 Manual Check
  *   明示"当前未配置公开更新通道"，background check 安静结束。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/update-service
+ * @module @see-sol-lab/deepseekgui/update-service
  */
 
 import { createHash } from 'node:crypto'
 import { win32 } from 'node:path'
 import { StringDecoder } from 'node:string_decoder'
 
-// ---- 语义版本比较（只服务于 DeepCode app version 形态） ----
+// ---- 语义版本比较（只服务于 DeepSeekGUI app version 形态） ----
 
 /** 语义版本形态：major.minor.patch 加可选 prerelease 段。 */
 const VERSION_SHAPE = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/
@@ -93,7 +93,7 @@ export function compareVersions(a: string, b: string, zh = true): VersionOrder {
  * latest 是否为"严格更新的 stable 版本"：latest 无 prerelease 段且
  * 语义上大于 current。prerelease 永不提示（alpha/beta 不自动推广）。
  * @param latest - provider 声明的 latest version。
- * @param current - 当前 DeepCode app version。
+ * @param current - 当前 DeepSeekGUI app version。
  * @returns 是否应提示更新。
  */
 export function isNewerStable(latest: string, current: string, zh = true): boolean {
@@ -118,7 +118,7 @@ export interface UpdateAsset {
 
 /** 解析成功的 update manifest。 */
 export interface UpdateManifest {
-  /** latest DeepCode app version（stable）。 */
+  /** latest DeepSeekGUI app version（stable）。 */
   latestVersion: string
   /** 给用户看的必要 release note 摘要（纯文本）。 */
   releaseNotes: string

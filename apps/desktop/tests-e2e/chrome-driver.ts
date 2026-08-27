@@ -4,7 +4,7 @@
  * 点击（production 控制入口），Compatibility View（127.0.0.1:3080）承接
  * 官方 UI 挂载断言。不依赖 playwright 是否把 WebContentsView 暴露为
  * Page，对视图架构变化稳健。
- * @module @see-sol-lab/deepcode/tests-e2e/chrome-driver
+ * @module @see-sol-lab/deepseekgui/tests-e2e/chrome-driver
  */
 
 import { spawnSync } from 'node:child_process'
@@ -27,7 +27,7 @@ export function portConnectable(port: number): Promise<boolean> {
 }
 
 /**
- * 场地清场（launch 之前）：杀掉任何遗留的 DeepCode 实例并等固定端口
+ * 场地清场（launch 之前）：杀掉任何遗留的 DeepSeekGUI 实例并等固定端口
  * 3080 释放。teardown 已尽力收割，但用例超时被 vitest 中断时 finally
  * 可能还没跑完——下一个文件/用例不该因此连坐（实测：一个超时用例的
  * 泄漏实例会让后续 launch 全部撞 fail-loud 端口占用）。
@@ -35,7 +35,7 @@ export function portConnectable(port: number): Promise<boolean> {
  */
 export async function ensureCleanStage(timeoutMs = 20_000): Promise<void> {
   if (!await portConnectable(3080)) return
-  spawnSync('taskkill', ['/IM', 'DeepCode.exe', '/T', '/F'], { stdio: 'ignore' })
+  spawnSync('taskkill', ['/IM', 'DeepSeekGUI.exe', '/T', '/F'], { stdio: 'ignore' })
   const deadline = Date.now() + timeoutMs
   while (await portConnectable(3080)) {
     if (Date.now() >= deadline) {
@@ -189,7 +189,7 @@ export async function clickChromeButton(app: ElectronApplication, id: string): P
   if (!clicked) throw new Error(`Chrome 按钮 ${id} 不存在、已禁用或位于隐藏面板中`)
 }
 
-// ---- DeepCode 设置分区驱动（P8-D39 之后的 production 控制入口）----
+// ---- DeepSeekGUI 设置分区驱动（P8-D39 之后的 production 控制入口）----
 //
 // Harness 控制面、插件管理与 BUG 诊断反馈都住在**官方设置页**里（settings
 // plugin 注册的三个 `settings.section`），不再是 Chrome view 的面板。所以
@@ -197,37 +197,37 @@ export async function clickChromeButton(app: ElectronApplication, id: string): P
 //   · 官方外壳（打开设置、切分区）——只认官方那几个稳定的语义属性：
 //     触发钮 `button[aria-haspopup="dialog"]`、面板 `[role="dialog"]`、
 //     导航行按钮的可见文本。类名是 CSS module 哈希，绝不能当选择器。
-//   · 分区内部（我们自己的插件）——认 `data-deepcode` 属性。插件的按钮
+//   · 分区内部（我们自己的插件）——认 `data-deepseekgui` 属性。插件的按钮
 //     是内联样式 + 随 locale 变的文案，这个属性是唯一的契约（见
 //     settings-plugin/lib/client.js 的 btn()）。
 
-/** DeepCode 的三个设置分区，值是导航行上的可见文本（zh/en 各一）。 */
-export const DEEPCODE_SECTIONS = {
+/** DeepSeekGUI 的三个设置分区，值是导航行上的可见文本（zh/en 各一）。 */
+export const DEEPSEEKGUI_SECTIONS = {
   harness: ['Harness（桌面）', 'Harness (Desktop)'],
   plugins: ['插件管理（本地）', 'Plugins (Local)'],
   feedback: ['BUG 诊断与反馈', 'Diagnostics & Feedback'],
 } as const
 
-/** 在 Compatibility View 里执行脚本（官方 UI + DeepCode 分区都在这一层）。 */
+/** 在 Compatibility View 里执行脚本（官方 UI + DeepSeekGUI 分区都在这一层）。 */
 async function evalInComp<T>(app: ElectronApplication, script: string): Promise<T> {
   return evalInView<T>(app, COMP_URL_PREFIX, script)
 }
 
 /**
- * 打开官方设置页并切到某个 DeepCode 分区。
+ * 打开官方设置页并切到某个 DeepSeekGUI 分区。
  *
  * 幂等：面板已开就不重复点触发钮；分区已经是目标就不重复点导航。用例里
  * 每个动作前调一次是安全的（很多用例在 restart 之后要重新进面板）。
  * @param app - Electron 应用。
- * @param section - DEEPCODE_SECTIONS 的键。
+ * @param section - DEEPSEEKGUI_SECTIONS 的键。
  * @param timeoutMs - 等待上限。
  */
-export async function openDeepCodeSection(
+export async function openDeepSeekGUISection(
   app: ElectronApplication,
-  section: keyof typeof DEEPCODE_SECTIONS,
+  section: keyof typeof DEEPSEEKGUI_SECTIONS,
   timeoutMs = 150_000,
 ): Promise<void> {
-  const labels = JSON.stringify(DEEPCODE_SECTIONS[section])
+  const labels = JSON.stringify(DEEPSEEKGUI_SECTIONS[section])
   // ⓪ 先等官方 UI 真的挂上来。设置入口是官方页面的一部分，页面没挂载时
   //    evalInComp 连 webContents 都找不到——poll 会一路吞异常直到超时，报出
   //    来的却是「找不到分区」这种误导性现场（2026-08-24 打包首跑：全新
@@ -238,7 +238,7 @@ export async function openDeepCodeSection(
   // 「有 modal 就当设置面板开了」是不够的：**全新 managed home 首启时官方
   // 会先弹首启引导框**（「稍后配置 / 保存并继续」），它同样是
   // [role="dialog"][aria-modal="true"]。把它当成设置面板，第 ② 步就会在
-  // 引导框里翻找 DeepCode 分区，翻不到，耗满整个 timeout——而每个 e2e 用例
+  // 引导框里翻找 DeepSeekGUI 分区，翻不到，耗满整个 timeout——而每个 e2e 用例
   // 都是全新 home，于是**全套 21 个用例集体超时**（2026-08-24 六套件首次
   // 跑齐时抓获；此前只单跑过 permission-ui，没暴露）。
   //
@@ -312,7 +312,7 @@ export async function openDeepCodeSection(
   // ③ 等分区内容真的挂上来（桥连上之前是「正在读取桌面状态…」）。
   await expect.poll(async () => {
     try {
-      return await evalInComp<number>(app, 'document.querySelectorAll(\'[data-deepcode]\').length')
+      return await evalInComp<number>(app, 'document.querySelectorAll(\'[data-deepseekgui]\').length')
     } catch {
       return 0
     }
@@ -320,7 +320,7 @@ export async function openDeepCodeSection(
 }
 
 /** 关闭官方设置页（回到会话界面）。 */
-export async function closeDeepCodeSettings(app: ElectronApplication): Promise<void> {
+export async function closeDeepSeekGUISettings(app: ElectronApplication): Promise<void> {
   await evalInComp<boolean>(app, `(() => {
     const dialog = document.querySelector('[role="dialog"][aria-modal="true"]')
     if (dialog === null) return true
@@ -332,12 +332,12 @@ export async function closeDeepCodeSettings(app: ElectronApplication): Promise<v
   })()`)
 }
 
-/** 等 DeepCode 分区里某个锚点出现且可见（隐藏节点不算数，与 chrome 侧同则）。 */
-export async function waitForDeepCodeElement(app: ElectronApplication, testId: string, timeoutMs = 90_000): Promise<void> {
+/** 等 DeepSeekGUI 分区里某个锚点出现且可见（隐藏节点不算数，与 chrome 侧同则）。 */
+export async function waitForDeepSeekGUIElement(app: ElectronApplication, testId: string, timeoutMs = 90_000): Promise<void> {
   await expect.poll(async () => {
     try {
       return await evalInComp<boolean>(app, `(() => {
-        const el = document.querySelector('[data-deepcode=' + ${JSON.stringify(JSON.stringify(testId))} + ']')
+        const el = document.querySelector('[data-deepseekgui=' + ${JSON.stringify(JSON.stringify(testId))} + ']')
         return el !== null && el.closest('[hidden]') === null
       })()`)
     } catch {
@@ -349,15 +349,15 @@ export async function waitForDeepCodeElement(app: ElectronApplication, testId: s
     // 反复瞎跑——Case F 为此白跑过两轮。
     const anchors = await evalInComp<string>(
       app,
-      "Array.from(document.querySelectorAll('[data-deepcode]')).map(n => n.getAttribute('data-deepcode')).slice(0, 40).join(',')",
+      "Array.from(document.querySelectorAll('[data-deepseekgui]')).map(n => n.getAttribute('data-deepseekgui')).slice(0, 40).join(',')",
     ).catch(() => '(读取失败)')
-    throw new Error(`DeepCode 锚点 ${testId} 未在 ${String(timeoutMs)}ms 内出现；同屏锚点=[${anchors}]\n${String(error)}`)
+    throw new Error(`DeepSeekGUI 锚点 ${testId} 未在 ${String(timeoutMs)}ms 内出现；同屏锚点=[${anchors}]\n${String(error)}`)
   })
 }
 
-/** 点 DeepCode 分区里的按钮（真实 DOM click；禁用/隐藏一律失败）。 */
-export async function clickDeepCodeButton(app: ElectronApplication, testId: string): Promise<void> {
-  await waitForDeepCodeElement(app, testId)
+/** 点 DeepSeekGUI 分区里的按钮（真实 DOM click；禁用/隐藏一律失败）。 */
+export async function clickDeepSeekGUIButton(app: ElectronApplication, testId: string): Promise<void> {
+  await waitForDeepSeekGUIElement(app, testId)
   // 再等它真的**可点**。分区里的按钮统一带 disabled:busy——只要有命令在途
   // （启动时的自动 discovery 就是一次），整片按钮同时禁用。只等「出现」会
   // 稳定地撞上这个瞬态：2026-08-24 Case F 现场就是锚点齐全、harness-refresh
@@ -366,7 +366,7 @@ export async function clickDeepCodeButton(app: ElectronApplication, testId: stri
   await expect.poll(async () => {
     try {
       return await evalInComp<boolean>(app, `(() => {
-        const el = document.querySelector('[data-deepcode=' + ${JSON.stringify(JSON.stringify(testId))} + ']')
+        const el = document.querySelector('[data-deepseekgui=' + ${JSON.stringify(JSON.stringify(testId))} + ']')
         return el !== null && el.disabled !== true && el.closest('[hidden]') === null
       })()`)
     } catch {
@@ -377,7 +377,7 @@ export async function clickDeepCodeButton(app: ElectronApplication, testId: stri
     // 那条信息比「poll 超时」有用得多。
   })
   const clicked = await evalInComp<boolean>(app, `(() => {
-    const el = document.querySelector('[data-deepcode=' + ${JSON.stringify(JSON.stringify(testId))} + ']')
+    const el = document.querySelector('[data-deepseekgui=' + ${JSON.stringify(JSON.stringify(testId))} + ']')
     if (el === null || el.disabled === true || el.closest('[hidden]') !== null) return false
     el.click()
     return true
@@ -388,14 +388,14 @@ export async function clickDeepCodeButton(app: ElectronApplication, testId: stri
     // 按钮在不在、禁用没有、以及同屏还有哪些锚点——后者能直接看出分区
     // 是不是根本没渲染到该有的状态。
     const scene = await evalInComp<string>(app, `(() => {
-      const el = document.querySelector('[data-deepcode=' + ${JSON.stringify(JSON.stringify(testId))} + ']')
-      const anchors = Array.from(document.querySelectorAll('[data-deepcode]'))
-        .map(n => n.getAttribute('data-deepcode')).slice(0, 40).join(',')
+      const el = document.querySelector('[data-deepseekgui=' + ${JSON.stringify(JSON.stringify(testId))} + ']')
+      const anchors = Array.from(document.querySelectorAll('[data-deepseekgui]'))
+        .map(n => n.getAttribute('data-deepseekgui')).slice(0, 40).join(',')
       if (el === null) return 'absent; anchors=' + anchors
       return 'disabled=' + (el.disabled === true) + ' hidden=' + (el.closest('[hidden]') !== null)
         + ' text=' + JSON.stringify((el.textContent ?? '').slice(0, 30)) + '; anchors=' + anchors
     })()`)
-    throw new Error(`DeepCode 分区按钮 ${testId} 点不动 → ${scene}`)
+    throw new Error(`DeepSeekGUI 分区按钮 ${testId} 点不动 → ${scene}`)
   }
 }
 
@@ -406,7 +406,7 @@ export async function clickDeepCodeButton(app: ElectronApplication, testId: stri
  * 模型配置引导（「稍后配置 / 保存并继续」）。fixtures 预写按掉了前者，
  * 后者取决于有没有配模型——而 e2e 的环境刻意剔除了一切凭据形态的变量，
  * 所以它必然出现。不走设置页的用例（如 workspace-picker 测官方 picker）
- * 碰不到 openDeepCodeSection 里那套识别逻辑，得自己调一次。
+ * 碰不到 openDeepSeekGUISection 里那套识别逻辑，得自己调一次。
  *
  * 只关**不是设置面板**的 modal：设置面板的导航行带 aria-current，见到它
  * 就原样放过，绝不误关用例自己开的面板。
@@ -448,7 +448,7 @@ export async function startupModalPresent(app: ElectronApplication): Promise<boo
 }
 
 /**
- * DeepCode 分区里当前存在的锚点清单。
+ * DeepSeekGUI 分区里当前存在的锚点清单。
  *
  * 断言「某个入口在/不在」用这个，不要用 dumpChromeButtons——那读的是
  * chrome 侧，而 P8-D39 之后这些入口都在官方设置页（compat view）里，
@@ -456,10 +456,10 @@ export async function startupModalPresent(app: ElectronApplication): Promise<boo
  * @param app - Electron 应用。
  * @returns 锚点名数组。
  */
-export async function deepCodeAnchors(app: ElectronApplication): Promise<string[]> {
+export async function deepseekGUIAnchors(app: ElectronApplication): Promise<string[]> {
   return evalInComp<string[]>(
     app,
-    "Array.from(document.querySelectorAll('[data-deepcode]')).map(n => n.getAttribute('data-deepcode'))",
+    "Array.from(document.querySelectorAll('[data-deepseekgui]')).map(n => n.getAttribute('data-deepseekgui'))",
   )
 }
 
@@ -472,26 +472,26 @@ export async function deepCodeAnchors(app: ElectronApplication): Promise<string[
  * @param app - Electron 应用。
  * @returns 面板文本；面板未开返回空串。
  */
-export async function deepCodeSectionText(app: ElectronApplication): Promise<string> {
+export async function deepseekGUISectionText(app: ElectronApplication): Promise<string> {
   return evalInComp<string>(
     app,
     "document.querySelector('[role=\"dialog\"][aria-modal=\"true\"]')?.textContent ?? ''",
   )
 }
 
-/** 读 DeepCode 分区里某个锚点的文本（断言用；不存在返回空串）。 */
-export async function readDeepCodeText(app: ElectronApplication, testId: string): Promise<string> {
+/** 读 DeepSeekGUI 分区里某个锚点的文本（断言用；不存在返回空串）。 */
+export async function readDeepSeekGUIText(app: ElectronApplication, testId: string): Promise<string> {
   return evalInComp<string>(app, `(() => {
-    const el = document.querySelector('[data-deepcode=' + ${JSON.stringify(JSON.stringify(testId))} + ']')
+    const el = document.querySelector('[data-deepseekgui=' + ${JSON.stringify(JSON.stringify(testId))} + ']')
     return el === null ? '' : (el.textContent ?? '')
   })()`)
 }
 
-/** 往 DeepCode 分区里的输入框写值（React 受控组件：走原生 setter + input 事件）。 */
-export async function fillDeepCodeInput(app: ElectronApplication, testId: string, value: string): Promise<void> {
-  await waitForDeepCodeElement(app, testId)
+/** 往 DeepSeekGUI 分区里的输入框写值（React 受控组件：走原生 setter + input 事件）。 */
+export async function fillDeepSeekGUIInput(app: ElectronApplication, testId: string, value: string): Promise<void> {
+  await waitForDeepSeekGUIElement(app, testId)
   const ok = await evalInComp<boolean>(app, `(() => {
-    const el = document.querySelector('[data-deepcode=' + ${JSON.stringify(JSON.stringify(testId))} + ']')
+    const el = document.querySelector('[data-deepseekgui=' + ${JSON.stringify(JSON.stringify(testId))} + ']')
     if (el === null) return false
     // 受控 input 必须绕开 React 的 value 追踪，否则 onChange 不触发。
     const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
@@ -501,7 +501,7 @@ export async function fillDeepCodeInput(app: ElectronApplication, testId: string
     el.dispatchEvent(new Event('input', { bubbles: true }))
     return true
   })()`)
-  if (!ok) throw new Error(`DeepCode 分区输入框 ${testId} 不存在`)
+  if (!ok) throw new Error(`DeepSeekGUI 分区输入框 ${testId} 不存在`)
 }
 
 /**
@@ -520,8 +520,8 @@ export async function openUpdatePanel(app: ElectronApplication): Promise<void> {
  * @param app - Electron 应用。
  */
 export async function openHarnessPanel(app: ElectronApplication): Promise<void> {
-  await openDeepCodeSection(app, 'harness')
-  await waitForDeepCodeElement(app, 'harness-refresh')
+  await openDeepSeekGUISection(app, 'harness')
+  await waitForDeepSeekGUIElement(app, 'harness-refresh')
 }
 
 /** Chrome DOM 的按钮 id 清单 dump（失败诊断用）。 */

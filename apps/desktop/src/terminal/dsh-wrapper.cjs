@@ -3,7 +3,7 @@
  * 文件，不经 tsc）：用户显式传 --profile 时显式值永远优先；bare 启动/
  * 维护命令默认 target active Profile；help/version 原样透传（不注入）。
  * 结构化扫描 argv 数组——绝不字符串 replace、绝不 shell parsing。
- * 事实全部经 env 由 DeepCode 注入（exact executable 与入口），本文件
+ * 事实全部经 env 由 DeepSeekGUI 注入（exact executable 与入口），本文件
  * 不下载 Runtime、不猜测系统安装。
  *
  * 这里是 argv 规则的**唯一实现**：terminal-service.ts 曾另有一份 TS 镜像，
@@ -15,7 +15,7 @@
 const { spawnSync } = require('node:child_process')
 
 function fail(message) {
-  process.stderr.write(`[deepcode dsh wrapper] ${message}\n`)
+  process.stderr.write(`[deepseekgui dsh wrapper] ${message}\n`)
   process.exit(1)
 }
 
@@ -51,23 +51,23 @@ module.exports = { resolveProfileArgv, hasExplicitProfile, helpOrVersion }
 // 作为 shim 入口运行时才真正转发（被 require 时只暴露纯函数，便于测试
 // 直接测这一份规则，不再维护第二份镜像）。
 if (require.main === module) {
-  const exe = process.env.DEEPCODE_WRAPPER_EXE
-  const dshBin = process.env.DEEPCODE_WRAPPER_DSH_BIN
-  const nodeArgsRaw = process.env.DEEPCODE_WRAPPER_NODE_ARGS
-  const activeProfile = process.env.DEEPCODE_ACTIVE_PROFILE
-  if (typeof exe !== 'string' || exe === '') fail('missing DEEPCODE_WRAPPER_EXE')
-  if (typeof dshBin !== 'string' || dshBin === '') fail('missing DEEPCODE_WRAPPER_DSH_BIN')
-  if (typeof activeProfile !== 'string' || activeProfile === '') fail('missing DEEPCODE_ACTIVE_PROFILE')
+  const exe = process.env.DEEPSEEKGUI_WRAPPER_EXE
+  const dshBin = process.env.DEEPSEEKGUI_WRAPPER_DSH_BIN
+  const nodeArgsRaw = process.env.DEEPSEEKGUI_WRAPPER_NODE_ARGS
+  const activeProfile = process.env.DEEPSEEKGUI_ACTIVE_PROFILE
+  if (typeof exe !== 'string' || exe === '') fail('missing DEEPSEEKGUI_WRAPPER_EXE')
+  if (typeof dshBin !== 'string' || dshBin === '') fail('missing DEEPSEEKGUI_WRAPPER_DSH_BIN')
+  if (typeof activeProfile !== 'string' || activeProfile === '') fail('missing DEEPSEEKGUI_ACTIVE_PROFILE')
 
   let nodeArgs = []
   if (nodeArgsRaw !== undefined && nodeArgsRaw !== '') {
     try {
       nodeArgs = JSON.parse(nodeArgsRaw)
       if (!Array.isArray(nodeArgs) || nodeArgs.some((entry) => typeof entry !== 'string')) {
-        fail('DEEPCODE_WRAPPER_NODE_ARGS must be a JSON string array')
+        fail('DEEPSEEKGUI_WRAPPER_NODE_ARGS must be a JSON string array')
       }
     } catch {
-      fail('DEEPCODE_WRAPPER_NODE_ARGS is not valid JSON')
+      fail('DEEPSEEKGUI_WRAPPER_NODE_ARGS is not valid JSON')
     }
   }
 

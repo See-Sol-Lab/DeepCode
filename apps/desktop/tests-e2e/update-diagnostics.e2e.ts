@@ -1,6 +1,6 @@
 /**
  * P4 打包验收（Update + Diagnostics + Release Hardening）：直接驱动打包
- * DeepCode.exe，经 production 控制入口（汉堡菜单 → 诊断中心的真实 DOM
+ * DeepSeekGUI.exe，经 production 控制入口（汉堡菜单 → 诊断中心的真实 DOM
  * 点击）验收更新通道策略、诊断包与日志保留。
  *
  * 证据边界（必须写明，别让读者以为覆盖了整条更新链）：
@@ -18,7 +18,7 @@
  *   P5 clean-machine gate。
  *
  * 全程隔离临时根 + 剔除凭据形态环境变量，不调用模型、不使用真实凭据。
- * @module @see-sol-lab/deepcode/tests-e2e/update-diagnostics
+ * @module @see-sol-lab/deepseekgui/tests-e2e/update-diagnostics
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -37,14 +37,14 @@ import {
 import {
   CHROME_URL_PREFIX,
   COMP_URL_PREFIX,
-  clickDeepCodeButton,
+  clickDeepSeekGUIButton,
   ensureCleanStage,
   evalInView,
-  openDeepCodeSection,
+  openDeepSeekGUISection,
   openHarnessPanel,
   openUpdatePanel,
   shutdownApp,
-  waitForDeepCodeElement,
+  waitForDeepSeekGUIElement,
 } from './chrome-driver.ts'
 
 /** 本套件的隔离根：Unicode、无空格（与既有打包验收同一约束）。 */
@@ -54,7 +54,7 @@ const isolationRoot = (suffix: string): string => sharedIsolationRoot(`dsh-p4-${
 function writeUpdateFeed(temp: string, feedUrl: string): void {
   const userData = userDataDir(temp)
   mkdirSync(userData, { recursive: true })
-  writeFileSync(join(userData, 'deepcode-update-feed.json'), `${JSON.stringify({ feedUrl }, undefined, 2)}\n`)
+  writeFileSync(join(userData, 'deepseekgui-update-feed.json'), `${JSON.stringify({ feedUrl }, undefined, 2)}\n`)
 }
 
 
@@ -62,23 +62,23 @@ function writeUpdateFeed(temp: string, feedUrl: string): void {
 /** 打开诊断中心面板（汉堡菜单 → 诊断中心，production 入口）。幂等。 */
 async function openDiagnostics(app: ElectronApplication): Promise<void> {
   // P8-D39：诊断中心搬进官方设置页的「BUG 诊断与反馈」分区。
-  // openDeepCodeSection 自身幂等（面板已开、分区已选就不重复点），不需要
+  // openDeepSeekGUISection 自身幂等（面板已开、分区已选就不重复点），不需要
   // 前置的"是否已可见"判断——旧实现那句读的是 D39 之前的 chrome 元素，
   // 恒 false，是死代码。
-  await openDeepCodeSection(app, 'feedback')
-  await waitForDeepCodeElement(app, 'diag-build-info')
+  await openDeepSeekGUISection(app, 'feedback')
+  await waitForDeepSeekGUIElement(app, 'diag-build-info')
 }
 
 /**
  * 面板当前文本（更新状态与构建信息的唯一可见事实）。
  *
- * **横跨两个面**：P8-D39 把诊断中心搬进官方设置页（compat view 的 DeepCode
+ * **横跨两个面**：P8-D39 把诊断中心搬进官方设置页（compat view 的 DeepSeekGUI
  * 分区），而「检查更新」按 D35① 仍住在 Chrome 菜单里——这个套件的断言两边
  * 都要，所以两边都读、拼起来给 includes 用。
  *
  * 旧实现读的是 chrome 侧的 `#diagnostics-panel`，那是 D39 之前的形态，元素
  * 早已不存在，函数**恒返回空串**。它一直没暴露，是因为每个用例都先在
- * openDeepCodeSection 上超时了（首启欢迎公告那个 modal），根本走不到断言——
+ * openDeepSeekGUISection 上超时了（首启欢迎公告那个 modal），根本走不到断言——
  * 一个坑盖住了另一个坑（2026-08-24 六套件跑齐后才见天日）。
  * @param app - 打包应用。
  * @returns 两侧文本拼接；任一侧读失败按空串计。
@@ -222,7 +222,7 @@ describe.runIf(packagedExists)('Packaged Diagnostics + log retention（P4）', (
     // 导出确认框选"确定"（不打开资源管理器）。
     await stubDialogs(app, [['诊断包已导出', 1]])
     await openDiagnostics(app)
-    await clickDeepCodeButton(app, 'diag-export')
+    await clickDeepSeekGUIButton(app, 'diag-export')
     await waitDiagnostics(app, '最近导出')
 
     const exportsRoot = join(userDataDir(temp), 'diagnostics')
@@ -277,7 +277,7 @@ describe.runIf(packagedExists)('Packaged Diagnostics + log retention（P4）', (
       )) {
         await openHarnessPanel(app)
       }
-      await clickDeepCodeButton(app, 'harness-restart')
+      await clickDeepSeekGUIButton(app, 'harness-restart')
       await expect.poll(statusText, { timeout: 60_000 }).not.toContain('运行中')
       await expect.poll(statusText, { timeout: 120_000 }).toContain('运行中')
     }

@@ -56,7 +56,7 @@ const experimentalPackageNamePrefix = '@deepseek-ai/dsh-experimental-'
 const releaseMemberDirectory = /^(?:packages\/(?!experimental\/)[^/]+\/[^/]+|apps\/[^/]+|vendor\/[^/]+)$/
 /**
  * Workspace directories that are private community packages, never release
- * members: the DeepCode desktop shell is an unofficial community client owned
+ * members: the DeepSeekGUI desktop shell is an unofficial community client owned
  * by See-Sol-Lab, must stay unpublishable, and points its repository at its
  * own home instead of the official monorepo.
  */
@@ -70,7 +70,7 @@ const appPackageFiles: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/dsh-web-frontend': ['dist', '!dist/**/*.map'],
   // The desktop shell ships its compiled main process and README; source maps
   // stay out of the published payload.
-  '@see-sol-lab/deepcode': ['lib', '!lib/**/*.map'],
+  '@see-sol-lab/deepseekgui': ['lib', '!lib/**/*.map'],
 }
 
 /** The subset of package.json fields this constraint check cares about. */

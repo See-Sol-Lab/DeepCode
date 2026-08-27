@@ -1,6 +1,6 @@
 {
-  "name": "@see-sol-lab/deepcode-browser",
-  "description": "DeepCode browser capability: embedded in-window pane (CDP) or headed Edge, driven over playwright-core with an SSRF gate.",
+  "name": "@see-sol-lab/deepseekgui-browser",
+  "description": "DeepSeekGUI browser capability: embedded in-window pane (CDP) or headed Edge, driven over playwright-core with an SSRF gate.",
   "version": "0.2.1",
   "private": true,
   "type": "module",

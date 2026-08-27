@@ -10,7 +10,7 @@
  *   "正在执行的会话数"，绝不夸大；
  * - 只显示数量，绝不显示会话内容/正文（隐私边界）。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/quit-confirm
+ * @module @see-sol-lab/deepseekgui/quit-confirm
  */
 
 import type { HarnessApi } from './harness-api.ts'

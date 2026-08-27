@@ -1,11 +1,11 @@
 /**
- * P2 常驻宿主打包验收（resident host）：直接驱动打包 DeepCode.exe。
+ * P2 常驻宿主打包验收（resident host）：直接驱动打包 DeepSeekGUI.exe。
  * 覆盖常驻生命周期竞态——close 只隐藏（DSH 继续运行、无 stop/fallback/
  * promotion）、hidden 窗口经 second instance 重开（单实例）、运行中 DSH
  * crash（Chrome 存活 → failed → Restart 恢复）、session-end（OS 关机
  * 无交互 orderly cleanup）与退出后无僵尸进程/端口释放。
  * 全程不调用模型、不需要 API key。
- * @module @see-sol-lab/deepcode/tests-e2e/resident-host
+ * @module @see-sol-lab/deepseekgui/tests-e2e/resident-host
  */
 
 import { spawnSync } from 'node:child_process'
@@ -56,7 +56,7 @@ async function waitLauncherState(temp: string): Promise<void> {
  * 串行套件 + 每用例 teardown 等端口释放，保证监听者必属本用例）。
  * 不能按进程树找：playwright 的 --inspect 会让 Electron 重新 exec 一层
  * 中间进程，app.process().pid 不是真 main，DSH 是孙子辈；且 Electron 的
- * GPU/utility/renderer/crashpad 全都叫 DeepCode.exe——第五扇窗的两轮
+ * GPU/utility/renderer/crashpad 全都叫 DeepSeekGUI.exe——第五扇窗的两轮
  * 排障（杀中间层带崩全树 / 直接子进程里永远找不到 bin.js）都源于此。
  */
 function dshServicePid(): number | null {
@@ -68,11 +68,11 @@ function dshServicePid(): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
-/** 任何存活的 DeepCode.exe 进程数（退出后应为 0）。 */
-function deepCodeProcessCount(): number {
+/** 任何存活的 DeepSeekGUI.exe 进程数（退出后应为 0）。 */
+function deepseekGUIProcessCount(): number {
   const probe = spawnSync('powershell', [
     '-NoProfile', '-Command',
-    "(Get-CimInstance Win32_Process -Filter \"Name='DeepCode.exe'\" -ErrorAction SilentlyContinue | Measure-Object).Count",
+    "(Get-CimInstance Win32_Process -Filter \"Name='DeepSeekGUI.exe'\" -ErrorAction SilentlyContinue | Measure-Object).Count",
   ], { encoding: 'utf8' })
   const parsed = Number.parseInt(probe.stdout.trim(), 10)
   return Number.isFinite(parsed) ? parsed : -1
@@ -222,8 +222,8 @@ describe.runIf(packagedExists)('Resident Host（P2 常驻生命周期）', () =>
           BrowserWindow.getAllWindows()[0]?.emit('session-end')
         })
         await expect.poll(() => portOpen(3080), { timeout: 30_000 }).toBe(false)
-        // 应用已退出：无 DeepCode.exe 残留（含 DSH 子进程）。
-        await expect.poll(() => deepCodeProcessCount(), { timeout: 30_000 }).toBe(0)
+        // 应用已退出：无 DeepSeekGUI.exe 残留（含 DSH 子进程）。
+        await expect.poll(() => deepseekGUIProcessCount(), { timeout: 30_000 }).toBe(0)
       } finally {
         // 断言失败时的兜底收割：不让泄漏实例占住 3080 毒害后续用例。
         await shutdownApp(app)
@@ -251,7 +251,7 @@ describe.runIf(packagedExists)('Resident Host（P2 常驻生命周期）', () =>
         // 官方程序化退出：必须经 before-quit → proceedQuit 真实退出。
         await app.evaluate(({ app: electronApp }) => { electronApp.quit() })
         await expect.poll(() => portOpen(3080), { timeout: 30_000 }).toBe(false)
-        await expect.poll(() => deepCodeProcessCount(), { timeout: 30_000 }).toBe(0)
+        await expect.poll(() => deepseekGUIProcessCount(), { timeout: 30_000 }).toBe(0)
       } finally {
         // 断言失败/退出未完成时的兜底收割：不让泄漏实例占住 3080 毒害
         // 后续文件（连环 launch 超时 + fail-loud 对话框风暴的教训）。

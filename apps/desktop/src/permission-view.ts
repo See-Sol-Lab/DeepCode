@@ -3,7 +3,7 @@
  * namespace 事实映射为 Desktop Chrome 的展示形态。
  *
  * 铁律（Harness 是唯一权限事实源）：
- * - 绝不维护 DeepCode 自己的 permission 状态——每次从官方 describe
+ * - 绝不维护 DeepSeekGUI 自己的 permission 状态——每次从官方 describe
  *   结果现算；
  * - 官方 permission service 不可用（namespace 缺失/读取失败）时
  *   fail closed：显示 unavailable，绝不显示 Sandbox、绝不伪装 Full
@@ -11,7 +11,7 @@
  * - preset 名与显示模式的映射只在这一处：UI 与切换命令共用同一份
  *   语义，绝不各写一份。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/permission-view
+ * @module @see-sol-lab/deepseekgui/permission-view
  */
 
 import type { SettingsDescribeValue } from './harness-api-types.ts'
@@ -22,7 +22,7 @@ export const PERMISSION_SETTINGS_NAMESPACE = 'permission'
 /** 官方 permission settings 的 defaultPreset 字段。 */
 export const PERMISSION_DEFAULT_FIELD = 'defaultPreset'
 
-/** DeepCode 推荐默认（安全 sandbox）preset 名。 */
+/** DeepSeekGUI 推荐默认（安全 sandbox）preset 名。 */
 export const RECOMMENDED_PRESET = 'workspace-write'
 
 /** 完全访问 preset 名（显式风险确认后才能切到）。 */

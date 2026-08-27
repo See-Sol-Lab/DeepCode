@@ -3,7 +3,7 @@
  * 真流、真 spawn 注入）——施工单点名的 download confirmation/cancel、
  * digest mismatch、handoff confirm/cancel/spawn failure 在此有行为级
  * 测试。不访问公网、无凭据、无模型。
- * @module @see-sol-lab/deepcode/tests/update-runner
+ * @module @see-sol-lab/deepseekgui/tests/update-runner
  */
 
 import { createHash } from 'node:crypto'

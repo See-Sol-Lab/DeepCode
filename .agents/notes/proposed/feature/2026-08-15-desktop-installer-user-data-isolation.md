@@ -10,9 +10,9 @@ The [portable distribution](2026-08-16-desktop-portable-distribution.md) runs fr
 
 ## Proposal
 
-**App-scoped DSH_HOME.** The packaged main process spawns the DSH service with `DSH_HOME` set to `join(app.getPath('userData'), 'dsh')` — `%APPDATA%\DeepCode\dsh` for the default product name. All credentials (`.credentials.yaml`), settings, sessions, and profiles are written there by the official DSH mechanisms; the app never reads a global `~/.dsh` and never writes keys to its own config, logs, the installer, or the command line. An ambient `DSH_HOME` environment variable overrides the default (development and automated verification), and development mode keeps today's behavior (no injection). `resolveDshLaunch` gains one optional field; the unit tests pin the injected value, the override, and the dev-mode passthrough.
+**App-scoped DSH_HOME.** The packaged main process spawns the DSH service with `DSH_HOME` set to `join(app.getPath('userData'), 'dsh')` — `%APPDATA%\DeepSeekGUI\dsh` for the default product name. All credentials (`.credentials.yaml`), settings, sessions, and profiles are written there by the official DSH mechanisms; the app never reads a global `~/.dsh` and never writes keys to its own config, logs, the installer, or the command line. An ambient `DSH_HOME` environment variable overrides the default (development and automated verification), and development mode keeps today's behavior (no injection). `resolveDshLaunch` gains one optional field; the unit tests pin the injected value, the override, and the dev-mode passthrough.
 
-**NSIS installer.** `electron-builder.yml` gains an `nsis` target alongside `dir`: assisted (wizard) installer, `perMachine: false` (current-user, no admin rights), Start menu and desktop shortcuts with the whale icon, `shortcutName: DeepCode`, artifact `DeepCode-Setup-${version}.exe`. The installer is built with `--prepackaged` from the already-assembled `win-unpacked`, so the copied `resources/dsh` runtime and the sanitized payload ship unchanged. No auto-update, signing, tray, auto-start, multi-platform, or file associations. The toolchain mirror (`ELECTRON_BUILDER_BINARIES_MIRROR`) defaults to npmmirror in the build script so NSIS binaries download on network-restricted machines.
+**NSIS installer.** `electron-builder.yml` gains an `nsis` target alongside `dir`: assisted (wizard) installer, `perMachine: false` (current-user, no admin rights), Start menu and desktop shortcuts with the whale icon, `shortcutName: DeepSeekGUI`, artifact `DeepSeekGUI-Setup-${version}.exe`. The installer is built with `--prepackaged` from the already-assembled `win-unpacked`, so the copied `resources/dsh` runtime and the sanitized payload ship unchanged. No auto-update, signing, tray, auto-start, multi-platform, or file associations. The toolchain mirror (`ELECTRON_BUILDER_BINARIES_MIRROR`) defaults to npmmirror in the build script so NSIS binaries download on network-restricted machines.
 
 **First-run documentation.** The bilingual README gains a six-step non-programmer path (install → launch → Settings/Models → paste key → pick workspace → new session), states where data lives, that uninstalling keeps the data folder, and how to clear it manually. No real keys, usernames, or private paths appear anywhere.
 
@@ -30,8 +30,8 @@ The [portable distribution](2026-08-16-desktop-portable-distribution.md) runs fr
 
 ## Acceptance criteria
 
-- The packaged app runs with `DSH_HOME` = `%APPDATA%\DeepCode\dsh`; credentials/settings/sessions land there, and a pre-existing `~/.dsh` is untouched.
-- `pnpm run build:desktop-dist` produces both `dist/desktop/win-unpacked/` and `dist/desktop/DeepCode-Setup-<version>.exe`.
+- The packaged app runs with `DSH_HOME` = `%APPDATA%\DeepSeekGUI\dsh`; credentials/settings/sessions land there, and a pre-existing `~/.dsh` is untouched.
+- `pnpm run build:desktop-dist` produces both `dist/desktop/win-unpacked/` and `dist/desktop/DeepSeekGUI-Setup-<version>.exe`.
 - Installing the Setup exe as a normal user succeeds without elevation; Start menu and desktop shortcuts appear; the app launches from the shortcut, loads the official UI, and releases port 3080 on close.
 - The uninstall entry exists and removes the application.
 - Unit tests (19+), `build:desktop`, typecheck, dev smoke, and the fixed verification script pass; the distribution scan stays clean (no `.git`, `.env`, sessions, keys, usernames, or private paths); `git diff --check` is clean.

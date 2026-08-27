@@ -10,7 +10,7 @@ Status: proposed
 
 ## Proposal
 
-新增 `pnpm run build:desktop-dist`（`scripts/build-desktop-dist.ts`），产出 `dist/desktop/win-unpacked/`，内含 `DeepCode.exe`：
+新增 `pnpm run build:desktop-dist`（`scripts/build-desktop-dist.ts`），产出 `dist/desktop/win-unpacked/`，内含 `DeepSeekGUI.exe`：
 
 - **打包**：两个 release family（`dsh`、`vendor`）走与 `release/pack.ts` 相同的逐成员检查（pnpm pack + payload 校验），输出到 `dist/npm-dsh` 与 `dist/npm-vendor`。
 - **安装**：写一份 staging consumer manifest，把[运行闭包](2026-08-15-desktop-runtime-closure-and-volume.zh.md)内的 tarball 声明为相对 `file:` 依赖，然后 `npm install`——与 `release/verify-packed-install.ts` 证明过的机制一致，但不带它的 `--omit=optional`：Windows ACL 沙箱的 `koffi` 与 Landlock 平台包以 optionalDependencies 发布预编译二进制，跳过它们会迫使源码构建。registry 流量仅限于外部依赖（commander、js-yaml、koffi、opentelemetry 等），由提交在仓库的 `apps/desktop/runtime.package-lock.json` 钉住（种子进 staging 安装并回写，外部漂移会以 git diff 的形式显形；锁文件含任何机器绝对路径都会使构建失败）。
@@ -33,7 +33,7 @@ Status: proposed
 
 ## Acceptance criteria
 
-- `pnpm run build:desktop-dist` 产出 `dist/desktop/win-unpacked/DeepCode.exe`。
+- `pnpm run build:desktop-dist` 产出 `dist/desktop/win-unpacked/DeepSeekGUI.exe`。
 - 打包版 exe 在开发机 Node/pnpm 从 PATH 移除的情况下（smoke 模式）显示官方 Web UI。
 - 关闭窗口后 DSH 子进程结束、端口 3080 释放。
 - 发行目录不含 `.git`、`.env`、会话日志、用户路径或 API key。

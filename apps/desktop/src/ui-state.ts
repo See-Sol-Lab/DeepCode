@@ -10,7 +10,7 @@
  * Hook 事实一律禁存：严格解析拒绝一切未知字段，越界字段让文件整体
  * 失效回退默认，而不是部分采纳。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/ui-state
+ * @module @see-sol-lab/deepseekgui/ui-state
  */
 
 import { createHash } from 'node:crypto'

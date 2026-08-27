@@ -1,19 +1,19 @@
 /**
- * Plugin Mutation Recovery 的纯逻辑层：DeepCode GUI 发起的插件写操作
+ * Plugin Mutation Recovery 的纯逻辑层：DeepSeekGUI 发起的插件写操作
  * （add/remove/update/install）的受保护事务。
  *
  * 铁律（P6-F）：
  * - 操作前只对三个白名单文件（package.json / pnpm-lock.yaml /
  *   pnpm-workspace.yaml）做 byte-identical 快照 + hash；文件不存在记录
  *   absent，绝不伪造空文件；绝不备份 node_modules、绝不备份整个 Profile。
- * - journal 只存在 DeepCode userData，绝不进入目标 Profile。
- * - 正常写路径仍只走官方 `dsh plugin`；恢复只在"DeepCode 自己发起、
+ * - journal 只存在 DeepSeekGUI userData，绝不进入目标 Profile。
+ * - 正常写路径仍只走官方 `dsh plugin`；恢复只在"DeepSeekGUI 自己发起、
  *   自己记录、hash 能证明归属"的失败事务上恢复这三个白名单文件。
  * - 同 Home/Profile 同时最多一个 pending unverified transaction。
  * - post-operation 后任一白名单文件发生 hash drift：禁止自动覆盖，
  *   进入人工恢复（fail closed）。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/plugin-recovery
+ * @module @see-sol-lab/deepseekgui/plugin-recovery
  */
 
 import { createHash } from 'node:crypto'
@@ -73,8 +73,8 @@ export function describePluginFailure(cause: PluginFailureCause, zh: boolean): s
         : 'The user cancelled the operation. pnpm may have already changed some files; the recovery record and snapshot are kept, so restoring is still possible. This is not a program fault.'
     case 'exit-code':
       return zh
-        ? `安装工具 pnpm 以退出码 ${String(cause.code)} 结束——是它自己报的错，不是 DeepCode 的操作出问题，也不是用户做错了什么。恢复记录和快照都已保留。`
-        : `pnpm exited with code ${String(cause.code)} — the packaging tool itself reported the failure; neither DeepCode nor the user did anything wrong. The recovery record and snapshot are kept.`
+        ? `安装工具 pnpm 以退出码 ${String(cause.code)} 结束——是它自己报的错，不是 DeepSeekGUI 的操作出问题，也不是用户做错了什么。恢复记录和快照都已保留。`
+        : `pnpm exited with code ${String(cause.code)} — the packaging tool itself reported the failure; neither DeepSeekGUI nor the user did anything wrong. The recovery record and snapshot are kept.`
     case 'spawn-failed':
       return zh
         ? '没能启动安装工具（找不到可执行文件或权限不足）。磁盘上的文件没有被改动。'

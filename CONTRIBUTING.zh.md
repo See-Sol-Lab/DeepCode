@@ -2,13 +2,13 @@
 
 [English](CONTRIBUTING.md) | 中文
 
-感谢你考虑为 DeepCode 的开发作出贡献！这份文档是 DeepCode 的共同开发指南，提交工作的人类与 Agent 都请先读一读。
+感谢你考虑为 DeepSeekGUI 的开发作出贡献！这份文档是 DeepSeekGUI 的共同开发指南，提交工作的人类与 Agent 都请先读一读。
 
-DeepCode 是把 DeepSeek Harness 装进 Windows 的桌面产品。你能帮上忙的地方很多——用它、报问题、写文档，或者直接来改代码。
+DeepSeekGUI 是把 DeepSeek Harness 装进 Windows 的桌面产品。你能帮上忙的地方很多——用它、报问题、写文档，或者直接来改代码。
 
 ## 报告问题与提建议
 
-- **报 bug**：到 [DeepCode Issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues) 提，带上 Windows 版本、DeepCode 版本和复现步骤，有截图或日志更好。
+- **报 bug**：到 [DeepSeekGUI Issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues) 提，带上 Windows 版本、DeepSeekGUI 版本和复现步骤，有截图或日志更好。
 - **提功能建议或反馈**：同样在 Issues 里聊，说清楚你想解决什么问题、期望它怎么工作。
 - **上游 Harness 本身的行为**：到 [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions) 提问，那边更对口。
 
@@ -24,7 +24,7 @@ DeepCode 是把 DeepSeek Harness 装进 Windows 的桌面产品。你能帮上�
 
 ```sh
 git clone https://github.com/See-Sol-Lab/DeepSeekGUI.git
-cd DeepCode
+cd DeepSeekGUI
 pnpm install
 ```
 
@@ -43,11 +43,11 @@ pnpm install
 
 ## 仓库边界
 
-如果把 DeepCode 的发展愿景比作一辆车，DeepSeek Harness 就是它的核心发动机。上游 Harness 的核心文件跟随官方持续更新，DeepCode 这边保持原样——请每一位 PR 提交者先了解这条原则。
+如果把 DeepSeekGUI 的发展愿景比作一辆车，DeepSeek Harness 就是它的核心发动机。上游 Harness 的核心文件跟随官方持续更新，DeepSeekGUI 这边保持原样——请每一位 PR 提交者先了解这条原则。
 
 具体来说：
 
-- **DeepCode 自己的桌面代码在 `apps/desktop/`**，这里欢迎改进。
+- **DeepSeekGUI 自己的桌面代码在 `apps/desktop/`**，这里欢迎改进。
 - **上游 Harness 部分**（`packages/`、`apps/cli`、`apps/web` 等）跟随官方更新，改动请提到 [上游仓库](https://github.com/deepseek-ai/deepseek-harness)。
 
 ## 提交 PR
@@ -59,7 +59,7 @@ pnpm install
 
 **提交前请确认**
 
-- [ ] 改动集中在 `apps/desktop/` 或其他 DeepCode 自有部分
+- [ ] 改动集中在 `apps/desktop/` 或其他 DeepSeekGUI 自有部分
 - [ ] `pnpm run build` 通过
 - [ ] `pnpm run typecheck` 与 `pnpm run lint` 通过
 - [ ] 涉及界面或文档的改动已中英同步
@@ -71,7 +71,7 @@ pnpm install
 
 ## 联系我们
 
-- DeepCode 的 bug 与产品反馈：[DeepCode Issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues)
+- DeepSeekGUI 的 bug 与产品反馈：[DeepSeekGUI Issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues)
 - 上游 Harness 行为相关的问题：[DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions)
 
-再次感谢你愿意花时间参与 DeepCode。
+再次感谢你愿意花时间参与 DeepSeekGUI。

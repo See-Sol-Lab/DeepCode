@@ -2,13 +2,13 @@
 
 English | [中文](CONTRIBUTING.zh.md)
 
-Thanks for considering a contribution to DeepCode! This is the shared development guide for the project, and we ask every contributor — human or agent — to give it a read first.
+Thanks for considering a contribution to DeepSeekGUI! This is the shared development guide for the project, and we ask every contributor — human or agent — to give it a read first.
 
-DeepCode packages DeepSeek Harness into a Windows desktop product. There are plenty of ways to help: use it, report what breaks, improve the docs, or dive into the code.
+DeepSeekGUI packages DeepSeek Harness into a Windows desktop product. There are plenty of ways to help: use it, report what breaks, improve the docs, or dive into the code.
 
 ## Reporting issues and suggesting features
 
-- **Report a bug**: open a [DeepCode issue](https://github.com/See-Sol-Lab/DeepSeekGUI/issues) with your Windows version, DeepCode version, and steps to reproduce. Screenshots or logs are very welcome.
+- **Report a bug**: open a [DeepSeekGUI issue](https://github.com/See-Sol-Lab/DeepSeekGUI/issues) with your Windows version, DeepSeekGUI version, and steps to reproduce. Screenshots or logs are very welcome.
 - **Suggest a feature or share feedback**: use Issues as well. Tell us what problem you want solved and how you expect it to work.
 - **Ask about upstream Harness behavior**: [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions) is the better place for that.
 
@@ -24,7 +24,7 @@ DeepCode packages DeepSeek Harness into a Windows desktop product. There are ple
 
 ```sh
 git clone https://github.com/See-Sol-Lab/DeepSeekGUI.git
-cd DeepCode
+cd DeepSeekGUI
 pnpm install
 ```
 
@@ -43,11 +43,11 @@ See [apps/desktop/README.md](apps/desktop/README.md) for engineering details and
 
 ## Repository boundaries
 
-If DeepCode's vision is a car, DeepSeek Harness is the engine inside it. Upstream Harness core files track the official repository and stay as they are here — please keep this principle in mind before opening a PR.
+If DeepSeekGUI's vision is a car, DeepSeek Harness is the engine inside it. Upstream Harness core files track the official repository and stay as they are here — please keep this principle in mind before opening a PR.
 
 In practice:
 
-- **DeepCode's own desktop code lives in `apps/desktop/`.** Improvements here are welcome.
+- **DeepSeekGUI's own desktop code lives in `apps/desktop/`.** Improvements here are welcome.
 - **Upstream Harness code** (`packages/`, `apps/cli`, `apps/web`, and friends) follows the official repository. Send changes for those to [upstream](https://github.com/deepseek-ai/deepseek-harness).
 
 ## Sending a pull request
@@ -59,7 +59,7 @@ In practice:
 
 **Before you submit**
 
-- [ ] Changes stay within `apps/desktop/` or another DeepCode-owned area
+- [ ] Changes stay within `apps/desktop/` or another DeepSeekGUI-owned area
 - [ ] `pnpm run build` passes
 - [ ] `pnpm run typecheck` and `pnpm run lint` pass
 - [ ] UI and documentation changes are synced in both languages
@@ -71,7 +71,7 @@ Please be kind and respectful, and keep discussions focused on the work. We want
 
 ## Contact
 
-- DeepCode bugs and product feedback: [DeepCode Issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues)
+- DeepSeekGUI bugs and product feedback: [DeepSeekGUI Issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues)
 - Questions about upstream Harness behavior: [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions)
 
-Thanks again for spending your time on DeepCode.
+Thanks again for spending your time on DeepSeekGUI.

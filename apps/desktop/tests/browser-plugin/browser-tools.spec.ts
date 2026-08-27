@@ -3,7 +3,7 @@
  * ignored-node dropping, depth cap) and the model-facing output formatters.
  * Browser launching itself is covered by the dev/packaged smoke e2e (needs a
  * real Edge); everything deterministic is pinned here.
- * @module @see-sol-lab/deepcode-browser/tests/browser-tools
+ * @module @see-sol-lab/deepseekgui-browser/tests/browser-tools
  */
 
 import { describe, expect, it } from 'vitest'

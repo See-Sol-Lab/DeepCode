@@ -2,7 +2,7 @@
  * update-service 测试：语义版本比较与 prerelease policy、manifest 严格
  * 解析、URL/filename 卫生、摘要校验与 handoff 决策。纯 Node 环境，
  * 无网络、无 Electron、无凭据。
- * @module @see-sol-lab/deepcode/tests/update-service
+ * @module @see-sol-lab/deepseekgui/tests/update-service
  */
 
 import { describe, expect, it } from 'vitest'
@@ -104,10 +104,10 @@ const MANIFEST = JSON.stringify({
   latestVersion: '0.2.0',
   releaseNotes: '修复若干问题\n新增更新通道',
   assets: [{
-    url: 'https://updates.example.com/DeepCode-Setup-0.2.0.exe',
+    url: 'https://updates.example.com/DeepSeekGUI-Setup-0.2.0.exe',
     sha256: 'a'.repeat(64),
     size: 123456789,
-    filename: 'DeepCode-Setup-0.2.0.exe',
+    filename: 'DeepSeekGUI-Setup-0.2.0.exe',
   }],
 })
 
@@ -152,7 +152,7 @@ describe('parseUpdateManifest（严格 schema，绝不猜测）', () => {
 
 describe('parseUpdateAsset / sanitizeAssetFilename / isSafeAssetUrl', () => {
   it('sanitize：只留 basename 与安全字符', () => {
-    expect(sanitizeAssetFilename('DeepCode-Setup-0.2.0.exe')).toBe('DeepCode-Setup-0.2.0.exe')
+    expect(sanitizeAssetFilename('DeepSeekGUI-Setup-0.2.0.exe')).toBe('DeepSeekGUI-Setup-0.2.0.exe')
     expect(sanitizeAssetFilename('C:\\evil\\path\\a.exe')).toBe('a.exe')
     expect(sanitizeAssetFilename('../../a.exe')).toBe('a.exe')
     expect(sanitizeAssetFilename('a b.exe')).toBeNull()

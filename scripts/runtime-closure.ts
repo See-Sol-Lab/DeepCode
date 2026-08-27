@@ -1,5 +1,5 @@
 /**
- * Runtime closure computation for the DeepCode distribution.
+ * Runtime closure computation for the DeepSeekGUI distribution.
  *
  * The distribution used to install every packed tarball of both release
  * families as direct staging dependencies, which dragged test toolchains

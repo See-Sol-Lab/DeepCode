@@ -1,9 +1,9 @@
 /**
- * about 纯函数测试：About 详情包含全部受控事实（DeepCode version、
+ * about 纯函数测试：About 详情包含全部受控事实（DeepSeekGUI version、
  * embedded DSH version/source、Electron、platform/arch、Home kind、
  * Profile、license、repository），且绝不出现任何凭据形态文本——
  * 函数输入面根本不接触环境变量/凭据/会话，secret 无法进入文本。
- * @module @see-sol-lab/deepcode/tests/about
+ * @module @see-sol-lab/deepseekgui/tests/about
  */
 
 import { describe, expect, it } from 'vitest'
@@ -12,9 +12,9 @@ import {
   ABOUT_LICENSE_SUMMARY,
   ABOUT_REPOSITORY,
 } from '../src/about.ts'
-import type { DeepCodeVersionInfo } from '../src/version-info.ts'
+import type { DeepSeekGUIVersionInfo } from '../src/version-info.ts'
 
-const version: DeepCodeVersionInfo = {
+const version: DeepSeekGUIVersionInfo = {
   appVersion: '0.1.0-alpha.1',
   embeddedDshVersion: '0.1.0-rc.5',
   sourceCommit: 'abc123',
@@ -26,7 +26,7 @@ const version: DeepCodeVersionInfo = {
 describe('aboutDetailText', () => {
   it('zh：包含版本四元组、Home kind、Profile、license 与仓库', () => {
     const text = aboutDetailText({ version, homeKind: 'managed', profile: 'web', locale: 'zh' })
-    expect(text).toContain('DeepCode 版本：0.1.0-alpha.1')
+    expect(text).toContain('DeepSeekGUI 版本：0.1.0-alpha.1')
     expect(text).toContain('内嵌 DSH 版本：0.1.0-rc.5（source abc123）')
     expect(text).toContain('Electron：43.4.0 · win32-x64')
     expect(text).toContain('Harness Home：托管模式')
@@ -50,7 +50,7 @@ describe('aboutDetailText', () => {
       locale: 'en',
     })
     expect(text).toContain('(source unknown)')
-    expect(text).toContain('DeepCode version: 0.1.0-alpha.1')
+    expect(text).toContain('DeepSeekGUI version: 0.1.0-alpha.1')
   })
 
   it('About 无 secret：不含 API key/token/secret/session 形态', () => {

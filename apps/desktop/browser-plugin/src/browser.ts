@@ -1,5 +1,5 @@
 /**
- * Browser instance management for the DeepCode browser capability.
+ * Browser instance management for the DeepSeekGUI browser capability.
  *
  * One headed Edge (channel 'msedge') browser per plugin instance, driven
  * through a loopback SSRF proxy so every navigation (and every redirect hop)
@@ -11,7 +11,7 @@
  * Browser crashes (kernel process death) never take down the harness process —
  * playwright reports the disconnect and the next call restarts the browser.
  *
- * @module @see-sol-lab/deepcode-browser/browser
+ * @module @see-sol-lab/deepseekgui-browser/browser
  */
 
 import {
@@ -48,7 +48,7 @@ export interface TabInfo {
 export interface BrowserManagerOptions {
   /** DNS injection for the SSRF gate (nodeLookup in production). */
   lookup: HostLookup
-  /** Directory screenshots are written to; defaults to $DEEPCODE_USERDATA/deepcode-browser/screenshots. */
+  /** Directory screenshots are written to; defaults to $DEEPSEEKGUI_USERDATA/deepseekgui-browser/screenshots. */
   screenshotDir?: string
   /** Playwright channel; defaults to system Edge. */
   channel?: string
@@ -114,8 +114,8 @@ export interface BrowserFacade {
 
 const DEFAULT_CHANNEL = 'msedge'
 const DEFAULT_SCREENSHOT_DIR = () => {
-  const base = process.env.DEEPCODE_USERDATA ?? process.env.TEMP ?? process.cwd()
-  return `${base.replace(/[\\/]$/, '')}/deepcode-browser/screenshots`
+  const base = process.env.DEEPSEEKGUI_USERDATA ?? process.env.TEMP ?? process.cwd()
+  return `${base.replace(/[\\/]$/, '')}/deepseekgui-browser/screenshots`
 }
 
 /** Ref prefix for a11y nodes; M3 click/type will address elements by these. */
@@ -155,7 +155,7 @@ async function cdpAccessibilityTree(page: Page): Promise<CdpAxNode[]> {
 /**
  * Turn a CDP connection failure into something a person can act on.
  *
- * The debugging port is chosen at random when DeepCode starts and cannot be
+ * The debugging port is chosen at random when DeepSeekGUI starts and cannot be
  * reserved beforehand — the switch has to be set before the app is ready,
  * and there is no synchronous way to claim a port that early. So a collision
  * with another program on this machine is rare but possible, and the raw
@@ -169,8 +169,8 @@ export function cdpConnectFailure(port: number, cause: unknown): Error {
   const detail = cause instanceof Error ? cause.message : String(cause)
   return new Error(
     `Could not reach the browser debugging port ${String(port)} (${detail}). `
-    + 'DeepCode picks this port at random on startup, so another program on this '
-    + 'machine may be holding it. Restarting DeepCode picks a different port.',
+    + 'DeepSeekGUI picks this port at random on startup, so another program on this '
+    + 'machine may be holding it. Restarting DeepSeekGUI picks a different port.',
   )
 }
 
@@ -263,7 +263,7 @@ function findPaneByUrl(browser: Browser, paneUrl: string): Page | undefined {
   return undefined
 }
 
-export class DeepCodeBrowser implements BrowserFacade {
+export class DeepSeekGUIBrowser implements BrowserFacade {
   private browser: Browser | null = null
   private context: BrowserContext | null = null
   private proxy: SsrfProxy | null = null

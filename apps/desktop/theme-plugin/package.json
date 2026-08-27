@@ -1,6 +1,6 @@
 {
-  "name": "@see-sol-lab/deepcode-theme",
-  "description": "DeepCode skin: stacks a token override layer on the official theme service so the deep-sea backdrop shows through the Harness UI",
+  "name": "@see-sol-lab/deepseekgui-theme",
+  "description": "DeepSeekGUI skin: stacks a token override layer on the official theme service so the deep-sea backdrop shows through the Harness UI",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -19,7 +19,7 @@
       "immediately": true
     }
   },
-  "license": "SEE LICENSE IN ../../../DEEPCODE-LICENSE.md",
+  "license": "SEE LICENSE IN ../../../DEEPSEEKGUI-LICENSE.md",
   "files": [
     "lib/client.js",
     "lib/index.js"

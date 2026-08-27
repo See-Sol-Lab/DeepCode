@@ -5,7 +5,7 @@
  * @xterm/* devDependencies change:
  *   pnpm --filter @see-sol-lab/deepcore exec node scripts/vendor-terminal-assets.mjs
  * The copied files are committed; MIT licenses ship beside them.
- * @module @see-sol-lab/deepcode/scripts/vendor-terminal-assets
+ * @module @see-sol-lab/deepseekgui/scripts/vendor-terminal-assets
  */
 
 import { copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'

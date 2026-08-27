@@ -1,14 +1,14 @@
 /**
  * P5 收口门禁（打包验收新增四条）：N launcher-state 损坏救援、O 窗口
  * 几何恢复与越界收敛、Q About / build info 四元组身份。全部驱动打包
- * DeepCode.exe，经真实入口与真实文件状态断言。
+ * DeepSeekGUI.exe，经真实入口与真实文件状态断言。
  *
  * H（DSH Terminal 打包态自动驱动）**不在本文件**：见文件尾部注释与
- * DEEPCODE_V1_MANUAL_ACCEPTANCE.md 的终端一条——托盘原生菜单无法被
+ * DEEPSEEKGUI_V1_MANUAL_ACCEPTANCE.md 的终端一条——托盘原生菜单无法被
  * playwright 驱动（证据见下），终端窗口的 ConPTY 交互留人工验收。
  *
  * 全程隔离临时根 + 剔除凭据形态环境变量，不调用模型、不使用真实凭据。
- * @module @see-sol-lab/deepcode/tests-e2e/p5-final-gate
+ * @module @see-sol-lab/deepseekgui/tests-e2e/p5-final-gate
  */
 
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -53,7 +53,7 @@ describe.runIf(packagedExists)('P5 final gate（打包态）', () => {
   // `_electron.launch` 返回时它已经在等待，测试侧没有任何时机装 dialog
   // stub（实测：evaluate 直接拿到 target closed）。产品行为本身有单测覆盖
   // （launcher-state.spec：先备份 .invalid-<ts> 再原子写默认、备份失败则
-  // 原文件不动），打包态的落点在 DEEPCODE_V1_MANUAL_ACCEPTANCE.md。
+  // 原文件不动），打包态的落点在 DEEPSEEKGUI_V1_MANUAL_ACCEPTANCE.md。
   it.skip('N. launcher-state 损坏救援：坏文件原样备份 .invalid-<ts>，新默认原子生成，DSH_HOME 与用户数据不被触碰', async () => {
     const temp = isolationRoot('launcher')
     const userData = userDataDir(temp)
@@ -180,15 +180,15 @@ describe.runIf(packagedExists)('P5 final gate（打包态）', () => {
     let log: string[] = []
     for (;;) {
       log = await dialogLog(app)
-      if (log.some(entry => entry.includes('关于 DeepCode') || entry.includes('DeepCode '))) break
+      if (log.some(entry => entry.includes('关于 DeepSeekGUI') || entry.includes('DeepSeekGUI '))) break
       if (Date.now() > deadline) throw new Error(`About 对话框未出现；记录：\n${log.join('\n')}`)
       await new Promise(resolve => setTimeout(resolve, 300))
     }
     const detail = log.join('\n')
-    // 四元组：DeepCode 版本、内嵌 DSH 版本与 source、Electron 与平台架构。
+    // 四元组：DeepSeekGUI 版本、内嵌 DSH 版本与 source、Electron 与平台架构。
     // 断言按实际界面文案写（中文 locale）：About 由 about.ts 组装，
     // 版本四元组各占一行，中英文案不同——正则必须认真实输出，不是想象中的格式。
-    expect(detail).toMatch(/DeepCode\s*(版本|version)?\s*[：:]\s*\d+\.\d+\.\d+/)
+    expect(detail).toMatch(/DeepSeekGUI\s*(版本|version)?\s*[：:]\s*\d+\.\d+\.\d+/)
     expect(detail).toMatch(/DSH[^\n]*\d+\.\d+\.\d+/)
     expect(detail).toMatch(/source\s+\w+/)
     expect(detail).toMatch(/Electron[^\n]*\d+\.\d+\.\d+/)
@@ -211,7 +211,7 @@ describe.runIf(packagedExists)('P5 final gate（打包态）', () => {
 // 2. 即便绕过入口直接创建终端窗口，ConPTY 的 shell 交互（输入/输出）
 //    在打包态的自动化驱动没有可靠的断言面：xterm 的渲染是 canvas，
 //    文本断言只能依赖无障碍树，而 pty 字节流的时序在 CI 上不可复现。
-// 因此 H 的验证落点在 DEEPCODE_V1_MANUAL_ACCEPTANCE.md 的「打开终端」一条
+// 因此 H 的验证落点在 DEEPSEEKGUI_V1_MANUAL_ACCEPTANCE.md 的「打开终端」一条
 // （干净机器人工验收：welcome 五行 + node/pnpm/dsh 私有 Runtime 来源 +
 // DSH_HOME 与 cwd 指向 active 选择）。parity 矩阵行 6 保持 in-progress，
 // 缺口如实写明，不伪造自动化证据。

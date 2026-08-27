@@ -2,7 +2,7 @@
  * window-state 纯函数测试：显示器/DPI/分辨率变化后的几何 clamp
  * （单屏、双屏拔除、窗口比工作区大、最小尺寸）、路径紧凑化与窗口
  * 状态落盘决策。不涉及 Electron，可在普通 Node 环境下运行。
- * @module @see-sol-lab/deepcode/tests/window-state
+ * @module @see-sol-lab/deepseekgui/tests/window-state
  */
 
 import { describe, expect, it } from 'vitest'

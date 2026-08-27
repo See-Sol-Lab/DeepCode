@@ -6,7 +6,7 @@
  * URL query（短）；任何失败组合都有确定输出（标题回退截断用户文本、
  * 正文回退静态模板），绝不让"复制+跳转"变成不可用。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/feedback-issue
+ * @module @see-sol-lab/deepseekgui/feedback-issue
  */
 
 /** issue 标题的最大长度（字符；URL query 的安全界）。 */
@@ -19,7 +19,7 @@ export const ISSUE_USER_TEXT_MAX = 20_000
 export interface FeedbackIssueInput {
   /** 是否使用中文文案。 */
   zh?: boolean
-  /** DeepCode app version。 */
+  /** DeepSeekGUI app version。 */
   appVersion: string
   /** embedded DSH version。 */
   dshVersion: string
@@ -58,7 +58,7 @@ export function issueTitle(reply: string | null, userText: string, zh = true): s
     if (candidate !== undefined && candidate !== '') return truncate(candidate, ISSUE_TITLE_MAX)
   }
   const fallback = userText.replace(/\s+/g, ' ').trim()
-  return fallback === '' ? 'DeepCode bug report' : truncate(fallback, ISSUE_TITLE_MAX)
+  return fallback === '' ? 'DeepSeekGUI bug report' : truncate(fallback, ISSUE_TITLE_MAX)
 }
 
 /**
@@ -74,7 +74,7 @@ export function buildIssueBody(input: FeedbackIssueInput): string {
   const sections = [
     '## Bug Report',
     '',
-    `**DeepCode Version:** ${input.appVersion}`,
+    `**DeepSeekGUI Version:** ${input.appVersion}`,
     `**DSH Version:** ${input.dshVersion}`,
     `**Windows Version:** ${input.windowsVersion}`,
     `**Home Type:** ${homeLabel}`,

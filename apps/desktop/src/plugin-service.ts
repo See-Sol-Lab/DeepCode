@@ -16,7 +16,7 @@
  * - 所有 spec 作为 argv 单项传入；相对路径 spec 由本模块锚定到用户明确
  *   选择的 invoking directory（绝不锚到 Electron install directory）。
  * 纯 Node 模块，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/plugin-service
+ * @module @see-sol-lab/deepseekgui/plugin-service
  */
 
 import { isAbsolute, resolve } from 'node:path'
@@ -315,13 +315,13 @@ export function validatePluginRequest(request: PluginOperationRequest): string |
   // 目标 profile 目录写出 INJECTED.txt，退出码 0）。desktop 绝不绕开
   // 官方 CLI，只在边界拒绝一切无法安全携带的字符。
   //
-  // 取舍（上游转发限制，非 DeepCode 产品选择）：含 | 或 > 或空格的
+  // 取舍（上游转发限制，非 DeepSeekGUI 产品选择）：含 | 或 > 或空格的
   // semver 复合范围（如 "1.x||2.x"、">=1 <2"）因此不被支持；插入符
   // 范围（^1.0.0）同样被拒——实证 `cmd /c echo pkg@^1.0.0` 输出
   // `pkg@1.0.0`，^ 被 cmd 当作转义符吞掉，范围语义被悄悄篡改成精确
   // 版本（这是注入面的另一形态）。波浪号与精确版本不受影响。持久修法
   // 属于上游（解析出 pnpm 的 .cmd 路径后 shell:false 直 spawn，或
-  // execFile + 显式转义），出口按 B1 已定的两条路（上游 PR 或 DeepCode
+  // execFile + 显式转义），出口按 B1 已定的两条路（上游 PR 或 DeepSeekGUI
   // Core adapter）；B2 不改上游。
   if (/[&|<>^%!"'`();,\u0000-\u001f]/.test(request.spec)) {
     return 'spec 包含官方 CLI 在 Windows shell 转发下无法安全携带的字符（& | < > ^ % ! " \' ` ( ) ; , 或控制字符）；含 | 或 > 或空格的 semver 复合范围（如 "1.x||2.x"、">=1 <2"）因此不支持'
@@ -414,7 +414,7 @@ export function expectedPackageName(spec: string): string | null {
   // Windows 绝对路径里既无 `/` 也无 `@`，会被下面的裸名分支整条吞成
   // "包名"，post-check 于是拿路径当 manifest 键去查，必然查不到——本地
   // 路径装插件因此总被判失败（打包验收实测：pnpm 明确输出
-  // `+ deepcode-packaged-bundle-fixture <- ..\bundle-fixture` 且退出 0，
+  // `+ deepseekgui-packaged-bundle-fixture <- ..\bundle-fixture` 且退出 0，
   // UI 仍报"退出 0 但验证与磁盘事实不符"并扣下 restart handoff）。
   if (localSpecPath(trimmed) !== null) return null
   const match = /^(?<name>@[^/@\s]+\/[^/@\s]+|[^/@\s]+)(?:@.*)?$/.exec(trimmed)

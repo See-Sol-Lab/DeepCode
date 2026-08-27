@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-08-16-desktop-web-parity-and-hardening.md
-2026-08-16-desktop-web-parity-and-hardening.md: babcaa4afa5d45efd7240985c3f78815a9d64a5e
-2026-08-16-desktop-web-parity-and-hardening.zh.md: a2eee750406f500b92e5a9982940c53cd64d48cc
+2026-08-16-desktop-web-parity-and-hardening.md: cf5e9f84732b90edd4a1fde91cc98d4b7bed9d94
+2026-08-16-desktop-web-parity-and-hardening.zh.md: 697f04b84d22465a8702fdd4c613424c121f2120

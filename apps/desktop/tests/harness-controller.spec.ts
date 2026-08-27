@@ -2,7 +2,7 @@
  * harness-controller 单测：切换协议的写入顺序、三类启动失败、单次
  * last-known-good 回退、回退失败、遗留 pending、restart 不改 selection、
  * 并发/重复停止只终结一次，以及失败记录的限长脱敏。
- * @module @see-sol-lab/deepcode/tests/harness-controller
+ * @module @see-sol-lab/deepseekgui/tests/harness-controller
  */
 
 import { describe, expect, it, vi } from 'vitest'

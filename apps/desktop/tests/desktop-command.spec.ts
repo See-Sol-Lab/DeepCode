@@ -3,7 +3,7 @@
  * credential redaction、明确 exit code、cancel 清树、按槽位单例约束
  * （terminal 与 maintenance 互不阻塞）与 dev/packaged 的 Node/pnpm
  * 路径解析。不涉及 Electron，可在普通 Node 环境下运行。
- * @module @see-sol-lab/deepcode/tests/desktop-command
+ * @module @see-sol-lab/deepseekgui/tests/desktop-command
  */
 
 import { describe, expect, it } from 'vitest'
@@ -138,7 +138,7 @@ describe('runDesktopCommand', () => {
 
 describe('结算必须唯一且总能到达（cancel 不再永久等待）', () => {
   /** 一个绝不存在的可执行文件：spawn 只会发 error，不保证再发 exit。 */
-  const missing = 'deepcode-this-executable-does-not-exist-9f3a'
+  const missing = 'deepseekgui-this-executable-does-not-exist-9f3a'
 
   it('缺失可执行文件 + 立即取消：cancel 能返回，不挂死', async () => {
     // 这是原先那条永久等待路径：cancel() 等的是 exit 事件，而 ENOENT

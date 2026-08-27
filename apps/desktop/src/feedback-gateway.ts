@@ -1,6 +1,6 @@
 /**
  * Feedback 的无 GitHub 提交通道（P8-D32）：把已组装的反馈打成版本化
- * payload，POST 给 DeepCode 反馈网关；网关未配置或不可达时由调用方降级
+ * payload，POST 给 DeepSeekGUI 反馈网关；网关未配置或不可达时由调用方降级
  * 为导出反馈文件。
  *
  * 为什么需要网关：目标用户（无 GitHub 账号，或无法访问 GitHub 的网络
@@ -10,11 +10,11 @@
  * 宣传站同机），网关用服务器侧 bot 身份代开 issue。token 只活在服务器上。
  *
  * 纯 Node 模块，不依赖 Electron；网络经注入的 fetch，便于单元测试。
- * @module @see-sol-lab/deepcode/feedback-gateway
+ * @module @see-sol-lab/deepseekgui/feedback-gateway
  */
 
 /** 网关地址的环境变量覆盖（测试/灰度用）。 */
-export const FEEDBACK_GATEWAY_URL_ENV = 'DEEPCODE_FEEDBACK_GATEWAY_URL'
+export const FEEDBACK_GATEWAY_URL_ENV = 'DEEPSEEKGUI_FEEDBACK_GATEWAY_URL'
 
 /**
  * 默认网关地址。空串 = 尚未部署（香港网关上线后填正式 URL 再打包）；
@@ -31,7 +31,7 @@ export const GATEWAY_TIMEOUT_MS = 10_000
  * @returns 生效 URL；空串 = 未配置。
  */
 /** 明确的开发开关：只有它才能放行非 https 的网关地址。 */
-export const FEEDBACK_GATEWAY_ALLOW_HTTP_ENV = 'DEEPCODE_FEEDBACK_GATEWAY_ALLOW_HTTP'
+export const FEEDBACK_GATEWAY_ALLOW_HTTP_ENV = 'DEEPSEEKGUI_FEEDBACK_GATEWAY_ALLOW_HTTP'
 
 /**
  * 网关地址为什么不能用。
@@ -153,12 +153,12 @@ export async function submitFeedbackToGateway(options: {
  * @param now - 当前时刻。
  * 精确到毫秒：只到秒的话，同一秒里导出两次，第二份会不声不响地盖掉
  * 第一份——而用户导出两次，往往正是因为想留住两份。
- * @returns `deepcode-feedback-YYYYMMDD-HHMMSS-mmm.md`。
+ * @returns `deepseekgui-feedback-YYYYMMDD-HHMMSS-mmm.md`。
  */
 export function feedbackExportFileName(now: Date): string {
   const pad = (value: number): string => String(value).padStart(2, '0')
   const stamp = `${String(now.getFullYear())}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
     + `-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
     + `-${String(now.getMilliseconds()).padStart(3, '0')}`
-  return `deepcode-feedback-${stamp}.md`
+  return `deepseekgui-feedback-${stamp}.md`
 }

@@ -7,9 +7,9 @@
  * CommonJS：vendored Loader 的 require 路径同时覆盖 dev（tsx）与打包态。
  */
 
-exports.name = 'deepcode-recovery-bad-plugin'
+exports.name = 'deepseekgui-recovery-bad-plugin'
 
 exports.apply = function apply() {
   setImmediate(() => { process.exit(1) })
-  throw new Error('deepcode-recovery-bad-plugin: apply threw on purpose')
+  throw new Error('deepseekgui-recovery-bad-plugin: apply threw on purpose')
 }

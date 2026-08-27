@@ -1,5 +1,5 @@
 {
-  "name": "deepcode-native-proof-plugin",
+  "name": "deepseekgui-native-proof-plugin",
   "version": "0.0.0",
   "private": true,
   "main": "./plugin.js"

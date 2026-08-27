@@ -1,13 +1,13 @@
 /**
  * P5 parity foundation：官方 Web 功能等价的验收地基，直接驱动打包后的
- * `dist/desktop/win-unpacked/DeepCode.exe`（playwright-core 的 Electron
+ * `dist/desktop/win-unpacked/DeepSeekGUI.exe`（playwright-core 的 Electron
  * 驱动，不依赖外装浏览器）。Electron userData 经 Chromium 标准开关
  * --user-data-dir 隔离进测试临时根（Windows 上 userData 走 Known Folder
  * API，不跟随 APPDATA 环境变量）；APPDATA/LOCALAPPDATA 钉扎与凭据形态
  * 环境变量剔除保留为纵深防御，不调用真实模型。完整矩阵与
  * 各项状态见 OFFICIAL_WEB_PARITY.md；尚未实现的矩阵项以 it.todo 占位——
  * 打包产物存在不等于功能通过。打包 exe 缺失时门禁测试明确失败（不假绿）。
- * @module @see-sol-lab/deepcode/tests-e2e/official-web-parity
+ * @module @see-sol-lab/deepseekgui/tests-e2e/official-web-parity
  */
 
 import { spawn, spawnSync } from 'node:child_process'
@@ -30,7 +30,7 @@ import {
 const APP_URL = 'http://127.0.0.1:3080/'
 
 describe('打包产物门禁', () => {
-  it('dist/desktop/win-unpacked/DeepCode.exe 存在（成品验收入口不得假绿）', () => {
+  it('dist/desktop/win-unpacked/DeepSeekGUI.exe 存在（成品验收入口不得假绿）', () => {
     expect(packagedExists, `缺少 ${EXE}；先运行 \`pnpm run build:desktop-dist\` 再执行 parity 验收`).toBe(true)
   })
 })
@@ -70,21 +70,21 @@ describe.runIf(packagedExists)('官方 Web 等价：打包 Electron 启动与生
       const target = webContents.getAllWebContents().find(contents => contents.getURL().startsWith(prefix))
       return target?.getURL() ?? ''
     }, COMP_URL_PREFIX)
-    // P8-D39 之后这个 URL 带控制桥参数（?deepcode-control=<port>.<token>）：
+    // P8-D39 之后这个 URL 带控制桥参数（?deepseekgui-control=<port>.<token>）：
     // 那是 settings-plugin 连回桌面控制面的凭据，不是另一个地址——外部浏览器
-    // 打开 3080 时没有它，也因此看不到 DeepCode 分区。比对去掉 query 之后的
+    // 打开 3080 时没有它，也因此看不到 DeepSeekGUI 分区。比对去掉 query 之后的
     // 地址：既证明打开的确实是官方 Web UI，又不把桥参数当成差异。
     expect(url.split('?')[0]).toBe(APP_URL)
   })
 
-  it('窗口标题固定为 DeepCode，Compatibility View 的 title 来自品牌构建', async () => {
+  it('窗口标题固定为 DeepSeekGUI，Compatibility View 的 title 来自品牌构建', async () => {
     const windowTitle = await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getTitle())
-    expect(windowTitle).toBe('DeepCode')
+    expect(windowTitle).toBe('DeepSeekGUI')
     // 品牌串在 build:lib:client（tsdown）阶段内联进前端产物，由
     // build-web-branded 连同 client lib 一起带环境构建——所以**打包态**的
-    // document.title 是 DeepCode，裸跑才会退回上游的 DSH Local Build。
+    // document.title 是 DeepSeekGUI，裸跑才会退回上游的 DSH Local Build。
     // 改的是我们自己的发行构建，不是上游文件。
-    expect(await evalInView<string>(app!, COMP_URL_PREFIX, 'document.title')).toBe('DeepCode')
+    expect(await evalInView<string>(app!, COMP_URL_PREFIX, 'document.title')).toBe('DeepSeekGUI')
   })
 
   it('第二实例立即退出，首实例窗口保持唯一并取得焦点', async () => {
@@ -117,8 +117,8 @@ describe.runIf(packagedExists)('官方 Web 等价：打包 Electron 启动与生
     app = undefined
     await closing.close()
     await expect.poll(() => portOpen(3080), { timeout: 15_000 }).toBe(false)
-    const tasklist = spawnSync('tasklist', ['/FI', 'IMAGENAME eq DeepCode.exe'], { encoding: 'utf8' })
-    expect(tasklist.stdout).not.toContain('DeepCode.exe')
+    const tasklist = spawnSync('tasklist', ['/FI', 'IMAGENAME eq DeepSeekGUI.exe'], { encoding: 'utf8' })
+    expect(tasklist.stdout).not.toContain('DeepSeekGUI.exe')
   })
 })
 

@@ -256,12 +256,12 @@ describe('release families', () => {
         writeFileSync(join(root, dir, 'package.json'), JSON.stringify(manifest))
       }
       write('apps/cli', { name: '@deepseek-ai/dsh', version: '0.0.1' })
-      // The DeepCode desktop shell: differently scoped AND private → not a member.
-      write('apps/desktop', { name: '@see-sol-lab/deepcode', version: '0.0.1', private: true })
+      // The DeepSeekGUI desktop shell: differently scoped AND private → not a member.
+      write('apps/desktop', { name: '@see-sol-lab/deepseekgui', version: '0.0.1', private: true })
       const dsh = releaseFamily('dsh')
       expect(dsh.members(root).map(entry => entry.name)).toEqual(['@deepseek-ai/dsh'])
       // A publishable foreign-scope package is still a mistake.
-      write('apps/desktop', { name: '@see-sol-lab/deepcode', version: '0.0.1' })
+      write('apps/desktop', { name: '@see-sol-lab/deepseekgui', version: '0.0.1' })
       expect(() => dsh.members(root)).toThrow(/must name an @deepseek-ai package/)
     } finally {
       rmSync(root, { recursive: true, force: true })

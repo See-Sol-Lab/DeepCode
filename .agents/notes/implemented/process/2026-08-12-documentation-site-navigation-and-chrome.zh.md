@@ -22,7 +22,7 @@ Status: implemented
 
 [scripts/project-doc-site.ts](../../../../scripts/project-doc-site.ts) 中的 `projectedPageContent` 会丢弃语言切换行和仓库徽章。切换行的匹配被限制在前八行内，因此展示该约定的教程仍能渲染出它的示例。
 
-导航栏标题是带 Release 标签的 DeepCode 文本 lockup，由 `siteTitle` 返回并交给 VitePress 按 HTML 渲染。它不需要针对主题准备图片资源，也让文档站与上游 DeepSeek 字标保持清晰区分。侧边栏滚动条平时不可见，滚动时出现，通过 `data-` 属性而非 class 标记，因为 Vue 在 patch 该元素时会整体重写 `class`。
+导航栏标题是带 Release 标签的 DeepSeekGUI 文本 lockup，由 `siteTitle` 返回并交给 VitePress 按 HTML 渲染。它不需要针对主题准备图片资源，也让文档站与上游 DeepSeek 字标保持清晰区分。侧边栏滚动条平时不可见，滚动时出现，通过 `data-` 属性而非 class 标记，因为 Vue 在 patch 该元素时会整体重写 `class`。
 
 ## 考虑过的替代方案
 

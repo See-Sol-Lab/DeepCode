@@ -8,11 +8,11 @@
  * - stdout：纯 pty 字节（UTF-8，终端直写）
  * - stderr：JSON-lines 事件（{event:'exit', exitCode} / {event:'error', message}）
  * - stdin：父进程输入 → pty 输入
- * welcome 文本经 env DEEPCODE_TERMINAL_WELCOME 传入并写入 pty。
+ * welcome 文本经 env DEEPSEEKGUI_TERMINAL_WELCOME 传入并写入 pty。
  * 本模块是 CJS（.cts）：打包态由 Electron 以 Node 模式执行，ESM 的
  * bare-import 不走 NODE_PATH，CJS require + createRequire 才能指向
  * runtime 内的 node-pty。
- * @module @see-sol-lab/deepcode/terminal-host
+ * @module @see-sol-lab/deepseekgui/terminal-host
  */
 
 import { createRequire } from 'node:module'
@@ -77,28 +77,28 @@ try {
   process.exit(1)
 }
 
-const shell = process.env.DEEPCODE_TERMINAL_SHELL ?? 'C:\\Windows\\System32\\cmd.exe'
+const shell = process.env.DEEPSEEKGUI_TERMINAL_SHELL ?? 'C:\\Windows\\System32\\cmd.exe'
 let shellArgs: string[] = []
-const shellArgsRaw = process.env.DEEPCODE_TERMINAL_SHELL_ARGS
+const shellArgsRaw = process.env.DEEPSEEKGUI_TERMINAL_SHELL_ARGS
 if (shellArgsRaw !== undefined && shellArgsRaw !== '') {
   try {
     const parsed: unknown = JSON.parse(shellArgsRaw)
     if (Array.isArray(parsed) && parsed.every(entry => typeof entry === 'string')) {
       shellArgs = parsed
     } else {
-      report({ event: 'error', message: 'terminal host: DEEPCODE_TERMINAL_SHELL_ARGS must be a JSON string array' })
+      report({ event: 'error', message: 'terminal host: DEEPSEEKGUI_TERMINAL_SHELL_ARGS must be a JSON string array' })
       process.exit(1)
     }
   } catch {
-    report({ event: 'error', message: 'terminal host: DEEPCODE_TERMINAL_SHELL_ARGS is not valid JSON' })
+    report({ event: 'error', message: 'terminal host: DEEPSEEKGUI_TERMINAL_SHELL_ARGS is not valid JSON' })
     process.exit(1)
   }
 }
 // cmd 需要 /d 参数时不重复注入；调用方（终端选择）已给出 exact argv。
 const env: NodeJS.ProcessEnv = { ...process.env }
 // 显式注入桌面事实：DSH_HOME 与只含 shims + 系统目录的 PATH。
-env.DSH_HOME = process.env.DEEPCODE_TERMINAL_DSH_HOME ?? ''
-env.PATH = process.env.DEEPCODE_TERMINAL_PATH ?? process.env.PATH ?? ''
+env.DSH_HOME = process.env.DEEPSEEKGUI_TERMINAL_DSH_HOME ?? ''
+env.PATH = process.env.DEEPSEEKGUI_TERMINAL_PATH ?? process.env.PATH ?? ''
 env.TERM = 'xterm-256color'
 
 let spawned: PtyProcess
@@ -107,7 +107,7 @@ try {
     name: 'xterm-256color',
     cols: TERMINAL_COLS,
     rows: TERMINAL_ROWS,
-    cwd: process.env.DEEPCODE_TERMINAL_CWD ?? homedir(),
+    cwd: process.env.DEEPSEEKGUI_TERMINAL_CWD ?? homedir(),
     env,
   })
 } catch (error) {
@@ -118,7 +118,7 @@ try {
 // welcome：main 组装的事实逐行直写 **终端输出流**（stdout → xterm 显示），
 // 绝不写进用户 shell 的 stdin——零 shell 介入、零转义问题、不污染终端
 // 历史。xterm 只负责显示。
-const welcome = process.env.DEEPCODE_TERMINAL_WELCOME
+const welcome = process.env.DEEPSEEKGUI_TERMINAL_WELCOME
 if (welcome !== undefined && welcome !== '') {
   for (const line of welcome.split('\n')) {
     process.stdout.write(`${line}\r\n`)

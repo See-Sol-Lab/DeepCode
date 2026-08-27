@@ -1,7 +1,7 @@
 /**
  * tray 菜单模板纯函数测试：只读 Profile/状态、Profiles submenu 的
  * 可选性与勾选、动作绑定面、无 Check for Updates、zh/en 文案。
- * @module @see-sol-lab/deepcode/tests/tray
+ * @module @see-sol-lab/deepseekgui/tests/tray
  */
 
 import { describe, expect, it } from 'vitest'
@@ -50,15 +50,15 @@ describe('trayMenuTemplate', () => {
   it('顶层结构：打开/只读 Profile/只读状态/分隔/Profiles/Restart/Terminal/检查更新/About/Quit（Harness 面板项已随 P8-D39 移居设置页）', () => {
     const items = trayMenuTemplate({ model: model(), locale: 'zh' })
     expect(labels(items)).toEqual([
-      '打开 DeepCode',
+      '打开 DeepSeekGUI',
       '当前 Profile：web（托管模式）',
       'Harness 状态：运行中 · web',
       '切换 Profile',
       '重启 Harness',
       '打开 DSH Terminal',
       '检查更新',
-      '关于 DeepCode',
-      '退出 DeepCode',
+      '关于 DeepSeekGUI',
+      '退出 DeepSeekGUI',
     ])
   })
 
@@ -96,19 +96,19 @@ describe('trayMenuTemplate', () => {
   it('动作绑定面：quit/restart/open-terminal/check-updates/about/show-window 全部就位', () => {
     const items = trayMenuTemplate({ model: model(), locale: 'zh' })
     const byLabel = new Map(items.map(item => [item.label, item]))
-    expect(byLabel.get('退出 DeepCode')!.action).toEqual({ kind: 'quit' })
+    expect(byLabel.get('退出 DeepSeekGUI')!.action).toEqual({ kind: 'quit' })
     expect(byLabel.get('重启 Harness')!.action).toEqual({ kind: 'restart' })
     expect(byLabel.get('打开 DSH Terminal')!.action).toEqual({ kind: 'open-terminal' })
     expect(byLabel.get('检查更新')!.action).toEqual({ kind: 'check-updates' })
-    expect(byLabel.get('关于 DeepCode')!.action).toEqual({ kind: 'about' })
-    expect(byLabel.get('打开 DeepCode')!.action).toEqual({ kind: 'show-window' })
+    expect(byLabel.get('关于 DeepSeekGUI')!.action).toEqual({ kind: 'about' })
+    expect(byLabel.get('打开 DeepSeekGUI')!.action).toEqual({ kind: 'show-window' })
   })
 
   it('en locale：英文文案 + Existing Home 标签', () => {
     const items = trayMenuTemplate({ model: model({ homeKind: 'existing' }), locale: 'en' })
     expect(labels(items)).toContain('Active Profile: web (Existing)')
     expect(labels(items)).toContain('Harness Status: Running · web')
-    expect(labels(items)).toContain('Quit DeepCode')
+    expect(labels(items)).toContain('Quit DeepSeekGUI')
     expect(labels(items)).toContain('Check for Updates')
   })
 

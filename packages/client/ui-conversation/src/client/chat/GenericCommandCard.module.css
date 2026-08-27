@@ -55,7 +55,7 @@
   overflow: hidden;
   flex: 1 1 auto;
   color: var(--dsw-alias-label-tertiary);
-  /* Host hook (DeepCode P8-D45): scales with the disclosure chrome. */
+  /* Host hook (DeepSeekGUI P8-D45): scales with the disclosure chrome. */
   font-size: var(--dsh-chrome-row-font-size, 14px);
   line-height: var(--dsh-chrome-row-line-height, 24px);
   text-overflow: ellipsis;

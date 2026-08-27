@@ -1,5 +1,5 @@
 /*
- * DeepCode Desktop Chrome：双主题（dark/light）、克制、低对比度边框。
+ * DeepSeekGUI Desktop Chrome：双主题（dark/light）、克制、低对比度边框。
  * 页面背景透明（菜单展开时 Compatibility View 从面板外透出）；
  * 只有顶栏与面板是不透明表面。状态色只用于圆点与小面积提示。
  * 主题由 renderer 依据 ControlModel.effectiveTheme 挂 data-theme；

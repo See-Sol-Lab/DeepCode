@@ -3,9 +3,9 @@
  * Terminal → PowerShell → cmd）、cwd 解析、welcome 组装与私有 shim 生成。
  * 全部纯函数（fs/env 探测经注入面传入），不依赖 Electron，便于单元测试。
  * shim 只转发到当前 exact executable，不下载 Runtime、不猜测系统安装；
- * 生成的 shim 目录只 prepend 给 DeepCode 新开的 terminal process，绝不
+ * 生成的 shim 目录只 prepend 给 DeepSeekGUI 新开的 terminal process，绝不
  * 污染父系统环境或任何永久环境变量。
- * @module @see-sol-lab/deepcode/terminal-service
+ * @module @see-sol-lab/deepseekgui/terminal-service
  */
 
 import type { DiscoveredProfile, ProfileDiscoveryV1 } from './profile-discovery.ts'
@@ -133,7 +133,7 @@ export interface TerminalWelcomeFacts {
 }
 
 /**
- * Terminal welcome：DeepCode version、DSH version、Active Profile、
+ * Terminal welcome：DeepSeekGUI version、DSH version、Active Profile、
  * DSH_HOME、Node/pnpm/dsh 的私有 Runtime 来源，以及终端宿主与 cwd
  * （含 cwd 回退说明）。不显示任何凭据或环境变量。文案按 locale 双语
  * （D29：zh 保持原样，en 为母语级新写）。
@@ -145,13 +145,13 @@ export function buildTerminalWelcome(facts: TerminalWelcomeFacts, locale: 'zh' |
   const zh = locale === 'zh'
   const pnpm = facts.pnpmVersion ?? 'unknown'
   return [
-    'DeepCode DSH Terminal',
-    `DeepCode ${facts.appVersion} · DSH ${facts.dshVersion}`,
+    'DeepSeekGUI DSH Terminal',
+    `DeepSeekGUI ${facts.appVersion} · DSH ${facts.dshVersion}`,
     `Active Profile: ${facts.activeProfile}`,
     `DSH_HOME: ${facts.dshHome}`,
     zh
-      ? `Runtime: Node ${facts.nodeVersion} · pnpm ${pnpm} · dsh — 全部来自 DeepCode 私有 Runtime`
-      : `Runtime: Node ${facts.nodeVersion} · pnpm ${pnpm} · dsh — all from the DeepCode private runtime`,
+      ? `Runtime: Node ${facts.nodeVersion} · pnpm ${pnpm} · dsh — 全部来自 DeepSeekGUI 私有 Runtime`
+      : `Runtime: Node ${facts.nodeVersion} · pnpm ${pnpm} · dsh — all from the DeepSeekGUI private runtime`,
     `Terminal: ${facts.shellLabel} · cwd: ${facts.cwd}`,
     ...facts.cwdNote === null ? [] : [facts.cwdNote],
     // P8-D36：没有提示符语义的用户不知道黑窗在等输入——住户实测对着一个
@@ -164,7 +164,7 @@ export function buildTerminalWelcome(facts: TerminalWelcomeFacts, locale: 'zh' |
 
 /** 私有 shim 生成的运行时事实（全部 exact 值，由 main 从当前形态解析）。 */
 export interface ShimRuntimeFacts {
-  /** node 形态的可执行文件（dev = node exe；packaged = DeepCode.exe）。 */
+  /** node 形态的可执行文件（dev = node exe；packaged = DeepSeekGUI.exe）。 */
   nodeExecutable: string
   /** node 形态的前缀 args（packaged = --expose-internals；dev = 空）。 */
   nodePrefixArgs: string[]
@@ -206,10 +206,10 @@ function dshShimCmd(facts: ShimRuntimeFacts): string {
   return [
     '@echo off',
     'set "ELECTRON_RUN_AS_NODE=1"',
-    `set "DEEPCODE_WRAPPER_EXE=${facts.nodeExecutable}"`,
-    `set "DEEPCODE_WRAPPER_DSH_BIN=${facts.dshBin}"`,
-    `set "DEEPCODE_WRAPPER_NODE_ARGS=${JSON.stringify(facts.dshNodeArgs)}"`,
-    `set "DEEPCODE_ACTIVE_PROFILE=${facts.activeProfile}"`,
+    `set "DEEPSEEKGUI_WRAPPER_EXE=${facts.nodeExecutable}"`,
+    `set "DEEPSEEKGUI_WRAPPER_DSH_BIN=${facts.dshBin}"`,
+    `set "DEEPSEEKGUI_WRAPPER_NODE_ARGS=${JSON.stringify(facts.dshNodeArgs)}"`,
+    `set "DEEPSEEKGUI_ACTIVE_PROFILE=${facts.activeProfile}"`,
     `"${facts.nodeExecutable}" ${prefix}"${facts.dshWrapperPath}" %*`,
     '',
   ].join('\r\n')

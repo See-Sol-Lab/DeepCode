@@ -42,7 +42,7 @@ Site publication remains separate from site construction. A dedicated GitHub Act
 
 **Build only in a deployment workflow.** A deployment job can reveal rendering failures after merge. Keeping the production build in `doc-sync` makes the same failure visible locally and in ordinary CI even when no public deployment exists.
 
-**Hard-code the public project path.** A fixed `/DeepCode/` base works for the public project URL but not for the unique origin assigned to a private Pages site or for a custom domain. Consuming Pages metadata keeps one build contract across those destinations.
+**Hard-code the public project path.** A fixed `/DeepSeekGUI/` base works for the public project URL but not for the unique origin assigned to a private Pages site or for a custom domain. Consuming Pages metadata keeps one build contract across those destinations.
 
 ## Consequences
 

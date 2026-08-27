@@ -5,7 +5,7 @@
  *
  * 只收敛**完全同构**的部分：每个用例的 shutdownApp、finally 与清场留在
  * 原处，隔离目录名也仍由调用方给（含不含空格是各套件故意的选择）。
- * @module @see-sol-lab/deepcode/tests-e2e/fixtures
+ * @module @see-sol-lab/deepseekgui/tests-e2e/fixtures
  */
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
@@ -16,7 +16,7 @@ import { parityEnv } from './parity-env.ts'
 import { waitForCompMount, waitForWindow } from './chrome-driver.ts'
 
 /** 被驱动的打包产物：所有 e2e 的唯一入口。 */
-export const EXE = join(process.cwd(), 'dist', 'desktop', 'win-unpacked', 'DeepCode.exe')
+export const EXE = join(process.cwd(), 'dist', 'desktop', 'win-unpacked', 'DeepSeekGUI.exe')
 
 /** 打包产物是否存在（缺失时套件自跳过；专门的门禁用例负责大声失败）。 */
 export const packagedExists = existsSync(EXE)
@@ -145,7 +145,7 @@ export function writeLauncherState(temp: string, home: string, profile: string):
 export async function stubDialogs(app: ElectronApplication, answers: [string, number][] = []): Promise<void> {
   await app.evaluate(({ dialog }, payload) => {
     const log: string[] = []
-    ;(globalThis as { __deepcodeDialogLog?: string[] }).__deepcodeDialogLog = log
+    ;(globalThis as { __deepseekguiDialogLog?: string[] }).__deepseekguiDialogLog = log
     dialog.showMessageBox = (async (...args: unknown[]) => {
       const options = (args.length > 1 ? args[1] : args[0]) as { message?: string; detail?: string }
       const message = String(options?.message ?? '')
@@ -163,7 +163,7 @@ export async function stubDialogs(app: ElectronApplication, answers: [string, nu
  */
 export async function dialogLog(app: ElectronApplication): Promise<string[]> {
   try {
-    return await app.evaluate(() => (globalThis as { __deepcodeDialogLog?: string[] }).__deepcodeDialogLog ?? [])
+    return await app.evaluate(() => (globalThis as { __deepseekguiDialogLog?: string[] }).__deepseekguiDialogLog ?? [])
   } catch {
     return []
   }

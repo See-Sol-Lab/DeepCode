@@ -1,10 +1,10 @@
 /**
- * S11 — Headless diagnostics（打包态）：DeepCode.exe --export-diagnostics
+ * S11 — Headless diagnostics（打包态）：DeepSeekGUI.exe --export-diagnostics
  * 在隔离 userData 下只导本地诊断证据：服务日志（脱敏）、fake crash dump
  * （总量有界）、active-run marker（未正常退出证据）与 build info。
  * 断言全程不启动 Harness（3080 从未被监听）、不创建窗口/tray、不加载
  * Profile/第三方插件，bundle 结构上不含 credential/.env/session 正文。
- * @module @see-sol-lab/deepcode/tests-e2e/headless-diagnostics
+ * @module @see-sol-lab/deepseekgui/tests-e2e/headless-diagnostics
  */
 
 import { spawnSync } from 'node:child_process'

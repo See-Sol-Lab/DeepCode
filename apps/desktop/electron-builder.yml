@@ -1,16 +1,16 @@
-# electron-builder configuration for the DeepCode distribution.
+# electron-builder configuration for the DeepSeekGUI distribution.
 # Outputs an unpacked win32-x64 directory (for development verification) and a
 # per-user NSIS installer (for end users). No signing, no auto-update.
 # electron-builder 26 resolves relative paths against the project directory
 # (the repository root), except `files` and `icon`, which resolve against
 # `directories.app`.
 
-# Final product identity: DeepCode, an unofficial community client owned by
+# Final product identity: DeepSeekGUI, an unofficial community client owned by
 # See-Sol-Lab — deliberately NOT under com.deepseek-ai, so the app never
 # impersonates an official DeepSeek publication. Frozen as of the first
 # commit; changing it later orphans installed users' registry entries.
-appId: io.github.see-sol-lab.deepcode
-productName: DeepCode
+appId: io.github.see-sol-lab.deepseekgui
+productName: DeepSeekGUI
 directories:
   app: apps/desktop
   output: dist/desktop
@@ -30,9 +30,9 @@ files:
 # directory, so both win-unpacked and the NSIS installer carry these notices.
 extraResources:
   - from: apps/desktop/LICENSE
-    to: licenses/DeepCode-PolyForm-Perimeter-1.0.1.txt
-  - from: DEEPCODE-LICENSE.md
-    to: licenses/DEEPCODE-LICENSE.md
+    to: licenses/DeepSeekGUI-PolyForm-Perimeter-1.0.1.txt
+  - from: DEEPSEEKGUI-LICENSE.md
+    to: licenses/DEEPSEEKGUI-LICENSE.md
   # The upstream MIT text lives in LICENSE-MIT-UPSTREAM. The repository root
   # LICENSE is a layered-licensing notice, not a license text, so it must never
   # be the source of the shipped MIT notice: MIT requires the full license text
@@ -69,7 +69,7 @@ nsis:
   # branches, and the per-machine one is compiled in only when
   # INSTALL_MODE_PER_ALL_USERS is defined — which happens only for
   # `perMachine: true`. With `false` below, a one-click install can only take
-  # the per-user branch: %LOCALAPPDATA%\Programs\DeepCode, registered under
+  # the per-user branch: %LOCALAPPDATA%\Programs\DeepSeekGUI, registered under
   # HKCU, and `installer.nsi` accordingly emits `RequestExecutionLevel user`.
   # The assisted installer used to be able to land in Program Files with HKLM
   # entries, which is what made the release notes' "current-user install, no
@@ -81,7 +81,7 @@ nsis:
   # ManifestDPIAware (the installer's own text is otherwise rendered at 96 DPI
   # and stretched) plus the uninstall-time prompt about the data directory.
   include: apps/desktop/build/installer.nsh
-  artifactName: DeepCode-Setup-${version}.exe
+  artifactName: DeepSeekGUI-Setup-${version}.exe
 
 # Reuse the already-downloaded Electron binary; nothing to rebuild or fetch.
 npmRebuild: false

@@ -1,6 +1,6 @@
 /**
  * Version-skew detection between an Existing Home's profile modules and the
- * bundled DSH runtime, and the plain-language fact DeepCode records about it.
+ * bundled DSH runtime, and the plain-language fact DeepSeekGUI records about it.
  */
 
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
@@ -11,7 +11,7 @@ import { CREDENTIALS_FILENAME, describeLegacyCredentialsLayout, describeRuntimeV
 
 /** Build a `node_modules/@deepseek-ai` tree with the given package versions. */
 function tree(packages: Record<string, string | null>): string {
-  const root = mkdtempSync(join(tmpdir(), 'deepcode-skew-'))
+  const root = mkdtempSync(join(tmpdir(), 'deepseekgui-skew-'))
   const scope = join(root, '@deepseek-ai')
   mkdirSync(scope, { recursive: true })
   for (const [name, version] of Object.entries(packages)) {
@@ -52,7 +52,7 @@ describe('detectRuntimeVersionSkew', () => {
   })
 
   it('returns nothing when either scope directory is absent', () => {
-    expect(detectRuntimeVersionSkew(mkdtempSync(join(tmpdir(), 'deepcode-skew-')), tree({ 'dsh-llm': '0.1.1-rc.2' }))).toEqual([])
+    expect(detectRuntimeVersionSkew(mkdtempSync(join(tmpdir(), 'deepseekgui-skew-')), tree({ 'dsh-llm': '0.1.1-rc.2' }))).toEqual([])
   })
 })
 
@@ -94,7 +94,7 @@ describe('describeRuntimeVersionSkew', () => {
 describe('hasLegacyCredentialsLayout', () => {
   /** Write a credentials document into a fresh Home and read the verdict. */
   function verdict(lines: readonly string[] | null): boolean {
-    const home = mkdtempSync(join(tmpdir(), 'deepcode-cred-'))
+    const home = mkdtempSync(join(tmpdir(), 'deepseekgui-cred-'))
     if (lines !== null) {
       writeFileSync(join(home, CREDENTIALS_FILENAME), lines.join(String.fromCharCode(10)))
     }

@@ -2,7 +2,7 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 import { defineConfig } from 'vitest/config'
 
 // Stage-five parity suite for the packaged desktop client: drives the built
-// dist/desktop/win-unpacked/DeepCode.exe through playwright-core's Electron
+// dist/desktop/win-unpacked/DeepSeekGUI.exe through playwright-core's Electron
 // driver (no separate browser). Self-skips when the packaged exe is absent.
 // Serial: every test shares the single fixed port 3080. The tsconfigPaths
 // plugin resolves bare workspace imports (e.g. @deepseek-ai/dsh-llm-mock-server

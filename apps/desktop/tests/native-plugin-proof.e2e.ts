@@ -8,7 +8,7 @@
  * DSH_HOME 等于 Existing Home、nonce 匹配；负例覆盖删行无 marker 与
  * apply throw → lastKnownGood 回退；全程断言 profile 与 fixture 文件字节
  * 不变。不调用模型、不要求 API key。
- * @module @see-sol-lab/deepcode/tests/native-plugin-proof
+ * @module @see-sol-lab/deepseekgui/tests/native-plugin-proof
  */
 
 import { spawn, type ChildProcess } from 'node:child_process'
@@ -27,7 +27,7 @@ import { repoRoot, resolveDshCommand, stopProcess, waitForServer } from '../src/
 
 /** fixture 包：不是 workspace 包，生产代码从不 import，打包 runtime 不当内置。 */
 const FIXTURE_PACKAGE_DIR = fileURLToPath(new URL('./fixtures/native-proof-plugin/', import.meta.url))
-const PLUGIN_PACKAGE_NAME = 'deepcode-native-proof-plugin'
+const PLUGIN_PACKAGE_NAME = 'deepseekgui-native-proof-plugin'
 
 /** marker 内容（只由 fixture 的 apply(ctx, config) 产生）。 */
 interface Marker {
@@ -96,7 +96,7 @@ function stageProfile(home: string, name: string, options: StageOptions = {}): s
   return dir
 }
 
-/** 用 DeepCode 的 launcher 向量（dev 官方 dsh 入口）启动一个 profile。 */
+/** 用 DeepSeekGUI 的 launcher 向量（dev 官方 dsh 入口）启动一个 profile。 */
 function launchProfile(home: string, profile: string): { child: ChildProcess; stderr: () => string } {
   const launch = resolveDshCommand({
     packaged: false,

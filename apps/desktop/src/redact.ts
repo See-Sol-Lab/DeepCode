@@ -2,7 +2,7 @@
  * 凭据形态文本脱敏：desktop 主进程的各条失败路径（服务日志、discovery
  * 错误、launcher 状态里的 BootFailure）共用同一套规则，保证凭据绝不落盘
  * 或进入对话框。
- * @module @see-sol-lab/deepcode/redact
+ * @module @see-sol-lab/deepseekgui/redact
  */
 
 /**

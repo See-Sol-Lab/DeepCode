@@ -1,10 +1,10 @@
 /**
- * Generate DeepCode's app icon from the repository's whale favicon.
+ * Generate DeepSeekGUI's app icon from the repository's whale favicon.
  *
  * The favicon is a monochrome whale that follows the page theme, so it would be
  * invisible on a dark taskbar. This renders it white on a deep-sea rounded
  * square instead: the whale reads as "a client in this ecosystem", while the
- * background colour — sampled from DeepCode's own backdrop artwork, not from
+ * background colour — sampled from DeepSeekGUI's own backdrop artwork, not from
  * any upstream palette — is what tells it apart from the official mark. Keeping
  * both halves matters: dropping the colour would erase the only distinction.
  *

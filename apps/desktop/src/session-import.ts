@@ -1,10 +1,10 @@
 /**
  * Importing conversations from a DSH home the user already had.
  *
- * Plenty of people install DeepCode on a machine that already runs the
- * official DSH. Nothing about that is a problem: DeepCode ships its own
+ * Plenty of people install DeepSeekGUI on a machine that already runs the
+ * official DSH. Nothing about that is a problem: DeepSeekGUI ships its own
  * runtime and keeps its own home, so the two never meet. But their history
- * lives over there and a fresh DeepCode starts empty, so offering to bring
+ * lives over there and a fresh DeepSeekGUI starts empty, so offering to bring
  * the conversations across is worth doing.
  *
  * Two things this module deliberately does NOT do.
@@ -142,25 +142,25 @@ export function surveyImportableSessions(sourceHome: string): ImportSurvey | nul
   }
 }
 
-/** Where DeepCode keeps its own notes inside a home (shared with the event log). */
-const DEEPCODE_DIRNAME = 'deepcode'
+/** Where DeepSeekGUI keeps its own notes inside a home (shared with the event log). */
+const DEEPSEEKGUI_DIRNAME = 'deepseekgui'
 
 /** Marker recording that the import offer has already been made once. */
 const OFFERED_FILENAME = 'session-import-offered'
 
 /**
- * Whether DeepCode should offer to import into this home.
+ * Whether DeepSeekGUI should offer to import into this home.
  *
  * Two conditions, both of them about not nagging. The home must hold no
  * conversations of its own — once someone has started working here, pulling
  * another history in on top is not a favour — and the offer must not have been
  * made before, so that declining it sticks even if they have not started a
  * conversation yet.
- * @param targetHome - the DeepCode managed home.
+ * @param targetHome - the DeepSeekGUI managed home.
  * @returns true when an offer is appropriate.
  */
 export function shouldOfferImport(targetHome: string): boolean {
-  if (existsSync(join(targetHome, DEEPCODE_DIRNAME, OFFERED_FILENAME))) return false
+  if (existsSync(join(targetHome, DEEPSEEKGUI_DIRNAME, OFFERED_FILENAME))) return false
   return sessionDirs(targetHome).length === 0
 }
 
@@ -169,10 +169,10 @@ export function shouldOfferImport(targetHome: string): boolean {
  *
  * Declining is an answer too, and it has to survive a restart: being asked the
  * same question on every launch is its own kind of broken.
- * @param targetHome - the DeepCode managed home.
+ * @param targetHome - the DeepSeekGUI managed home.
  */
 export function markImportOffered(targetHome: string): void {
-  const dir = join(targetHome, DEEPCODE_DIRNAME)
+  const dir = join(targetHome, DEEPSEEKGUI_DIRNAME)
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, OFFERED_FILENAME), new Date().toISOString(), 'utf8')
 }
@@ -186,7 +186,7 @@ export interface ImportResult {
 }
 
 /**
- * Copy conversations into the DeepCode managed home.
+ * Copy conversations into the DeepSeekGUI managed home.
  *
  * Never overwrites: a session id already present on the target is left as it
  * is. A fresh install has nothing to collide with, and on a second run the
@@ -195,7 +195,7 @@ export interface ImportResult {
  *
  * The source is only ever read.
  * @param sourceHome - home to import from.
- * @param targetHome - the DeepCode managed home.
+ * @param targetHome - the DeepSeekGUI managed home.
  * @returns how many were copied and how many were left alone.
  */
 export function importSessions(sourceHome: string, targetHome: string): ImportResult {

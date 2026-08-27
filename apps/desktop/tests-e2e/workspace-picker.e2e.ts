@@ -1,13 +1,13 @@
 /**
  * S12 — Packaged Windows Workspace picker（打包态）：官方 Harness 的
- * Workspace 选择入口在 DeepCode 打包壳内真实可用——选择含中文+空格的
+ * Workspace 选择入口在 DeepSeekGUI 打包壳内真实可用——选择含中文+空格的
  * 临时目录、create/adopt 成功、能建 session、Cancel 无副作用、目录内容
- * byte-identical。DeepCode 零自有 workspace 代码：全部走 3080 页面的
+ * byte-identical。DeepSeekGUI 零自有 workspace 代码：全部走 3080 页面的
  * 官方 ui-workspace + host.pickDirectory（native IFileOpenDialog）。
  *
  * 系统对话框的自动化经 UIAutomation 脚本驱动（fixtures/drive-open-dialog.ps1）；
  * production 代码零测试后门，被驱动的是 OS 对话框本身。
- * @module @see-sol-lab/deepcode/tests-e2e/workspace-picker
+ * @module @see-sol-lab/deepseekgui/tests-e2e/workspace-picker
  */
 
 import { spawnSync } from 'node:child_process'
@@ -132,7 +132,7 @@ describe.runIf(packagedExists)('S12 — Packaged Windows Workspace picker（打�
     // aria-modal，挡在「添加工作区」前面。fixtures 只预写按掉了欢迎公告，
     // 这一个取决于有没有配模型——e2e 环境刻意剔除了一切凭据变量，所以它
     // 必然出现（2026-08-24 现场：失败时可见文本里就有那两个按钮）。
-    // 这个用例不走设置页，碰不到 openDeepCodeSection 里的识别逻辑。
+    // 这个用例不走设置页，碰不到 openDeepSeekGUISection 里的识别逻辑。
     await expect.poll(async () => {
       await dismissStartupModal(instance)
       return startupModalPresent(instance)

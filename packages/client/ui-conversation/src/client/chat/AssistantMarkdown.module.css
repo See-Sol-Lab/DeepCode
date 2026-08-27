@@ -3,9 +3,9 @@
    43:32997) — separate from the body's internal gap so the footer spacing
    stays fixed when the body is a single block.
 
-   Host hook (DeepCode P8-D25): the figma values stay as the var() fallbacks,
+   Host hook (DeepSeekGUI P8-D25): the figma values stay as the var() fallbacks,
    so this stylesheet renders identically unless a host theme layer supplies
-   the --dsh-assistant-* variables (DeepCode's theme plugin does, via the
+   the --dsh-assistant-* variables (DeepSeekGUI's theme plugin does, via the
    official overrideTokens extension point — the tokens land as inline CSS
    variables on <body>). Vanilla `dsh web` never defines them. */
 
@@ -25,7 +25,7 @@
 .body {
   display: flex;
   flex-direction: column;
-  /* Host hook (DeepCode P8-D45): the figma 16px block gap reads too airy
+  /* Host hook (DeepSeekGUI P8-D45): the figma 16px block gap reads too airy
      once a host shrinks the body font; default keeps upstream exactly. */
   gap: var(--dsh-assistant-block-gap, 16px);
 }
@@ -65,7 +65,7 @@
 
 /* Finalized footer offset (figma 43:32997); chrome lives in MessageIconActions. */
 .actions {
-  /* Host hook (DeepCode P8-D45): footer offset follows the block gap scale. */
+  /* Host hook (DeepSeekGUI P8-D45): footer offset follows the block gap scale. */
   margin-top: var(--dsh-assistant-actions-gap, 16px);
   /* Optical align with the icon hit targets that pad past the glyph; follows
      the P8-D45 pad hook so the first glyph stays on the text axis. */

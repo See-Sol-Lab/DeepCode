@@ -2,9 +2,9 @@
  * SSRF gate full-matrix unit tests (菲博 §7.3.1): loopback / private /
  * link-local / cloud metadata / non-http(s) schemes / DNS rebinding (mock
  * resolver) / URL hygiene. Every navigation target must pass before bytes
- * move; localhost (incl. DeepCode's own 3080/control bridge) is blocked by
+ * move; localhost (incl. DeepSeekGUI's own 3080/control bridge) is blocked by
  * design, never exempted.
- * @module @see-sol-lab/deepcode-browser/tests/ssrf
+ * @module @see-sol-lab/deepseekgui-browser/tests/ssrf
  */
 
 import { describe, expect, it } from 'vitest'
@@ -184,7 +184,7 @@ describe('DNS 重绑定防线（resolveChecked + validateNavigationTarget）', (
     expect((await validateNavigationTarget('http://localhost:3080/', lookupOf(['127.0.0.1']))).ok).toBe(false)
     expect((await validateNavigationTarget('http://192.168.1.5/', lookupOf(['192.168.1.5']))).ok).toBe(false)
     expect((await validateNavigationTarget('https://127.0.0.1/', lookupOf(['127.0.0.1']))).ok).toBe(false)
-    // DeepCode 自己的控制桥就是 localhost：被正确拦截是特性不是 bug。
+    // DeepSeekGUI 自己的控制桥就是 localhost：被正确拦截是特性不是 bug。
     expect((await validateNavigationTarget('http://127.0.0.1:3080/control/model', lookupOf(['127.0.0.1']))).ok).toBe(false)
   })
 })

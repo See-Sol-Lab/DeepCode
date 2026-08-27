@@ -10,9 +10,9 @@ Status: proposed
 
 ## Proposal
 
-**应用专属 DSH_HOME。** 打包态主进程以 `DSH_HOME=join(app.getPath('userData'), 'dsh')`（默认产品名下即 `%APPDATA%\DeepCode\dsh`）派生 DSH 服务。全部凭据（`.credentials.yaml`）、设置、会话与 profiles 由官方 DSH 机制写入该目录；应用从不读取全局 `~/.dsh`，也绝不把密钥写进自己的配置、日志、安装包或命令行。环境变量 `DSH_HOME` 存在时覆盖默认值（开发与自动验证），开发态保持现状（不注入）。`resolveDshLaunch` 增加一个可选字段；单元测试固定注入值、覆盖行为与开发态直通。
+**应用专属 DSH_HOME。** 打包态主进程以 `DSH_HOME=join(app.getPath('userData'), 'dsh')`（默认产品名下即 `%APPDATA%\DeepSeekGUI\dsh`）派生 DSH 服务。全部凭据（`.credentials.yaml`）、设置、会话与 profiles 由官方 DSH 机制写入该目录；应用从不读取全局 `~/.dsh`，也绝不把密钥写进自己的配置、日志、安装包或命令行。环境变量 `DSH_HOME` 存在时覆盖默认值（开发与自动验证），开发态保持现状（不注入）。`resolveDshLaunch` 增加一个可选字段；单元测试固定注入值、覆盖行为与开发态直通。
 
-**NSIS 安装程序。** `electron-builder.yml` 在 `dir` 之外增加 `nsis` target：向导式安装、`perMachine: false`（当前用户安装，无需管理员权限）、开始菜单与桌面快捷方式（鲸鱼图标）、`shortcutName: DeepCode`、产物 `DeepCode-Setup-${version}.exe`。安装包通过 `--prepackaged` 从已组装好的 `win-unpacked` 生成，因此拷贝好的 `resources/dsh` 运行时与消毒后的内容原样进包。不做自动更新、签名、托盘、开机启动、多平台或文件关联。构建脚本默认把工具链镜像（`ELECTRON_BUILDER_BINARIES_MIRROR`）指向 npmmirror，保证受限网络也能下载 NSIS 二进制。
+**NSIS 安装程序。** `electron-builder.yml` 在 `dir` 之外增加 `nsis` target：向导式安装、`perMachine: false`（当前用户安装，无需管理员权限）、开始菜单与桌面快捷方式（鲸鱼图标）、`shortcutName: DeepSeekGUI`、产物 `DeepSeekGUI-Setup-${version}.exe`。安装包通过 `--prepackaged` 从已组装好的 `win-unpacked` 生成，因此拷贝好的 `resources/dsh` 运行时与消毒后的内容原样进包。不做自动更新、签名、托盘、开机启动、多平台或文件关联。构建脚本默认把工具链镜像（`ELECTRON_BUILDER_BINARIES_MIRROR`）指向 npmmirror，保证受限网络也能下载 NSIS 二进制。
 
 **首次使用文档。** 双语 README 增加六步非程序员路径（安装 → 启动 → 设置/Models → 填 key → 选工作区 → 新会话），说明数据位置、卸载保留数据的行为与手动清除方法。任何地方不出现真实 key、用户名或私人路径。
 
@@ -30,8 +30,8 @@ Status: proposed
 
 ## Acceptance criteria
 
-- 打包应用以 `DSH_HOME` = `%APPDATA%\DeepCode\dsh` 运行；凭据/设置/会话落在此处，已有的 `~/.dsh` 不受影响。
-- `pnpm run build:desktop-dist` 同时产出 `dist/desktop/win-unpacked/` 与 `dist/desktop/DeepCode-Setup-<version>.exe`。
+- 打包应用以 `DSH_HOME` = `%APPDATA%\DeepSeekGUI\dsh` 运行；凭据/设置/会话落在此处，已有的 `~/.dsh` 不受影响。
+- `pnpm run build:desktop-dist` 同时产出 `dist/desktop/win-unpacked/` 与 `dist/desktop/DeepSeekGUI-Setup-<version>.exe`。
 - 普通用户安装 Setup exe 无需提权；开始菜单与桌面快捷方式出现；从快捷方式启动应用、加载官方 UI、关闭后释放端口 3080。
 - 卸载入口存在并移除应用。
 - 单元测试（19+）、`build:desktop`、typecheck、开发态 smoke 与修复后的验收脚本通过；发行扫描保持干净（无 `.git`、`.env`、会话、密钥、用户名或私人路径）；`git diff --check` 干净。

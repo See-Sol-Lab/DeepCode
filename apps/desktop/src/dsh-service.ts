@@ -1,7 +1,7 @@
 /**
  * DSH 本地服务的进程管理：固定端口、启动前占用探测、就绪等待、停止。
  * 纯 Node 逻辑，不依赖 Electron，便于单元测试。
- * @module @see-sol-lab/deepcode/dsh-service
+ * @module @see-sol-lab/deepseekgui/dsh-service
  */
 
 import { spawn, type ChildProcess } from 'node:child_process'
@@ -77,7 +77,7 @@ export function repoRoot(): string {
  * 锁成只读，而不是让人填一个永不生效的值。
  *
  * 代价是**用户在 GUI 里再也改不了 key**，只能去改系统环境变量。装过 DSH TUI
- * 或别的 AI CLI 的人几乎都设过它，而他们正是 DeepCode 的核心受众；密钥一旦在
+ * 或别的 AI CLI 的人几乎都设过它，而他们正是 DeepSeekGUI 的核心受众；密钥一旦在
  * 平台侧被删，应用就进入「有 key 改不了 + key 无效没有模型」的死锁，界面上不给
  * 任何出路（2026-08-22 住户实机撞上，P8-D23）。
  */
@@ -86,7 +86,7 @@ export const MANAGED_HOME_BLOCKED_ENV = 'DEEPSEEK_API_KEY'
 /**
  * 构造要透传给 DSH 的环境。
  *
- * Managed Home 是「DeepCode 自己管的干净目录」，宿主的模型密钥不该漏进去；拦掉
+ * Managed Home 是「DeepSeekGUI 自己管的干净目录」，宿主的模型密钥不该漏进去；拦掉
  * 之后官方 UI 检测不到环境凭据，密钥输入框恢复可编辑，用户在界面上就能填、能换
  * ——**不必开命令行**。Existing Home 是接管用户自己的 DSH Home，行为必须和他自己
  * 跑 `dsh web` 一致，因此原样透传。
@@ -189,14 +189,14 @@ export function resolveDshCommand(options: {
 
 /**
  * 组装启动 DSH 服务的命令。开发态与打包态走同一个 `@deepseek-ai/dsh` 入口
- * 与同一 `--host`/`--port`，并用 `--no-open` 将浏览器表层留在 DeepCode
+ * 与同一 `--host`/`--port`，并用 `--no-open` 将浏览器表层留在 DeepSeekGUI
  * 的 Compatibility View；`--profile` 与 `DSH_HOME` 完全由传入的 launcher
  * selection 决定，函数自身不做任何默认推断。
  * @param options - 启动模式、launcher selection 与运行环境。
  * @returns spawn 参数：可执行文件、参数、工作目录与环境。
  */
 /** 皮肤插件的包名，也是它在模块 fallback 里的链接名。 */
-export const THEME_PLUGIN_PACKAGE = '@see-sol-lab/deepcode-theme'
+export const THEME_PLUGIN_PACKAGE = '@see-sol-lab/deepseekgui-theme'
 
 /**
  * 让皮肤插件对所有 profile 可解析。
@@ -209,7 +209,7 @@ export const THEME_PLUGIN_PACKAGE = '@see-sol-lab/deepcode-theme'
  *
  * 这里写的是**安装级 fallback 目录**，不是任何 profile 的清单：profile 的
  * `package.json` / `cordis.patch.yml` / 插件依赖一个字节都不动，用户自己跑
- * `dsh web` 时也不会加载它（皮肤只经 `--patch` 进入 DeepCode 这一轮 composition）。
+ * `dsh web` 时也不会加载它（皮肤只经 `--patch` 进入 DeepSeekGUI 这一轮 composition）。
  *
  * 幂等：已指向正确目标就原样返回；指向别处（例如换了安装位置）则重建。
  * @param dshHome - 生效的 DSH_HOME。
@@ -222,7 +222,7 @@ export function ensureThemePluginResolvable(dshHome: string, packageDir: string)
 }
 
 /**
- * 让一个 DeepCode 自带插件对所有 profile 可解析（皮肤与目录选择器共用这一套）。
+ * 让一个 DeepSeekGUI 自带插件对所有 profile 可解析（皮肤与目录选择器共用这一套）。
  *
  * 语义与上面那条完全一致，只是包名成了参数：两个插件都是随发行走的安装级
  * 资产，都靠 profiles 的模块 fallback 目录被解析，都绝不写进任何 profile
@@ -295,16 +295,16 @@ export function ensurePluginResolvable(dshHome: string, packageDir: string, pack
   }
 }
 
-/** DeepCode 皮肤 overlay 的文件名（随包发行，非用户资产）。 */
-export const THEME_PATCH_FILENAME = 'deepcode-theme.patch.yml'
+/** DeepSeekGUI 皮肤 overlay 的文件名（随包发行，非用户资产）。 */
+export const THEME_PATCH_FILENAME = 'deepseekgui-theme.patch.yml'
 
 /**
- * DeepCode 皮肤 overlay 的绝对路径。
+ * DeepSeekGUI 皮肤 overlay 的绝对路径。
  *
  * 走 `--patch` 而不是 `dsh plugin add`：overlay 落在合成顺序的最后一层
  * （bundle → profile 自己的 cordis.patch.yml → launcher 层），因此皮肤只
- * 存在于 DeepCode 启动的这一轮 composition 里——用户自己跑 `dsh web` 看到
- * 的仍是原版 Harness，卸载 DeepCode 也不会在 profile 清单里留下我们的插件。
+ * 存在于 DeepSeekGUI 启动的这一轮 composition 里——用户自己跑 `dsh web` 看到
+ * 的仍是原版 Harness，卸载 DeepSeekGUI 也不会在 profile 清单里留下我们的插件。
  * 对用户 profile 的「零写入」承诺因此完好。
  *
  * 打包态放在 DSH 运行时目录内：那个 Node 进程读不到 asar，插件与 overlay
@@ -328,7 +328,7 @@ export function resolveThemePluginDir(options: {
 }
 
 /**
- * DeepCode 皮肤 overlay 的绝对路径（形态见下方原注释）。
+ * DeepSeekGUI 皮肤 overlay 的绝对路径（形态见下方原注释）。
  * @param options - 形态与路径。
  * @returns overlay 绝对路径；缺少定位信息时返回 undefined。
  */
@@ -347,11 +347,11 @@ export function resolveThemePatchFile(options: {
     : join(options.root, 'apps', 'desktop', 'theme-plugin', THEME_PATCH_FILENAME)
 }
 
-/** 设置分区插件的包名（P8-D39：官方设置页里的 DeepCode 控制分区）。 */
-export const SETTINGS_PLUGIN_PACKAGE = '@see-sol-lab/deepcode-settings'
+/** 设置分区插件的包名（P8-D39：官方设置页里的 DeepSeekGUI 控制分区）。 */
+export const SETTINGS_PLUGIN_PACKAGE = '@see-sol-lab/deepseekgui-settings'
 
 /** 设置分区 overlay 的文件名（随包发行，非用户资产）。 */
-export const SETTINGS_PATCH_FILENAME = 'deepcode-settings.patch.yml'
+export const SETTINGS_PATCH_FILENAME = 'deepseekgui-settings.patch.yml'
 
 /**
  * 设置分区插件目录的绝对路径（形态取舍与 theme 相同：dev 用仓库目录，
@@ -395,16 +395,16 @@ export function resolveSettingsPatchFile(options: {
 }
 
 /** 目录选择器插件的包名，也是它在模块 fallback 里的链接名（P8-D11）。 */
-export const PICKER_PLUGIN_PACKAGE = '@see-sol-lab/deepcode-directory-picker'
+export const PICKER_PLUGIN_PACKAGE = '@see-sol-lab/deepseekgui-directory-picker'
 
 /** 目录选择器 overlay 的文件名（随包发行，非用户资产）。 */
-export const PICKER_PATCH_FILENAME = 'deepcode-picker.patch.yml'
+export const PICKER_PATCH_FILENAME = 'deepseekgui-picker.patch.yml'
 
 /**
  * 目录选择器插件目录的绝对路径。
  *
  * **只在打包态存在，这是刻意的。** D11 是打包态特有缺陷：官方 native picker
- * 起的 koffi COM worker 继承 `process.execPath`，打包态那是 DeepCode.exe，
+ * 起的 koffi COM worker 继承 `process.execPath`，打包态那是 DeepSeekGUI.exe，
  * worker 于是落在 Electron 的 Node realm 里 FATAL 崩溃（即便
  * ELECTRON_RUN_AS_NODE=1 一路继承下去也一样）。开发态 DSH 用真 node，官方
  * picker 完全正常，没有缺陷要修；而且仓库根的 node_modules 里也没有
@@ -439,10 +439,10 @@ export function resolvePickerPatchFile(options: {
 }
 
 /** 内置浏览器插件包名（随包发行，B3-11 住户 2026-08-24 定：装完即用）。 */
-export const BROWSER_PLUGIN_PACKAGE = '@see-sol-lab/deepcode-browser'
+export const BROWSER_PLUGIN_PACKAGE = '@see-sol-lab/deepseekgui-browser'
 
 /** 浏览器 overlay 的文件名（随包发行，非用户资产）。 */
-export const BROWSER_PATCH_FILENAME = 'deepcode-browser.patch.yml'
+export const BROWSER_PATCH_FILENAME = 'deepseekgui-browser.patch.yml'
 
 /**
  * profile 的清单是否已经把某个包列进 bundles 层。
@@ -452,7 +452,7 @@ export const BROWSER_PATCH_FILENAME = 'deepcode-browser.patch.yml'
  * bundles 层——插件的 `package.json` 声明了 `dsh.bundle.patch`，官方
  * reconcile 会把它连同自带的 `cordis.patch.yml` 一起加进去。两条路插入的
  * 是同一个 loader id，同时生效时官方 loader 直接抛
- * `duplicate loader entry id: deepcode-browser` 并硬退出，整个 Harness
+ * `duplicate loader entry id: deepseekgui-browser` 并硬退出，整个 Harness
  * 起不来（2026-08-24 实机抓获：住户在 B3-10 装过插件，profile 里留下了
  * 那条 bundles，装上内置版的新包后 DSH 启动即崩）。
  *
@@ -481,7 +481,7 @@ export function profileBundlesInclude(dshHome: string, profile: string, packageN
  * 浏览器插件目录的绝对路径。
  *
  * 只在打包态：随包发行的那一份连同 `playwright-core` 一起放在 DSH 运行时的
- * node_modules 里，用户装完 DeepCode 就自带浏览器能力，不必再 `dsh plugin
+ * node_modules 里，用户装完 DeepSeekGUI 就自带浏览器能力，不必再 `dsh plugin
  * add`（内网用户根本没有 registry 可用）。开发态走仓库里的插件源码目录，
  * 依赖由 workspace 解析。
  * @param options - 形态与路径。
@@ -575,7 +575,7 @@ export function resolveDshLaunch(options: {
     })
     : undefined
   // 设置分区（P8-D39）：同一模式第三次。解析不了就不带 overlay——没有它
-  // 只是设置页里少了 DeepCode 分区，Chrome 菜单的控制面照常可用。
+  // 只是设置页里少了 DeepSeekGUI 分区，Chrome 菜单的控制面照常可用。
   const settingsDir = resolveSettingsPluginDir({
     packaged: options.packaged,
     ...options.root === undefined ? {} : { root: options.root },
@@ -637,7 +637,7 @@ export function resolveDshLaunch(options: {
       ...browserPatch === undefined ? [] : ['--patch', browserPatch],
       '--host', options.host ?? DEFAULT_HOST,
       '--port', String(options.port ?? DEFAULT_PORT),
-      // DeepCode owns the browser surface inside its Compatibility View.
+      // DeepSeekGUI owns the browser surface inside its Compatibility View.
       // rc.2 opens the system browser by default unless this app flag is set.
       '--no-open',
     ],
@@ -689,7 +689,7 @@ export interface ServiceLogWriter {
 }
 
 /** 日志截断标记；其自身字节数从上限中预留，标记不突破上限。 */
-const LOG_TRUNCATION_MARKER = '\n[deepcode] log size limit reached; further output dropped\n'
+const LOG_TRUNCATION_MARKER = '\n[deepseekgui] log size limit reached; further output dropped\n'
 
 /**
  * 列出与某个日志文件同族的全部文件名（current 与 `.1`/`.2`… 历史），

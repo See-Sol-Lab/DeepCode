@@ -7,10 +7,10 @@ index 1e1891371b13892c688d6414bcf07243f34b11e4..ce181bc14b32e5089e7ed46dd7c0a62a
  // https://github.com/electron-userland/electron-builder/commit/2539cfba20dc639128e75c5b786651b652bb4b78
  function getWindowsInstallationDirName(appInfo, isTryToUseProductName) {
 -    return isTryToUseProductName && /^[-_+0-9a-zA-Z .]+$/.test(appInfo.productFilename) ? appInfo.productFilename : appInfo.sanitizedName;
-+    // DeepCode local patch: upstream refuses the product name for one-click
++    // DeepSeekGUI local patch: upstream refuses the product name for one-click
 +    // per-user installs and falls back to sanitizedName -- for a scoped
-+    // package that yields "@see-sol-labdeepcode" under LOCALAPPDATA\Programs.
-+    // Our product name ("DeepCode") passes the safe-charset test, so always
++    // package that yields "@see-sol-labdeepseekgui" under LOCALAPPDATA\Programs.
++    // Our product name ("DeepSeekGUI") passes the safe-charset test, so always
 +    // try it. Existing installs are unaffected: the per-user branch reads
 +    // InstallLocation from HKCU first and keeps upgrading in place.
 +    return /^[-_+0-9a-zA-Z .]+$/.test(appInfo.productFilename) ? appInfo.productFilename : appInfo.sanitizedName;
@@ -27,8 +27,8 @@ index 053772f55ca6ece52f0a34c4fa0f05c9a5f07bd2..a25459a5f631a42331284bb2e20cc698
    ${IfNot} ${Silent}
 -    !ifdef HEADER_ICO
 -      SpiderBanner::Show /MODERN /ICON "$PLUGINSDIR\installerHeaderico.ico"
-+    !ifdef DEEPCODE_USE_MUI_INSTFILES
-+      # DeepCode local patch: compile-time display-layer switch. Do not create
++    !ifdef DEEPSEEKGUI_USE_MUI_INSTFILES
++      # DeepSeekGUI local patch: compile-time display-layer switch. Do not create
 +      # the SpiderBanner at all -- the MUI InstFiles page is already compiled
 +      # and sitting behind it; the banner is display-only and owns no install
 +      # lifecycle. With it gone, the include's MUI_PAGE_CUSTOMFUNCTION_SHOW
@@ -69,7 +69,7 @@ index 01d007ed273c72ea5efb191f823c203faefdf177..735aefb937bd314a8fcd31a37eb19168
  
  !insertmacro MUI_PAGE_INSTFILES
  !ifdef BUILD_UNINSTALLER
-+  # DeepCode local patch: MUI page-hook defines are consumed first-come-first-
++  # DeepSeekGUI local patch: MUI page-hook defines are consumed first-come-first-
 +  # served, and the installer page above also expands in the uninstaller
 +  # build -- so an un. SHOW hook defined up front gets eaten by a page that
 +  # never shows, failing the compile. This seam lets user scripts define the
@@ -89,11 +89,11 @@ index c3f4f11982689baa220de5051bbf144adbd9accc..6b3e43bb1cbfc59138e5a8d32e9b0cbf
        # one-click installer executes uninstall section in the silent mode, but we must show message dialog if silent mode was not explicitly set by user (using /S flag)
        call un.checkAppRunning
 -      SetSilent silent
-+      # DeepCode local patch: with the skinned MUI InstFiles page enabled, an
++      # DeepSeekGUI local patch: with the skinned MUI InstFiles page enabled, an
 +      # interactive uninstall keeps its UI (the skin lives on that page).
 +      # Explicit /S (upgrades, QuietUninstallString) is handled above and
 +      # stays fully silent.
-+      !ifndef DEEPCODE_USE_MUI_INSTFILES
++      !ifndef DEEPSEEKGUI_USE_MUI_INSTFILES
 +        SetSilent silent
 +      !endif
      !endif

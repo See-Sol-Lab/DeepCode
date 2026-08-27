@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-08-15-desktop-runtime-closure-and-volume.md
-2026-08-15-desktop-runtime-closure-and-volume.md: a4c0eba0eda72c72165897b081bbd658681b3b8d
-2026-08-15-desktop-runtime-closure-and-volume.zh.md: f5a5f939c0c5e633014c315e64282882b73a0c45
+2026-08-15-desktop-runtime-closure-and-volume.md: 6d29a60f19313dde364d4902b205f2acc74b7111
+2026-08-15-desktop-runtime-closure-and-volume.zh.md: e5958bf08c1aef08f69fb0c6fdefb0e62a534840

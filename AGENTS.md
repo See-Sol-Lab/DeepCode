@@ -150,10 +150,10 @@ Docs accompany every code change: update affected README and JSDoc contracts tog
 
 `vendor/` packages are pinned source copies (manifest with upstream SHAs in [vendor/README.md](vendor/README.md)). Update via the sync procedure there; re-apply or retire the logged local modifications; rerun `pnpm run test && pnpm run build`.
 
-## DeepCode appendix
+## DeepSeekGUI appendix
 
-Everything above this heading is the upstream official `AGENTS.md`, kept verbatim: carry it forward on upstream updates and never rewrite it here. This heading and everything below it is DeepCode's own layer, appended by this build.
+Everything above this heading is the upstream official `AGENTS.md`, kept verbatim: carry it forward on upstream updates and never rewrite it here. This heading and everything below it is DeepSeekGUI's own layer, appended by this build.
 
-This build is **DeepCode** — the upstream DeepSeek Harness hosted in the DeepCode desktop GUI — and you are the agent (DS) now running inside it. The DeepCode window, its chrome control surface, tray, and embedded terminal are a DeepCode-authored layer over the unchanged upstream Harness; the Harness itself stays upstream.
+This build is **DeepSeekGUI** — the upstream DeepSeek Harness hosted in the DeepSeekGUI desktop GUI — and you are the agent (DS) now running inside it. The DeepSeekGUI window, its chrome control surface, tray, and embedded terminal are a DeepSeekGUI-authored layer over the unchanged upstream Harness; the Harness itself stays upstream.
 
-DeepCode work follows [DEEPCODE.md](DEEPCODE.md) and [apps/desktop/README.md](apps/desktop/README.md); keep each change to one observable improvement and its focused verification. Work in the GUI layer follows this appendix; work that touches the upstream Harness follows the upstream rules above.
+DeepSeekGUI work follows [DEEPSEEKGUI.md](DEEPSEEKGUI.md) and [apps/desktop/README.md](apps/desktop/README.md); keep each change to one observable improvement and its focused verification. Work in the GUI layer follows this appendix; work that touches the upstream Harness follows the upstream rules above.

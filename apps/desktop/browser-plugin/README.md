@@ -1,14 +1,14 @@
-# @see-sol-lab/deepcode-browser
+# @see-sol-lab/deepseekgui-browser
 
 English | [中文](README.zh.md)
 
-DeepCode's browser plugin exposes a visible Microsoft Edge browser to the agent through the official Harness tool-calling loop. It combines read-only browsing, interaction tools, SSRF protection, permission levels, and approval for sensitive actions.
+DeepSeekGUI's browser plugin exposes a visible Microsoft Edge browser to the agent through the official Harness tool-calling loop. It combines read-only browsing, interaction tools, SSRF protection, permission levels, and approval for sensitive actions.
 
 ## Tools
 
 ### Read-only (L0)
 
-- `browser_navigate` opens a URL after the SSRF policy accepts it. Local, private, and reserved addresses are refused, including DeepCode's own loopback control service.
+- `browser_navigate` opens a URL after the SSRF policy accepts it. Local, private, and reserved addresses are refused, including DeepSeekGUI's own loopback control service.
 - `browser_snapshot` returns the accessibility tree and visible text, with stable `ref` values for later interaction.
 - `browser_screenshot` saves a page screenshot locally. A vision-capable model is required to inspect the image itself.
 - `browser_wait` waits for load, network idle, a selector, or a bounded delay.
@@ -31,13 +31,13 @@ Read-only sessions reject every L1 interaction. L2 actions pass the read-only ch
 
 ## Installation
 
-The DeepCode Managed Profile includes the browser overlay. A compatible custom Profile can install the package through the official plugin path:
+The DeepSeekGUI Managed Profile includes the browser overlay. A compatible custom Profile can install the package through the official plugin path:
 
 ```sh
-dsh plugin add @see-sol-lab/deepcode-browser
+dsh plugin add @see-sol-lab/deepseekgui-browser
 
 # Development tarball
-dsh plugin add ./see-sol-lab-deepcode-browser-0.1.0.tgz
+dsh plugin add ./see-sol-lab-deepseekgui-browser-0.1.0.tgz
 ```
 
 The package declares `dsh.bundle.patch`, so `dsh plugin add` inserts its bundle into the Profile composition without a manual patch edit.
@@ -46,7 +46,7 @@ Use a registry package or tarball for a plugin with runtime dependencies. pnpm d
 
 ## Runtime dependencies
 
-`playwright-core` belongs to the plugin's runtime closure under the Profile `node_modules`; it is not added to the DeepCode private runtime or Electron payload. The plugin reuses the installed Microsoft Edge channel and downloads no browser engine.
+`playwright-core` belongs to the plugin's runtime closure under the Profile `node_modules`; it is not added to the DeepSeekGUI private runtime or Electron payload. The plugin reuses the installed Microsoft Edge channel and downloads no browser engine.
 
 ## Security
 

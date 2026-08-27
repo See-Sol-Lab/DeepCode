@@ -49,7 +49,7 @@ worktrees/
 /vendor/*/src/**/*.d.ts
 /vendor/*/src/**/*.d.ts.map
 
-# 例外：DeepCode 皮肤插件的 lib/ 是**手写产物**，不是编译输出。
+# 例外：DeepSeekGUI 皮肤插件的 lib/ 是**手写产物**，不是编译输出。
 # 它的形状（__ModuleLoader__.load 自注册）是官方 client 运行时的契约，
 # 没有对应的 TS 源码可以重新生成——被忽略掉就等于插件整个丢失。
 !/apps/desktop/theme-plugin/lib/

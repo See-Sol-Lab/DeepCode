@@ -3,7 +3,7 @@
  * 查询失败与超时一律 null（绝不阻塞退出）、绝不显示会话内容（本模块
  * 只有数量接口）。文案权威在 view-model 字典，这里断言形态选择与
  * {count} 替换。
- * @module @see-sol-lab/deepcode/tests/quit-confirm
+ * @module @see-sol-lab/deepseekgui/tests/quit-confirm
  */
 
 import { describe, expect, it, vi } from 'vitest'
@@ -54,8 +54,8 @@ describe('quitConfirmDetail 三态文案', () => {
   })
 
   it('查不到（null）：退回 B2-P2 的诚实旧文案（"如果有"）', () => {
-    expect(quitConfirmDetail(null, zh)).toBe('退出 DeepCode 会停止 Harness，并中断当前正在执行的任务（如果有）。')
-    expect(quitConfirmDetail(null, en)).toBe('Quitting DeepCode will stop Harness and interrupt any task that is currently running.')
+    expect(quitConfirmDetail(null, zh)).toBe('退出 DeepSeekGUI 会停止 Harness，并中断当前正在执行的任务（如果有）。')
+    expect(quitConfirmDetail(null, en)).toBe('Quitting DeepSeekGUI will stop Harness and interrupt any task that is currently running.')
   })
 })
 
@@ -90,6 +90,6 @@ describe('buildQuitConfirmDetail 组合出口', () => {
     expect(await buildQuitConfirmDetail(ok, zh)).toBe('有 1 个会话正在执行。退出会中断它。')
     const broken = apiWith({ items: [] })
     broken.sessionList = vi.fn(async () => { throw new Error('boom') })
-    expect(await buildQuitConfirmDetail(broken, zh)).toBe('退出 DeepCode 会停止 Harness，并中断当前正在执行的任务（如果有）。')
+    expect(await buildQuitConfirmDetail(broken, zh)).toBe('退出 DeepSeekGUI 会停止 Harness，并中断当前正在执行的任务（如果有）。')
   })
 })

@@ -3,7 +3,7 @@
  * + turn/end 双出现才算回复完成）、任何一步失败与 30s 超时一律 null
  * （降级，绝不抛出）、assistant 文本提取的 fail-closed 形状。
  * fake api + 虚拟时钟注入，零网络零模型。
- * @module @see-sol-lab/deepcode/tests/feedback-session
+ * @module @see-sol-lab/deepseekgui/tests/feedback-session
  */
 
 import { describe, expect, it } from 'vitest'

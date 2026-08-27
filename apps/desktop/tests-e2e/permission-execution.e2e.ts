@@ -1,6 +1,6 @@
 /**
  * S2 / S3 / S6 / S13 — 权限执行打包验收（打包态）：真实 agent 经官方
- * HTTP RPC（session.create / session.prompt，非 DeepCode 私有 API）在
+ * HTTP RPC（session.create / session.prompt，非 DeepSeekGUI 私有 API）在
  * packaged Harness 里执行 sandboxed PowerShell 工具：
  * - S2：workspace-write 的越界写被 **ACL confinement 硬拒绝**（受限进程
  *   不持有目标权限，OS 直接拒绝）——sentinel byte-identical、无兄弟文件、
@@ -8,12 +8,12 @@
  * - S3：工作区内写经允许路径成功（不是"为安全把工具全禁了"）；
  * - S6a/S6b：**工具请求提权**（sandbox_permissions + justification）才是
  *   抵达 approval policy 的那条路——UI 真实可见、未答前不执行、Deny 后
- *   动作不发生、Approve once 后才执行，且 DeepCode 不存第二份信任状态；
+ *   动作不发生、Approve once 后才执行，且 DeepSeekGUI 不存第二份信任状态；
  * - S13：无害 sandboxed PowerShell 动作执行成功，执行期间不出现可见
  *   pwsh 控制台窗口（黑框检测：按创建时间 + MainWindowHandle 采样）。
  * LLM 用 repo 内 mock server（每测试独立实例，tool_call_success →
  * pwsh 工具），零网络、零真实凭据；全部 destructive 断言落在隔离临时根。
- * @module @see-sol-lab/deepcode/tests-e2e/permission-execution
+ * @module @see-sol-lab/deepseekgui/tests-e2e/permission-execution
  */
 
 import { spawnSync } from 'node:child_process'
@@ -40,7 +40,7 @@ import { launchPackaged } from './fixtures.ts'
 /** 本套件的隔离根：Unicode、无空格（argv 路径必须无空格）。 */
 const isolationRoot = (suffix: string): string => sharedIsolationRoot(`dsh-exec-${suffix}-`, '执行s')
 
-/** 官方 RPC 信封调用（测试侧驱动官方 API，不经 DeepCode 私有面）。 */
+/** 官方 RPC 信封调用（测试侧驱动官方 API，不经 DeepSeekGUI 私有面）。 */
 async function rpc(method: string, payload: unknown): Promise<{ ok: boolean; value?: unknown; error?: { code: string; message: string } }> {
   const rpcId = Math.random().toString(36).slice(2)
   const response = await fetch(`http://127.0.0.1:3080/api/${method}`, {
@@ -301,7 +301,7 @@ describe.runIf(packagedExists)('S2/S3/S6/S13 — 权限执行（打包态）', (
     const sessionId = await createVisibleSession(app!, workspaceA)
     void rpc('session.prompt', { sessionId, mode: 'queue', content: [{ type: 'text', text: '请按工具要求执行' }] })
 
-    // approval 真实可见：DeepCode 不自动批准，也不替用户作答。
+    // approval 真实可见：DeepSeekGUI 不自动批准，也不替用户作答。
     // 120s → 240s：这一步等的是完整 agent 回合（mock LLM 应答 → 工具调用 →
     // 审批卡渲染）。单跑整套只要 49 秒，全套连跑时机器满载，同一条要 120
     // 秒以上——2026-08-24 六套件跑齐时它是唯一的 flaky。超时按最坏负载给，
@@ -315,7 +315,7 @@ describe.runIf(packagedExists)('S2/S3/S6/S13 — 权限执行（打包态）', (
 
     await clickApproval(app!, '拒绝')
     await waitTurnSettled(app!, sessionId)
-    // 决定同样要落进日志：点了才算答过，DeepCode 不替用户产生这条记录。
+    // 决定同样要落进日志：点了才算答过，DeepSeekGUI 不替用户产生这条记录。
     expect(await sessionEventTypes(sessionId), 'Deny 未落进会话日志').toContain('approval/decided')
 
     expect(readFileSync(join(outside, 'sentinel.txt'))).toEqual(sentinelBefore)
@@ -324,7 +324,7 @@ describe.runIf(packagedExists)('S2/S3/S6/S13 — 权限执行（打包态）', (
     expect(await currentPreset()).not.toBe('danger-full-access')
   }, 300_000)
 
-  it('S6b：Approve once 后该动作执行；approval/trust 状态仍归 Harness，DeepCode 不存第二份', async () => {
+  it('S6b：Approve once 后该动作执行；approval/trust 状态仍归 Harness，DeepSeekGUI 不存第二份', async () => {
     const temp = isolationRoot('s6b')
     const outside = join(temp, 'outside-b')
     const workspaceA = join(temp, 'workspace-a')
@@ -347,8 +347,8 @@ describe.runIf(packagedExists)('S2/S3/S6/S13 — 权限执行（打包态）', (
 
     // 用户批准了，动作才发生（trim：Set-Content 会补一个行尾）。
     expect(readFileSync(join(outside, 'sentinel.txt'), 'utf8').trim()).toBe('approved write')
-    // 授权归 Harness：DeepCode 的 userData 下没有任何 approval/trust 存档，
-    // "允许一次"就只是一次，绝不由 DeepCode 记成长期信任。
+    // 授权归 Harness：DeepSeekGUI 的 userData 下没有任何 approval/trust 存档，
+    // "允许一次"就只是一次，绝不由 DeepSeekGUI 记成长期信任。
     expect(readdirSync(userDataDir(temp)).filter(name => /approval|trust/i.test(name))).toEqual([])
   }, 300_000)
 
