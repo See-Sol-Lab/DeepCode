@@ -3,20 +3,10 @@ name: CI
 on:
   # No main-push trigger. This fork lands its work as direct pushes to main, so
   # every commit fired the whole upstream matrix and mailed a failure for lanes
-  # it does not maintain. Pull requests and manual dispatch still reach it.
+  # it does not maintain. Pull requests still reach it.
   pull_request:
-  workflow_dispatch:
-    inputs:
-      suite:
-        description: Manual CI suite to run
-        required: true
-        default: larger-runner-benchmark
-        type: choice
-        options:
-          - larger-runner-benchmark
-          - consolidated-runner-benchmark
 
-# Cancel superseded runs so stale pull requests, dispatches, and DeepCode main pushes do not retain runner capacity.
+# Cancel superseded pull-request runs so stale heads do not retain runner capacity.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -29,13 +19,6 @@ env:
   # CI runs must never report to the production telemetry endpoint baked
   # into apps/cli/cordis.yml (AppCLIEntry disables the row when set).
   DSH_TELEMETRY_DISABLED: '1'
-
-# Cancel a superseded pull-request run on a new push so a fresh head does not
-# queue a second full 9-job run behind a stale one (paid enterprise runners
-# would otherwise stack with no auto-cancellation).
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
 
