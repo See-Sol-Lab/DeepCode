@@ -12,12 +12,12 @@
 
 ## 1. 下载 DeepCode
 
-从 [DeepCode Releases](https://github.com/See-Sol-Lab/DeepCode/releases/latest) 下载最新的 `DeepCode-Setup-<version>.exe`。
+下载 [`DeepCode-Setup-1.0.0.exe`](https://github.com/See-Sol-Lab/DeepCode/releases/download/v1.0.0/DeepCode-Setup-1.0.0.exe)。
 
-DeepCode V1 尚未进行代码签名。Windows SmartScreen 可能显示未知发布者警告。运行安装包前，请先用对应的 `SHA256SUMS.txt` 校验文件：
+DeepCode V1 尚未进行代码签名。Windows SmartScreen 可能显示未知发布者警告。运行安装包前，请先用对应的 [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepCode/releases/download/v1.0.0/SHA256SUMS.txt) 校验文件：
 
 ```powershell
-Get-FileHash .\DeepCode-Setup-<version>.exe -Algorithm SHA256
+Get-FileHash .\DeepCode-Setup-1.0.0.exe -Algorithm SHA256
 ```
 
 输出的 hash 与发布清单完全一致时再继续。在 SmartScreen 中选择**更多信息**，然后选择**仍要运行**。
@@ -53,7 +53,7 @@ DeepCode 通过 Harness 凭据服务把 key 保存在应用数据目录中，不
 
 确认结果符合预期后，再要求 agent 完成边界明确的修改。DeepCode 会流式显示回复，并把会话保存在当前选择的 Harness Home 中，供你稍后恢复。
 
-<!-- SCREENSHOT SLOT: docs/user/deepcode/assets/workbench-overview.webp — 1600x1000，英文界面，一次已完成的 coding 任务，不得出现私人路径或凭据。 -->
+![DeepCode 完成创建并运行 JavaScript 文件的 coding 任务](assets/workbench-overview.png)
 
 ## 6. 检查批准请求与改动
 

@@ -37,17 +37,23 @@ DeepCode 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
 
 | 平台 | 下载 | 要求 |
 | --- | --- | --- |
-| Windows | [下载最新安装包](https://github.com/See-Sol-Lab/DeepCode/releases/latest) | Windows 10/11，x64 |
+| Windows | [下载安装包](https://github.com/See-Sol-Lab/DeepCode/releases/download/v1.0.0/DeepCode-Setup-1.0.0.exe) | Windows 10/11，x64 |
 
 DeepCode 为当前 Windows 用户安装，不需要管理员权限，并自带 Harness 运行时、Node.js 与 pnpm。
 
-DeepCode V1 尚未进行代码签名，因此 Windows SmartScreen 可能显示未知发布者警告。请从同一个 Release 下载 `SHA256SUMS.txt`，并在运行前校验安装包：
+或在已安装 [GitHub CLI](https://cli.github.com/) 的 PowerShell 中下载最新安装包与校验清单：
 
 ```powershell
-Get-FileHash .\DeepCode-Setup-<version>.exe -Algorithm SHA256
+gh release download --repo See-Sol-Lab/DeepCode --pattern 'DeepCode-Setup-*.exe' --pattern 'SHA256SUMS.txt' --clobber
 ```
 
-只有输出的 hash 与发布清单完全一致时才继续。详见[安装与故障排查指南](docs/user/deepcode/data-troubleshooting.zh.md#windows-smartscreen-blocks-the-installer)。
+DeepCode V1 尚未进行代码签名，因此 Windows SmartScreen 可能显示未知发布者警告。请从同一个 Release 下载 [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepCode/releases/download/v1.0.0/SHA256SUMS.txt)，并在运行前校验安装包：
+
+```powershell
+Get-FileHash .\DeepCode-Setup-1.0.0.exe -Algorithm SHA256
+```
+
+只有输出的 hash 与发布清单完全一致时才继续，然后运行 `Start-Process .\DeepCode-Setup-1.0.0.exe` 完成安装。详见[安装与故障排查指南](docs/user/deepcode/data-troubleshooting.zh.md#windows-smartscreen-blocks-the-installer)。
 
 ## 快速开始
 
@@ -73,7 +79,7 @@ Get-FileHash .\DeepCode-Setup-<version>.exe -Algorithm SHA256
 
 ## 产品一览
 
-<!-- SCREENSHOT SLOT A: docs/user/deepcode/assets/workbench-overview.webp | 1600x1000 | 英文界面，一次已完成的 coding 任务，不得出现私人路径或凭据。 -->
+![DeepCode 完成创建并运行 JavaScript 文件的 coding 任务](docs/user/deepcode/assets/workbench-overview.png)
 
 ### 使用代码、文件与图片工作
 

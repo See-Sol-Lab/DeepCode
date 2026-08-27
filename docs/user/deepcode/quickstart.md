@@ -12,12 +12,12 @@ This tutorial takes a new Windows user from download to a working DeepSeek codin
 
 ## 1. Download DeepCode
 
-Download the latest `DeepCode-Setup-<version>.exe` from the [DeepCode releases page](https://github.com/See-Sol-Lab/DeepCode/releases/latest).
+Download [`DeepCode-Setup-1.0.0.exe`](https://github.com/See-Sol-Lab/DeepCode/releases/download/v1.0.0/DeepCode-Setup-1.0.0.exe).
 
-DeepCode V1 is not code-signed. Windows SmartScreen may show an unknown-publisher warning. Verify the installer against the matching `SHA256SUMS.txt` before running it:
+DeepCode V1 is not code-signed. Windows SmartScreen may show an unknown-publisher warning. Verify the installer against the matching [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepCode/releases/download/v1.0.0/SHA256SUMS.txt) before running it:
 
 ```powershell
-Get-FileHash .\DeepCode-Setup-<version>.exe -Algorithm SHA256
+Get-FileHash .\DeepCode-Setup-1.0.0.exe -Algorithm SHA256
 ```
 
 Continue only when the printed hash matches the release manifest exactly. In SmartScreen, select **More info**, then **Run anyway**.
@@ -53,7 +53,7 @@ Create a new session and give the agent one concrete outcome, for example:
 
 Once you are comfortable with the result, ask for a bounded change. DeepCode streams the reply and keeps the session in the selected Harness Home so you can resume it later.
 
-<!-- SCREENSHOT SLOT: docs/user/deepcode/assets/workbench-overview.webp — 1600x1000, English UI, one completed coding task with no private paths or credentials. -->
+![A completed DeepCode coding task that creates and runs a JavaScript file](assets/workbench-overview.png)
 
 ## 6. Review approvals and changes
 

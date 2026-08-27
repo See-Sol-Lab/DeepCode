@@ -37,17 +37,23 @@ DeepCode turns [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harnes
 
 | Platform | Download | Requirements |
 | --- | --- | --- |
-| Windows | [Download the latest installer](https://github.com/See-Sol-Lab/DeepCode/releases/latest) | Windows 10/11, x64 |
+| Windows | [Download the installer](https://github.com/See-Sol-Lab/DeepCode/releases/download/v1.0.0/DeepCode-Setup-1.0.0.exe) | Windows 10/11, x64 |
 
 DeepCode installs for the current Windows user without administrator rights and includes its own Harness runtime, Node.js, and pnpm.
 
-DeepCode V1 is not code-signed, so Windows SmartScreen may show an unknown-publisher warning. Download `SHA256SUMS.txt` from the same release and verify the installer before running it:
+Or download the latest installer and checksum from PowerShell with [GitHub CLI](https://cli.github.com/):
 
 ```powershell
-Get-FileHash .\DeepCode-Setup-<version>.exe -Algorithm SHA256
+gh release download --repo See-Sol-Lab/DeepCode --pattern 'DeepCode-Setup-*.exe' --pattern 'SHA256SUMS.txt' --clobber
 ```
 
-Continue only when the printed hash matches the release manifest exactly. See the [installation and troubleshooting guide](docs/user/deepcode/data-troubleshooting.md#windows-smartscreen-blocks-the-installer).
+DeepCode V1 is not code-signed, so Windows SmartScreen may show an unknown-publisher warning. Download [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepCode/releases/download/v1.0.0/SHA256SUMS.txt) from the same release and verify the installer before running it:
+
+```powershell
+Get-FileHash .\DeepCode-Setup-1.0.0.exe -Algorithm SHA256
+```
+
+Continue only when the printed hash matches the release manifest exactly, then run `Start-Process .\DeepCode-Setup-1.0.0.exe`. See the [installation and troubleshooting guide](docs/user/deepcode/data-troubleshooting.md#windows-smartscreen-blocks-the-installer).
 
 ## Quick start
 
@@ -73,7 +79,7 @@ The [DeepCode quick-start guide](docs/user/deepcode/quickstart.md) walks through
 
 ## Product tour
 
-<!-- SCREENSHOT SLOT A: docs/user/deepcode/assets/workbench-overview.webp | 1600x1000 | English UI, one completed coding task, no private paths or credentials. -->
+![A completed DeepCode coding task that creates and runs a JavaScript file](docs/user/deepcode/assets/workbench-overview.png)
 
 ### Work with code, files, and images
 
