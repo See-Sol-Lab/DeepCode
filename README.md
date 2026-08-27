@@ -1,5 +1,3 @@
-![DeepSeekGUI — a harness-first desktop workspace for agentic coding](docs/user/deepseekgui/assets/deepseekgui-banner.png)
-
 <div align="center">
 
 # <img src="./apps/desktop/src/chrome/icon.png" width="38" alt="" align="absmiddle" /> DeepSeekGUI

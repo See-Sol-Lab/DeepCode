@@ -9,7 +9,7 @@ overrides:
   '@deepseek-ai/schemastery': link:vendor/schemastery
 
 patchedDependencies:
-  app-builder-lib@26.15.3: dd4186afb8f1623ba0b0bd54f2050f988ae132019b71df0970549f52e1693a4f
+  app-builder-lib@26.15.3: 54ceea8fd7f12dd7eba729163d60101b1be08044efdeba3f7bf0699f148abb35
   node-pty@1.2.0-beta.15: b40ae545608897914bd25fb009c97eeac478c34e8a910298ddcb01b746534bb0
 
 importers:
@@ -18154,7 +18154,7 @@ snapshots:
 
   anynum@1.0.0: {}
 
-  app-builder-lib@26.15.3(patch_hash=dd4186afb8f1623ba0b0bd54f2050f988ae132019b71df0970549f52e1693a4f)(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.15.3):
+  app-builder-lib@26.15.3(patch_hash=54ceea8fd7f12dd7eba729163d60101b1be08044efdeba3f7bf0699f148abb35)(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.15.3):
     dependencies:
       '@electron/asar': 3.4.1
       '@electron/fuses': 1.8.0
@@ -18753,7 +18753,7 @@ snapshots:
 
   dmg-builder@26.15.3(electron-builder-squirrel-windows@26.15.3):
     dependencies:
-      app-builder-lib: 26.15.3(patch_hash=dd4186afb8f1623ba0b0bd54f2050f988ae132019b71df0970549f52e1693a4f)(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.15.3)
+      app-builder-lib: 26.15.3(patch_hash=54ceea8fd7f12dd7eba729163d60101b1be08044efdeba3f7bf0699f148abb35)(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.15.3)
       builder-util: 26.15.3
       fs-extra: 10.1.0
       js-yaml: 4.2.0
@@ -18820,7 +18820,7 @@ snapshots:
 
   electron-builder-squirrel-windows@26.15.3(dmg-builder@26.15.3):
     dependencies:
-      app-builder-lib: 26.15.3(patch_hash=dd4186afb8f1623ba0b0bd54f2050f988ae132019b71df0970549f52e1693a4f)(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.15.3)
+      app-builder-lib: 26.15.3(patch_hash=54ceea8fd7f12dd7eba729163d60101b1be08044efdeba3f7bf0699f148abb35)(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.15.3)
       builder-util: 26.15.3
       electron-winstaller: 5.4.0
     transitivePeerDependencies:
@@ -18829,7 +18829,7 @@ snapshots:
 
   electron-builder@26.15.3(electron-builder-squirrel-windows@26.15.3):
     dependencies:
-      app-builder-lib: 26.15.3(patch_hash=dd4186afb8f1623ba0b0bd54f2050f988ae132019b71df0970549f52e1693a4f)(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.15.3)
+      app-builder-lib: 26.15.3(patch_hash=54ceea8fd7f12dd7eba729163d60101b1be08044efdeba3f7bf0699f148abb35)(dmg-builder@26.15.3)(electron-builder-squirrel-windows@26.15.3)
       builder-util: 26.15.3
       builder-util-runtime: 9.7.0
       chalk: 4.1.2
