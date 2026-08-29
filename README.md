@@ -11,11 +11,11 @@ English | [中文](README.zh.md)
 </div>
 
 <p align="center">
-  <em>Use it like Codex. Inspect it like a lab. Extend it like Harness.</em>
+  <em>DeepSeek's coding agent, on your desktop.</em>
 </p>
 
 <p align="center">
-  A DeepSeek-native Agent Workbench for Windows, powered by DeepSeek Harness.
+  A Windows desktop client for <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a>.
 </p>
 
 <p align="center">
@@ -27,118 +27,116 @@ English | [中文](README.zh.md)
 
 <!-- PRODUCT HUNT BADGE SLOT: add the official post badge after the DeepSeekGUI Product Hunt URL exists. -->
 
-DeepSeekGUI turns [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) into a complete Windows product: install it, connect DeepSeek, choose a workspace, and let an agent inspect, edit, browse, run tools, and explain its work. Harness remains the only runtime and source of session, model, credential, permission, tool, memory, compaction, and plugin state.
+DeepSeekGUI wraps [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) in a native Windows app. Point it at a folder, give the agent a task, and it reads your code, edits files, runs commands, browses the web, and explains what it did — all through DeepSeek's models.
 
-**Unofficial product:** DeepSeekGUI is not affiliated with or endorsed by DeepSeek. The upstream Harness runtime and official Web UI are DeepSeek's work.
+Just the installer and an API key — everything else is bundled.
+
+**Not an official DeepSeek product.** Built on top of DeepSeek Harness but independently developed. The upstream runtime and official Web UI are DeepSeek's work.
 
 ## Download
 
 | Platform | Download | Requirements |
 | --- | --- | --- |
-| Windows | [Download the installer](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/download/v1.0.0/DeepSeekGUI-Setup-1.0.0.exe) | Windows 10/11, x64 |
+| Windows | [Download installer](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/download/v1.0.0/DeepSeekGUI-Setup-1.0.0.exe) | Windows 10/11, x64 |
 
-DeepSeekGUI installs for the current Windows user without administrator rights and includes its own Harness runtime, Node.js, and pnpm.
+Installs to your user account — just double-click. The installer bundles its own runtime, ready to go.
 
-Or download the latest installer and checksum from PowerShell with [GitHub CLI](https://cli.github.com/):
+<details>
+<summary>Verify the download (recommended)</summary>
+
+V1 isn't code-signed yet, so Windows SmartScreen will warn about an unknown publisher. Verify the installer hash before running it:
 
 ```powershell
 gh release download --repo See-Sol-Lab/DeepSeekGUI --pattern 'DeepSeekGUI-Setup-*.exe' --pattern 'SHA256SUMS.txt' --clobber
-```
-
-DeepSeekGUI V1 is not code-signed, so Windows SmartScreen may show an unknown-publisher warning. Download [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/download/v1.0.0/SHA256SUMS.txt) from the same release and verify the installer before running it:
-
-```powershell
 Get-FileHash .\DeepSeekGUI-Setup-1.0.0.exe -Algorithm SHA256
 ```
 
-Continue only when the printed hash matches the release manifest exactly, then run `Start-Process .\DeepSeekGUI-Setup-1.0.0.exe`. See the [installation and troubleshooting guide](docs/user/deepseekgui/data-troubleshooting.md#windows-smartscreen-blocks-the-installer).
+Only run the installer if the hash matches [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/download/v1.0.0/SHA256SUMS.txt). See the [troubleshooting guide](docs/user/deepseekgui/data-troubleshooting.md#windows-smartscreen-blocks-the-installer) if you get stuck.
+
+</details>
 
 ## Quick start
 
-1. Install and launch DeepSeekGUI.
-2. Open **Settings → Models** and enter your DeepSeek API key.
-3. Select a model. Choose an image-capable model when the task includes screenshots or other visual input.
-4. Return to the home page and choose a workspace folder.
-5. Start a session and give the agent one concrete outcome.
-6. Review tool approvals and the resulting file changes.
+1. Install DeepSeekGUI and open it.
+2. Go to **Settings → Models** and paste your DeepSeek API key.
+3. Pick a model (choose one with vision support if you need image input).
+4. Go back to the home screen and open a workspace folder.
+5. Start a session, tell the agent what you want, and review its work.
 
-The [DeepSeekGUI quick-start guide](docs/user/deepseekgui/quickstart.md) walks through the complete first session.
+See the [quick-start guide](docs/user/deepseekgui/quickstart.md) for a full walkthrough.
 
 ## Why DeepSeekGUI
 
-| | |
-| --- | --- |
-| **Harness-native** | Profiles, sessions, tools, credentials, permissions, memory, compaction, hooks, and plugins stay in the native Harness composition. DeepSeekGUI does not create a second agent runtime. |
-| **DeepSeek-first** | DeepSeek models, reasoning, image input, and Harness behavior are first-class product paths rather than compatibility afterthoughts. |
-| **A real Windows product** | One-click current-user installation, resident tray, model settings, DSH Terminal, updates, feedback, diagnostics, and an uninstall data choice. |
-| **Observable and recoverable** | Live Harness status, explicit targets, redacted diagnostics, last-known-good Profile recovery, and protected plugin changes make failures understandable and reversible. |
-| **Safer execution** | Sandbox is the recommended default, approvals remain owned by Harness, Full Access always carries an explicit warning, and browser submissions require approval. |
-| **Programmable** | Use arbitrary compatible Harness Profiles and Cordis plugins, inspect the active composition, and keep the official DSH CLI close at hand. |
+**It's a real app.** One-click install — bundles its own runtime, so all you need is the installer.
 
-## Product tour
+**Built for DeepSeek.** DeepSeek reasoning, vision, and tool use each have dedicated product paths.
 
-![A completed DeepSeekGUI coding task that creates and runs a JavaScript file](docs/user/deepseekgui/assets/workbench-overview.png)
+**You stay in control.** The agent runs sandboxed by default. Every file edit and tool action needs your approval before it happens. You see what it's doing, and you can stop it.
 
-### Work with code, files, and images
+**A real, visible browser.** The built-in browser panel uses Edge — you can watch the agent navigate in real time. Sensitive actions still go through approval.
 
-Choose a workspace, resume durable sessions, attach images to a vision-capable model, stream results, and review tool activity without leaving the desktop application.
+**Everything stays on your machine.** Sessions, credentials, and settings are all stored locally.
 
-![A DeepSeekGUI vision session correctly describing an attached interface screenshot](docs/user/deepseekgui/assets/vision-response.png)
+**Still Harness under the hood.** Profiles, plugins, hooks, and the CLI all work the same way. DeepSeekGUI wraps the runtime and keeps full compatibility.
 
-### Give the agent a real browser
+## Screenshots
 
-DeepSeekGUI's built-in browser uses visible Microsoft Edge, checks navigation targets and redirects against SSRF rules, keeps physical mouse and keyboard control with the user, and routes sensitive submissions through Harness approval.
+![DeepSeekGUI coding session](docs/user/deepseekgui/assets/workbench-overview.png)
 
-![A DeepSeekGUI session using the built-in browser to inspect a public webpage](docs/user/deepseekgui/assets/browser-panel.png)
+*Give the agent a task and watch it work through your codebase — editing files, running commands, explaining each step.*
 
-### Inspect and control the Harness
+![Vision input](docs/user/deepseekgui/assets/vision-response.png)
 
-Switch Managed or Existing Homes, select Profiles, inspect effective plugin state, manage compatible plugins through the official CLI path, and recover a failed change without hiding what happened.
+*Attach screenshots or images. Vision-capable models will describe and work with them.*
 
-![DeepSeekGUI Settings with general, model, plugin, and agent preset controls](docs/user/deepseekgui/assets/settings-panel.png)
+![Built-in browser](docs/user/deepseekgui/assets/browser-panel.png)
 
-## What ships in V1
+*The agent can browse the web in a visible Edge window. You see every page it visits.*
 
-- Windows 10/11 x64 installer and portable unpacked build.
-- DeepSeek and custom model configuration through Harness settings.
-- Text and image input for models that advertise the corresponding modality.
-- Workspace-based coding sessions with native Harness tools and approvals.
-- Managed and Existing Harness Homes with Profile discovery and switching.
-- Plugin Manager with target confirmation, streamed output, post-checks, and protected recovery.
-- Built-in real-browser tools and a visible Browser Panel.
-- Sandbox, Full Access, Read-only, and Custom permission reporting.
-- DSH Terminal with private runtime shims and no system PATH modification.
-- Update verification, local diagnostics export, feedback, system tray, and bilingual Chinese/English desktop copy.
+![Settings](docs/user/deepseekgui/assets/settings-panel.png)
 
-DeepSeekGUI V1 is tested on Windows x64. It is not code-signed and does not ship macOS or Linux builds, an account system, automatic startup, or a plugin marketplace.
+*Configure models, manage plugins, and switch between Harness profiles from one place.*
+
+## What's in V1
+
+- **Windows installer** — one-click setup, installs per-user. Also available as a portable build.
+- **DeepSeek + custom models** — connect any OpenAI-compatible provider alongside DeepSeek.
+- **Text and image input** — attach screenshots to vision-capable models.
+- **Workspace sessions** — pick a folder, start coding, come back later.
+- **Built-in browser** — the agent browses with visible Edge, right where you can watch.
+- **Plugin support** — install and manage Harness-compatible plugins from the app.
+- **Sandbox by default** — every tool call needs your approval unless you opt into full access.
+- **Built-in terminal** — run Harness CLI commands in its own isolated environment.
+- **Bilingual** — full Chinese and English interface.
+- **System tray** — minimize to tray, check for updates.
+
+V1 targets Windows x64. SmartScreen will warn until code signing ships. macOS, Linux, and accounts come later.
 
 ## Documentation
 
-| Guide | What it covers |
+| Guide | |
 | --- | --- |
-| [Quick start](docs/user/deepseekgui/quickstart.md) | Install, connect DeepSeek, choose a workspace, and finish the first session. |
-| [Models and vision](docs/user/deepseekgui/models.md) | API keys, model selection, image input, and custom providers. |
-| [Workspaces and sessions](docs/user/deepseekgui/workspaces-sessions.md) | Workspace scope, durable sessions, attachments, review, and tray behavior. |
-| [Profiles and plugins](docs/user/deepseekgui/profiles-plugins.md) | Managed/Existing Homes, Profile switching, plugin operations, and recovery. |
-| [Permissions and approvals](docs/user/deepseekgui/permissions.md) | Sandbox, Full Access, approvals, Existing Home behavior, and browser permissions. |
-| [Desktop tools](docs/user/deepseekgui/desktop-tools.md) | Browser, DSH Terminal, updates, diagnostics, feedback, and lifecycle. |
-| [Data and troubleshooting](docs/user/deepseekgui/data-troubleshooting.md) | Data locations, privacy, uninstall behavior, common failures, and support. |
+| [Quick start](docs/user/deepseekgui/quickstart.md) | First session walkthrough |
+| [Models and vision](docs/user/deepseekgui/models.md) | API keys, model setup, image input |
+| [Workspaces and sessions](docs/user/deepseekgui/workspaces-sessions.md) | Working with folders and sessions |
+| [Profiles and plugins](docs/user/deepseekgui/profiles-plugins.md) | Harness profiles and plugin management |
+| [Permissions](docs/user/deepseekgui/permissions.md) | Sandbox, approvals, and access levels |
+| [Desktop tools](docs/user/deepseekgui/desktop-tools.md) | Browser, terminal, updates, diagnostics |
+| [Data and troubleshooting](docs/user/deepseekgui/data-troubleshooting.md) | Data locations, privacy, common issues |
 
-The documentation website also retains the upstream Harness development tutorials and reference material for plugin authors and advanced users.
+The docs also include upstream Harness tutorials and plugin-authoring reference.
 
 ## Data and privacy
 
-DeepSeekGUI stores its Managed Harness Home under `%APPDATA%\DeepSeekGUI\dsh`. Credentials, settings, sessions, Profiles, and plugins stay in that Home unless the configured model provider or a tool transmits content required by the task.
+All your data stays local in `%APPDATA%\DeepSeekGUI\dsh` — credentials, settings, sessions, everything. The only network traffic goes to your configured model provider.
 
-Service logs redact credential-shaped text. Diagnostics bundles are created locally and never uploaded automatically. Review crash dumps before sharing them because they can still contain local paths or memory fragments.
-
-Uninstall asks whether to remove `%APPDATA%\DeepSeekGUI`. Keeping it preserves credentials, settings, sessions, and Profiles for a later reinstall.
+Logs automatically redact anything that looks like a credential. Diagnostics stay local. When you uninstall, the app asks whether to keep or remove your data.
 
 ## Build from source
 
-### Run DeepSeekGUI Desktop from source
+### Run DeepSeekGUI from source
 
-DeepSeekGUI development requires the Node.js version declared by the repository and pnpm:
+Requires the Node.js version declared by the repository and pnpm:
 
 ```sh
 git clone https://github.com/See-Sol-Lab/DeepSeekGUI.git
@@ -148,31 +146,31 @@ pnpm run build
 pnpm run dev:desktop
 ```
 
-Build the Windows distribution with:
+Build the Windows distribution:
 
 ```sh
 pnpm run build:desktop-dist
 ```
 
-See [DeepSeekGUI Desktop](apps/desktop/README.md) for engineering details and packaging verification.
+See [DeepSeekGUI Desktop](apps/desktop/README.md) for packaging details.
 
 <a id="run"></a>
 
 ### Run Harness from npm
 
-Install Node.js, then start the upstream Web UI with:
+Install Node.js, then start the upstream Web UI:
 
 ```sh
 npx @deepseek-ai/dsh web
 ```
 
-The command opens `http://127.0.0.1:3080` for a local launch.
+Opens `http://127.0.0.1:3080` in your browser.
 
 <a id="run-deepseek-harness-from-source"></a>
 
 ### Run Harness from source
 
-The public DeepSeekGUI tree contains the upstream Harness source used by the desktop build:
+The public tree contains the upstream Harness source used by the desktop build:
 
 ```sh
 pnpm install
@@ -182,19 +180,19 @@ pnpm dsh web
 
 ## Contributing and support
 
-- Report DeepSeekGUI bugs and product feedback through [DeepSeekGUI Issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues).
+- Report bugs and feedback through [DeepSeekGUI Issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues).
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) before sending a pull request.
-- Use [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions) for questions about upstream Harness behavior.
+- For upstream Harness questions, use [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions).
 
-## License and upstream relationship
+## License
 
-This repository combines two licensing scopes:
+Two scopes:
 
-- Upstream DeepSeek Harness code and upstream-derived material remain under DeepSeek's [MIT License](LICENSE-MIT-UPSTREAM).
-- Original DeepSeekGUI desktop and product work is source-available under the [PolyForm Perimeter License 1.0.1](apps/desktop/LICENSE). Personal, educational, research, hobby, internal business, and other permitted uses are allowed; providing a competing product requires a separate license from See-Sol-Lab.
+- **Upstream Harness** code stays under DeepSeek's [MIT License](LICENSE-MIT-UPSTREAM).
+- **DeepSeekGUI** original work is source-available under the [PolyForm Perimeter License 1.0.1](apps/desktop/LICENSE). Personal, educational, research, hobby, and internal business use are fine. Building a competing product requires a separate license from See-Sol-Lab.
 
-The root [`LICENSE`](LICENSE) is a scope notice, not a single repository-wide license grant. Read [DeepSeekGUI licensing](DEEPSEEKGUI-LICENSE.md) and [third-party notices](THIRD_PARTY_NOTICES.md) before redistributing the software.
+The root [`LICENSE`](LICENSE) explains how the scopes apply. Read [DeepSeekGUI licensing](DEEPSEEKGUI-LICENSE.md) and [third-party notices](THIRD_PARTY_NOTICES.md) before redistributing.
 
 ---
 
-DeepSeekGUI is the public release repository. Day-to-day development happens in a separate private repository; releases publish the product tree rather than the private development history.
+DeepSeekGUI is the public release repository. Day-to-day development happens in a private repo; releases publish the product tree.

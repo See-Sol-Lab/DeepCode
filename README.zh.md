@@ -11,11 +11,11 @@
 </div>
 
 <p align="center">
-  <em>像 Codex 一样使用。像实验室一样检查。像 Harness 一样扩展。</em>
+  <em>DeepSeek 的 AI 编程助手，装在桌面上。</em>
 </p>
 
 <p align="center">
-  由 DeepSeek Harness 驱动的 Windows DeepSeek 原生 Agent Workbench。
+  基于 <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> 的 Windows 桌面客户端。
 </p>
 
 <p align="center">
@@ -27,9 +27,11 @@
 
 <!-- PRODUCT HUNT BADGE SLOT: DeepSeekGUI Product Hunt URL 创建后添加官方 post badge。 -->
 
-DeepSeekGUI 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 变成完整的 Windows 产品：安装应用、连接 DeepSeek、选择工作区，然后让 agent 检查、编辑、浏览、运行工具并解释自己的工作。Harness 仍是会话、模型、凭据、权限、工具、记忆、压缩与插件状态的唯一运行时和真源。
+DeepSeekGUI 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 包成了一个 Windows 桌面应用。选个文件夹、给 AI 一个任务，它就能帮你读代码、改文件、跑命令、上网查资料，做完还会跟你解释它干了什么——全程用的是 DeepSeek 自己的模型。
 
-**非官方产品：** DeepSeekGUI 与 DeepSeek 无隶属关系，也未获其背书。上游 Harness 运行时与官方 Web UI 是 DeepSeek 的工作成果。
+一个安装包、一个 API key，直接就能用。
+
+**非官方产品：** 基于 DeepSeek Harness 构建，但由第三方独立开发，与 DeepSeek 官方无关。上游运行时和官方 Web UI 是 DeepSeek 的工作成果。
 
 ## 下载
 
@@ -37,108 +39,104 @@ DeepSeekGUI 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harne
 | --- | --- | --- |
 | Windows | [下载安装包](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/download/v1.0.0/DeepSeekGUI-Setup-1.0.0.exe) | Windows 10/11，x64 |
 
-DeepSeekGUI 为当前 Windows 用户安装，不需要管理员权限，并自带 Harness 运行时、Node.js 与 pnpm。
+安装在当前用户下，双击即可。安装包自带运行时，开箱即用。
 
-或在已安装 [GitHub CLI](https://cli.github.com/) 的 PowerShell 中下载最新安装包与校验清单：
+<details>
+<summary>校验安装包（建议）</summary>
+
+V1 还没做代码签名，Windows SmartScreen 会弹未知发布者警告。建议先校验 hash 再运行：
 
 ```powershell
 gh release download --repo See-Sol-Lab/DeepSeekGUI --pattern 'DeepSeekGUI-Setup-*.exe' --pattern 'SHA256SUMS.txt' --clobber
-```
-
-DeepSeekGUI V1 尚未进行代码签名，因此 Windows SmartScreen 可能显示未知发布者警告。请从同一个 Release 下载 [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/download/v1.0.0/SHA256SUMS.txt)，并在运行前校验安装包：
-
-```powershell
 Get-FileHash .\DeepSeekGUI-Setup-1.0.0.exe -Algorithm SHA256
 ```
 
-只有输出的 hash 与发布清单完全一致时才继续，然后运行 `Start-Process .\DeepSeekGUI-Setup-1.0.0.exe` 完成安装。详见[安装与故障排查指南](docs/user/deepseekgui/data-troubleshooting.zh.md#windows-smartscreen-blocks-the-installer)。
+hash 和 [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/download/v1.0.0/SHA256SUMS.txt) 对上了再装。遇到问题看[故障排查指南](docs/user/deepseekgui/data-troubleshooting.zh.md#windows-smartscreen-blocks-the-installer)。
+
+</details>
 
 ## 快速开始
 
-1. 安装并启动 DeepSeekGUI。
-2. 打开**设置 → 模型**，输入 DeepSeek API key。
-3. 选择模型。任务包含截图或其他视觉输入时，请选择支持图片的模型。
-4. 返回首页并选择工作区文件夹。
-5. 新建会话，向 agent 说明一个具体结果。
-6. 检查工具批准请求与最终文件改动。
+1. 安装 DeepSeekGUI，打开它。
+2. 进 **设置 → 模型**，填上你的 DeepSeek API key。
+3. 选一个模型（需要处理图片的话选支持视觉的模型）。
+4. 回到主页，选一个工作区文件夹。
+5. 开个会话，告诉 AI 你要什么，然后检查它的操作。
 
-[DeepSeekGUI 快速开始指南](docs/user/deepseekgui/quickstart.zh.md)会带你完成完整的第一次会话。
+详细步骤看[快速开始指南](docs/user/deepseekgui/quickstart.zh.md)。
 
-## 为什么选择 DeepSeekGUI
+## 为什么用 DeepSeekGUI
 
-| | |
-| --- | --- |
-| **Harness 原生** | Profile、会话、工具、凭据、权限、记忆、压缩、钩子与插件全部保留在 Harness 原生组合中。DeepSeekGUI 不建立第二套 agent 运行时。 |
-| **DeepSeek 优先** | DeepSeek 模型、推理、图片输入与 Harness 行为都是第一等产品路径，不是事后补上的兼容层。 |
-| **真正的 Windows 产品** | 一键当前用户安装、常驻托盘、模型设置、DSH Terminal、更新、反馈、诊断与卸载数据选择。 |
-| **可观察、可恢复** | 实时 Harness 状态、明确操作目标、已脱敏诊断、last-known-good Profile 恢复与受保护的插件改动，让失败可以理解并恢复。 |
-| **更安全的执行** | Sandbox 是推荐默认值，批准仍由 Harness 持有，Full Access 始终显示明确警告，浏览器提交必须要求批准。 |
-| **可编程** | 使用任意兼容的 Harness Profile 与 Cordis 插件，检查当前组合，并随时使用官方 DSH CLI。 |
+**装上就能用。** 一键安装，所有依赖都打包好了。
 
-## 产品一览
+**专门给 DeepSeek 做的。** DeepSeek 的推理、视觉、工具调用都有各自的产品路径。
 
-![DeepSeekGUI 完成创建并运行 JavaScript 文件的 coding 任务](docs/user/deepseekgui/assets/workbench-overview.png)
+**你说了算。** 默认沙盒模式，AI 改文件、跑工具都要你先批准。你能看到它在干什么，随时可以叫停。
 
-### 使用代码、文件与图片工作
+**看得见的浏览器。** 内置浏览器用的是 Edge，AI 访问什么页面你全程可见。敏感操作照样需要你批准。
 
-选择工作区、恢复持久化会话、向视觉模型附加图片、流式查看结果，并在桌面应用中检查工具活动。
+**数据全在本地。** 会话、密钥、设置全部存在你电脑上。
 
-![DeepSeekGUI 视觉会话正确描述附加的界面截图](docs/user/deepseekgui/assets/vision-response.png)
+**底下还是 Harness。** Profile、插件、钩子、CLI 全都照常工作。DeepSeekGUI 直接包住 Harness 运行时，完全兼容。
 
-### 给 agent 一个真实浏览器
+## 截图
 
-DeepSeekGUI 内置浏览器使用可见的 Microsoft Edge，按 SSRF 规则检查导航与重定向，把物理鼠标与键盘控制留给用户，并通过 Harness 批准处理敏感提交。
+![DeepSeekGUI 编程会话](docs/user/deepseekgui/assets/workbench-overview.png)
 
-![DeepSeekGUI 会话使用内置浏览器检查公开网页](docs/user/deepseekgui/assets/browser-panel.png)
+*给 AI 一个任务，看它一步步帮你改代码、跑命令、解释每一步做了什么。*
 
-### 检查并控制 Harness
+![视觉输入](docs/user/deepseekgui/assets/vision-response.png)
 
-切换 Managed Home 或 Existing Home、选择 Profile、检查插件 effective status、通过官方 CLI 路径管理兼容插件，并在不掩盖事实的前提下恢复失败改动。
+*可以贴截图或图片进去，支持视觉的模型会识别并处理。*
 
-![DeepSeekGUI 设置面板，包含通用、模型、插件与 agent preset 控制](docs/user/deepseekgui/assets/settings-panel.png)
+![内置浏览器](docs/user/deepseekgui/assets/browser-panel.png)
 
-## V1 包含什么
+*AI 可以用 Edge 浏览器上网，你能看到它访问的每一个页面。*
 
-- Windows 10/11 x64 安装包与 portable unpacked build。
-- 通过 Harness 设置配置 DeepSeek 与自定义模型。
-- 为声明对应模态的模型提供文本与图片输入。
-- 基于工作区的 coding 会话，以及原生 Harness 工具与批准。
-- Managed Home 与 Existing Home，以及 Profile 发现和切换。
-- Plugin Manager，包括目标确认、流式输出、事后检查与受保护恢复。
-- 内置真实浏览器工具与可见 Browser Panel。
-- Sandbox、Full Access、Read-only 与 Custom 权限状态。
-- DSH Terminal，包括私有运行时 shim，绝不修改系统 PATH。
-- 更新校验、本地诊断导出、反馈、系统托盘与完整中英双语桌面文案。
+![设置面板](docs/user/deepseekgui/assets/settings-panel.png)
 
-DeepSeekGUI V1 仅在 Windows x64 上测试。它尚未进行代码签名，也不提供 macOS 或 Linux 构建、账户系统、开机自启动或插件市场。
+*在一个地方配模型、管插件、切换 Harness Profile。*
+
+## V1 有什么
+
+- **Windows 安装包** — 一键安装，装在用户目录。也有免安装版。
+- **DeepSeek + 自定义模型** — 除了 DeepSeek，也可以接其他 OpenAI 兼容的服务。
+- **文字和图片输入** — 给支持视觉的模型贴截图。
+- **工作区会话** — 选个文件夹开始写代码，下次回来继续。
+- **内置浏览器** — AI 用 Edge 上网，全程可见。
+- **插件支持** — 在应用里安装和管理 Harness 兼容插件。
+- **默认沙盒** — 所有工具调用都需要你批准，除非你主动开放全部权限。
+- **内置终端** — 在独立环境里跑 Harness CLI 命令。
+- **中英双语** — 界面完整支持中文和英文。
+- **系统托盘** — 最小化到托盘，自动检查更新。
+
+V1 面向 Windows x64。代码签名随后跟上（届时 SmartScreen 警告会消失）。macOS、Linux 和账户系统后续版本加入。
 
 ## 文档
 
-| 指南 | 内容 |
+| 指南 | |
 | --- | --- |
-| [快速开始](docs/user/deepseekgui/quickstart.zh.md) | 安装、连接 DeepSeek、选择工作区并完成第一次会话。 |
-| [模型与视觉](docs/user/deepseekgui/models.zh.md) | API key、模型选择、图片输入与自定义提供方。 |
-| [工作区与会话](docs/user/deepseekgui/workspaces-sessions.zh.md) | 工作区范围、持久化会话、附件、检查与托盘行为。 |
-| [Profile 与插件](docs/user/deepseekgui/profiles-plugins.zh.md) | Managed/Existing Home、Profile 切换、插件操作与恢复。 |
-| [权限与批准](docs/user/deepseekgui/permissions.zh.md) | Sandbox、Full Access、批准、Existing Home 行为与浏览器权限。 |
-| [桌面工具](docs/user/deepseekgui/desktop-tools.zh.md) | 浏览器、DSH Terminal、更新、诊断、反馈与生命周期。 |
-| [数据与故障排查](docs/user/deepseekgui/data-troubleshooting.zh.md) | 数据位置、隐私、卸载行为、常见失败与支持。 |
+| [快速开始](docs/user/deepseekgui/quickstart.zh.md) | 第一次会话完整流程 |
+| [模型与视觉](docs/user/deepseekgui/models.zh.md) | API key、模型配置、图片输入 |
+| [工作区与会话](docs/user/deepseekgui/workspaces-sessions.zh.md) | 文件夹、会话管理 |
+| [Profile 与插件](docs/user/deepseekgui/profiles-plugins.zh.md) | Harness Profile 和插件管理 |
+| [权限与批准](docs/user/deepseekgui/permissions.zh.md) | 沙盒、权限、审批 |
+| [桌面工具](docs/user/deepseekgui/desktop-tools.zh.md) | 浏览器、终端、更新、诊断 |
+| [数据与故障排查](docs/user/deepseekgui/data-troubleshooting.zh.md) | 数据位置、隐私、常见问题 |
 
-文档网站同时保留上游 Harness 开发教程与参考资料，供插件作者与高级用户使用。
+文档里也保留了上游 Harness 的开发教程和插件开发参考。
 
 ## 数据与隐私
 
-DeepSeekGUI 把 Managed Harness Home 保存在 `%APPDATA%\DeepSeekGUI\dsh`。凭据、设置、会话、Profile 与插件会留在该 Home 中；已配置的模型提供方或工具仍可能发送任务要求的内容。
+所有数据都存在本地 `%APPDATA%\DeepSeekGUI\dsh`——密钥、设置、会话，全在你电脑上。唯一的网络流量是你和你配的模型服务之间的通信。
 
-服务日志会脱敏凭据形态文本。诊断包保存在本地，绝不自动上传。Crash dump 仍可能包含本地路径或内存片段，分享前必须检查。
-
-卸载时，DeepSeekGUI 会询问是否删除 `%APPDATA%\DeepSeekGUI`。保留该目录，即可在以后重新安装时继续使用凭据、设置、会话与 Profile。
+日志会自动把像密钥的内容打码。诊断文件存在本地。卸载时会问你要保留还是清除数据，保留的话下次装回来还能接着用。
 
 ## 从源码构建
 
-### 从源码运行 DeepSeekGUI Desktop
+### 从源码运行 DeepSeekGUI
 
-DeepSeekGUI 开发需要仓库声明的 Node.js 版本与 pnpm：
+需要仓库指定版本的 Node.js 和 pnpm：
 
 ```sh
 git clone https://github.com/See-Sol-Lab/DeepSeekGUI.git
@@ -154,25 +152,25 @@ pnpm run dev:desktop
 pnpm run build:desktop-dist
 ```
 
-工程细节与打包验证见 [DeepSeekGUI Desktop](apps/desktop/README.zh.md)。
+打包细节见 [DeepSeekGUI Desktop](apps/desktop/README.zh.md)。
 
 <a id="run"></a>
 
 ### 通过 npm 运行 Harness
 
-安装 Node.js，然后启动上游 Web UI：
+装好 Node.js，启动上游 Web UI：
 
 ```sh
 npx @deepseek-ai/dsh web
 ```
 
-该命令在本机启动时会打开 `http://127.0.0.1:3080`。
+会在浏览器打开 `http://127.0.0.1:3080`。
 
 <a id="run-deepseek-harness-from-source"></a>
 
 ### 从源码运行 Harness
 
-DeepSeekGUI 公开代码树包含桌面构建所使用的上游 Harness 源码：
+公开代码树里有桌面版使用的上游 Harness 源码：
 
 ```sh
 pnpm install
@@ -180,21 +178,21 @@ pnpm run build
 pnpm dsh web
 ```
 
-## 参与贡献与支持
+## 参与贡献
 
-- 通过 [DeepSeekGUI Issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues) 报告 DeepSeekGUI bug 与产品反馈。
-- 提交 PR 前请阅读 [CONTRIBUTING.md](CONTRIBUTING.zh.md)。
-- 上游 Harness 行为问题请使用 [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions)。
+- Bug 和反馈提到 [DeepSeekGUI Issues](https://github.com/See-Sol-Lab/DeepSeekGUI/issues)。
+- PR 之前先看 [CONTRIBUTING.md](CONTRIBUTING.zh.md)。
+- 上游 Harness 的问题去 [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions)。
 
-## 许可证与上游关系
+## 许可证
 
-本仓库包含两类许可证范围：
+两部分：
 
-- 上游 DeepSeek Harness 代码及其衍生内容继续遵循 DeepSeek 的 [MIT License](LICENSE-MIT-UPSTREAM)。
-- DeepSeekGUI 原创桌面与产品代码以 [PolyForm Perimeter License 1.0.1](apps/desktop/LICENSE) 源码可见发布。个人、教育、研究、兴趣、公司内部使用及其他许可范围内的用途都可以；提供竞争产品需要获得 See-Sol-Lab 的单独授权。
+- **上游 Harness** 代码继续遵循 DeepSeek 的 [MIT License](LICENSE-MIT-UPSTREAM)。
+- **DeepSeekGUI** 原创代码以 [PolyForm Perimeter License 1.0.1](apps/desktop/LICENSE) 源码可见发布。个人、学习、研究、爱好、公司内部用都行；做竞品需要找 See-Sol-Lab 另外拿授权。
 
-根目录 [`LICENSE`](LICENSE) 是适用范围说明，不是覆盖整个仓库的单一许可证授权。重新分发软件前，请阅读 [DeepSeekGUI 许可说明](DEEPSEEKGUI-LICENSE.md)与[第三方声明](THIRD_PARTY_NOTICES.md)。
+根目录 [`LICENSE`](LICENSE) 说明了两部分怎么划分。重新分发前请读 [DeepSeekGUI 许可说明](DEEPSEEKGUI-LICENSE.md)和[第三方声明](THIRD_PARTY_NOTICES.md)。
 
 ---
 
-DeepSeekGUI 是公开发布仓库。日常开发在另一个私有仓库中进行；Release 发布产品代码树，不公开私有开发历史。
+DeepSeekGUI 是公开发布仓库。日常开发在私有仓库里进行，Release 发布的是产品代码树。
