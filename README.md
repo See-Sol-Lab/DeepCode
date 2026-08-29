@@ -1,6 +1,6 @@
 <div align="center">
 
-# <img src="./apps/desktop/src/chrome/icon.png" width="38" alt="" align="absmiddle" /> DeepSeekGUI
+# <img src="./apps/desktop/src/chrome/icon.png" width="38" alt="" align="absmiddle" /> DeepSeekGUI v1
 
 </div>
 
@@ -27,11 +27,13 @@ English | [中文](README.zh.md)
 
 <!-- PRODUCT HUNT BADGE SLOT: add the official post badge after the DeepSeekGUI Product Hunt URL exists. -->
 
-DeepSeekGUI wraps [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) in a native Windows app. Point it at a folder, give the agent a task, and it reads your code, edits files, runs commands, browses the web, and explains what it did — all through DeepSeek's models.
+DeepSeekGUI packages the [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) Web UI into a native Windows app. V1 runs the official Harness interface inside a desktop shell, with added integration — installer, system tray, built-in browser and terminal. Point it at a folder, give the agent a task, and it reads your code, edits files, runs commands, browses the web, and explains what it did — all through DeepSeek's models.
 
 Just the installer and an API key — everything else is bundled.
 
 **Not an official DeepSeek product.** Built on top of DeepSeek Harness but independently developed. The upstream runtime and official Web UI are DeepSeek's work.
+
+> **Where this is headed:** V1 is a desktop wrapper around the upstream Web UI. A fully independent workbench with a custom interface built for desktop is in active development and expected to ship as **v2.0.0**.
 
 ## Download
 
@@ -97,7 +99,7 @@ See the [quick-start guide](docs/user/deepseekgui/quickstart.md) for a full walk
 
 *Configure models, manage plugins, and switch between Harness profiles from one place.*
 
-## What's in V1
+## What's in V1.0
 
 - **Windows installer** — one-click setup, installs per-user. Also available as a portable build.
 - **DeepSeek + custom models** — connect any OpenAI-compatible provider alongside DeepSeek.
@@ -110,7 +112,14 @@ See the [quick-start guide](docs/user/deepseekgui/quickstart.md) for a full walk
 - **Bilingual** — full Chinese and English interface.
 - **System tray** — minimize to tray, check for updates.
 
-V1 targets Windows x64. SmartScreen will warn until code signing ships. macOS, Linux, and accounts come later.
+V1.0 targets Windows x64. SmartScreen will warn until code signing ships. macOS, Linux, and accounts come later.
+
+## Roadmap
+
+| Version | Status | What changes |
+| --- | --- | --- |
+| **v1.0** | Released | Desktop wrapper around the official Harness Web UI, with installer, system tray, built-in browser and terminal. |
+| **v2.0** | In development | Fully independent workbench — custom UI built from scratch for desktop, replacing the upstream Web UI entirely. |
 
 ## Documentation
 

@@ -1,6 +1,6 @@
 <div align="center">
 
-# <img src="./apps/desktop/src/chrome/icon.png" width="38" alt="" align="absmiddle" /> DeepSeekGUI
+# <img src="./apps/desktop/src/chrome/icon.png" width="38" alt="" align="absmiddle" /> DeepSeekGUI v1
 
 </div>
 
@@ -27,11 +27,13 @@
 
 <!-- PRODUCT HUNT BADGE SLOT: DeepSeekGUI Product Hunt URL 创建后添加官方 post badge。 -->
 
-DeepSeekGUI 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 包成了一个 Windows 桌面应用。选个文件夹、给 AI 一个任务，它就能帮你读代码、改文件、跑命令、上网查资料，做完还会跟你解释它干了什么——全程用的是 DeepSeek 自己的模型。
+DeepSeekGUI 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的官方 Web UI 装进了一个 Windows 桌面应用。V1 跑的就是上游原版界面，外面加了桌面集成——安装包、系统托盘、内置浏览器和终端。选个文件夹、给 AI 一个任务，它就能帮你读代码、改文件、跑命令、上网查资料，做完还会跟你解释它干了什么——全程用的是 DeepSeek 自己的模型。
 
 一个安装包、一个 API key，直接就能用。
 
 **非官方产品：** 基于 DeepSeek Harness 构建，但由第三方独立开发，与 DeepSeek 官方无关。上游运行时和官方 Web UI 是 DeepSeek 的工作成果。
+
+> **开发方向：** V1 是对上游 Web UI 的桌面包装。完全独立的自研工作台正在开发中，预计在 **v2.0.0** 发布。
 
 ## 下载
 
@@ -97,7 +99,7 @@ hash 和 [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/
 
 *在一个地方配模型、管插件、切换 Harness Profile。*
 
-## V1 有什么
+## V1.0 功能
 
 - **Windows 安装包** — 一键安装，装在用户目录。也有免安装版。
 - **DeepSeek + 自定义模型** — 除了 DeepSeek，也可以接其他 OpenAI 兼容的服务。
@@ -110,7 +112,14 @@ hash 和 [`SHA256SUMS.txt`](https://github.com/See-Sol-Lab/DeepSeekGUI/releases/
 - **中英双语** — 界面完整支持中文和英文。
 - **系统托盘** — 最小化到托盘，自动检查更新。
 
-V1 面向 Windows x64。代码签名随后跟上（届时 SmartScreen 警告会消失）。macOS、Linux 和账户系统后续版本加入。
+V1.0 面向 Windows x64。代码签名随后跟上（届时 SmartScreen 警告会消失）。macOS、Linux 和账户系统后续版本加入。
+
+## 开发路线
+
+| 版本 | 状态 | 内容 |
+| --- | --- | --- |
+| **v1.0** | 已发布 | 将官方 Harness Web UI 包进桌面应用，增加安装包、系统托盘、内置浏览器和终端。 |
+| **v2.0** | 开发中 | 完全独立的自研工作台——从零构建桌面专属界面，替换上游 Web UI。 |
 
 ## 文档
 
