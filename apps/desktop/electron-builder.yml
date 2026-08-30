@@ -64,6 +64,10 @@ linux:
   # source image the window chrome uses.
   icon: apps/desktop/src/chrome/icon.png
   category: Development
+  # Linux derives the executable name from package.json's name by default,
+  # and the scoped @see-sol-lab/deepseekgui contains characters AppImage
+  # rejects. Lowercase binary name per Linux convention.
+  executableName: deepseekgui
   # AppImage only for now: single file, runs on any distribution, closest to
   # the Windows one-click story. deb/rpm need maintainer identity and desktop
   # integration decisions, which belong to the full Linux packaging pass.
