@@ -10,10 +10,15 @@ import { contextBridge, ipcRenderer } from 'electron'
 // main 经 additionalArguments 传入的 locale（P7-H：退出消息文案选语言）。
 const localeArg = process.argv.find(arg => arg.startsWith('--deepseekgui-locale='))
 const locale = localeArg?.slice('--deepseekgui-locale='.length) === 'zh' ? 'zh' : 'en'
+// 终端宿主 label（URI 编码传入；启动期提示行显示真实 shell 名）。
+const shellArg = process.argv.find(arg => arg.startsWith('--deepseekgui-shell='))
+const shellLabel = shellArg === undefined ? '' : decodeURIComponent(shellArg.slice('--deepseekgui-shell='.length))
 
 contextBridge.exposeInMainWorld('deepseekGUITerminal', {
   /** 界面语言（zh / en），renderer 的静态文案据此选择。 */
   locale,
+  /** 终端宿主 label（如 PowerShell 7 / bash），启动期提示行用。 */
+  shellLabel,
   /** 向 pty 发送用户输入（原样透传，main 只接受 string）。 */
   send: (data: string): Promise<void> => ipcRenderer.invoke('deepseekgui-terminal:send', data),
   /** 上报 xterm 的真实尺寸（P8-D47）：main 组帧转给 host 调 pty.resize。 */

@@ -2559,8 +2559,12 @@ void app.whenReady().then(async () => {
         sandbox: true,
         preload: join(moduleDir, 'terminal', 'preload.cjs'),
         // renderer 的退出消息按此选语言（P7-H：英文系统不再看到中文方块字）。
+        // shell label 供启动期提示行显示真实宿主（Linux 是 bash/zsh，不再
+        // 写死 PowerShell）；URI 编码防 Electron 在 Windows 上按空格拆
+        // additionalArguments（"PowerShell 7"）。
         additionalArguments: [
           `--deepseekgui-locale=${desktopLocaleZh() ? 'zh' : 'en'}`,
+          `--deepseekgui-shell=${encodeURIComponent(shell.label)}`,
         ],
       },
     })

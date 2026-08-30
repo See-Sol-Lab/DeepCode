@@ -10,6 +10,8 @@ import { FitAddon } from '../../src/terminal/vendor/addon-fit.mjs'
 interface DeepSeekGUITerminalApi {
   /** 界面语言（zh/en，main 经 additionalArguments 传入）。 */
   locale: 'zh' | 'en'
+  /** 终端宿主 label（如 PowerShell 7 / bash），启动期提示行用。 */
+  shellLabel: string
   send(data: string): Promise<void>
   resize(cols: number, rows: number): void
   onData(listener: (text: string) => void): void
@@ -39,9 +41,10 @@ term.focus()
 api.resize(term.cols, term.rows)
 // 启动期提示（P8-D36）：shell 的提示符出现前窗口是全黑的，用户会当它死了。
 // 暗色一行说明（D29：按界面语言），shell 输出到来后自然被顶上去。
+const shellName = api.shellLabel === '' ? 'shell' : api.shellLabel
 const startingHint = api.locale === 'zh'
-  ? '正在启动 PowerShell，出现提示符后即可输入…'
-  : 'Starting PowerShell — you can type once the prompt appears…'
+  ? `正在启动 ${shellName}，出现提示符后即可输入…`
+  : `Starting ${shellName} — you can type once the prompt appears…`
 term.write(`\x1b[2m${startingHint}\x1b[0m\r\n`)
 // 窗口重获焦点时把键盘还给终端（点了别处再回来，光标要立刻能打字）。
 window.addEventListener('focus', () => { term.focus() })
