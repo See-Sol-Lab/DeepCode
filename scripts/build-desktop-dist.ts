@@ -165,7 +165,8 @@ function requirePrerequisites(): void {
   // the committed binaries).
   const appIcon = join(ROOT, 'apps', 'desktop', 'build', 'icon.ico')
   const trayIcon = join(ROOT, 'apps', 'desktop', 'src', 'chrome', 'tray.ico')
-  if (!existsSync(appIcon) || !existsSync(trayIcon)) {
+  const trayPng = join(ROOT, 'apps', 'desktop', 'src', 'chrome', 'tray.png')
+  if (!existsSync(appIcon) || !existsSync(trayIcon) || !existsSync(trayPng)) {
     runPnpm(['run', 'generate:desktop-icon'])
   }
   const required: [string, string][] = [
@@ -176,6 +177,8 @@ function requirePrerequisites(): void {
     // P7-I：托盘图标是多尺寸 .ico 运行时资产（16/20/24/32），缺失时
     // 打包必须失败——托盘是常驻应用"回来的门"，与 app icon 同一层门禁。
     ['tray icon', trayIcon],
+    // Linux 托盘的单图 PNG（同源生成），与 ICO 同一层门禁。
+    ['tray icon (png)', trayPng],
   ]
   const missing = required.filter(([, path]) => !existsSync(path)).map(([name]) => name)
   if (missing.length === 0) return

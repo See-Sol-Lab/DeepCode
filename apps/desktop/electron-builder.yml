@@ -50,6 +50,10 @@ extraResources:
   # which silently costs the app its tray (P8-D20).
   - from: apps/desktop/src/chrome/tray.ico
     to: tray.ico
+  # The Linux tray asset: Linux trays take a single PNG, not an ICO container.
+  # Same createFromPath constraint as above, so it too ships as a real file.
+  - from: apps/desktop/src/chrome/tray.png
+    to: tray.png
 
 # The DSH runtime is copied into resources/dsh by scripts/build-desktop-dist.ts
 # after electron-builder finishes (its path resolution differs across versions).

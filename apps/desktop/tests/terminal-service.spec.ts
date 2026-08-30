@@ -15,9 +15,11 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   buildTerminalWelcome,
+  resolvePosixTerminalShell,
   resolveTerminalCwd,
   resolveTerminalShell,
   terminalShimContents,
+  terminalShimContentsPosix,
   type ShimRuntimeFacts,
 } from '../src/terminal-service.ts'
 import type { ProfileDiscoveryV1 } from '../src/profile-discovery.ts'
@@ -227,6 +229,61 @@ describe('terminalShimContents（私有 shims）', () => {
   it('node.cmd 用 node 形态前缀 args 转发', () => {
     const node = terminalShimContents(facts).get('node.cmd')!
     expect(node).toContain('"E:\\app\\DeepSeekGUI.exe" --expose-internals %*')
+  })
+})
+
+describe('resolvePosixTerminalShell（$SHELL → bash → sh）', () => {
+  it('$SHELL 存在 → 内嵌用户 shell，label 取文件名', () => {
+    const choice = resolvePosixTerminalShell(probe(['/usr/bin/zsh']), '/usr/bin/zsh')
+    expect(choice).toEqual({ kind: 'embedded', label: 'zsh', executable: '/usr/bin/zsh', args: [] })
+  })
+
+  it('$SHELL 未设置或不存在 → /bin/bash', () => {
+    const choice = resolvePosixTerminalShell(probe(['/bin/bash']), undefined)
+    expect(choice).toEqual({ kind: 'embedded', label: 'bash', executable: '/bin/bash', args: [] })
+    const stale = resolvePosixTerminalShell(probe(['/bin/bash']), '/usr/bin/fish')
+    expect(stale.executable).toBe('/bin/bash')
+  })
+
+  it('bash 也 absent → /bin/sh（绝不无限 fallback）', () => {
+    const choice = resolvePosixTerminalShell(probe([]), undefined)
+    expect(choice).toEqual({ kind: 'embedded', label: 'sh', executable: '/bin/sh', args: [] })
+  })
+})
+
+describe('terminalShimContentsPosix（私有 shims，POSIX 形态）', () => {
+  const facts: ShimRuntimeFacts = {
+    nodeExecutable: '/opt/deepseekgui/deepseekgui',
+    nodePrefixArgs: ['--expose-internals'],
+    dshWrapperPath: '/home/u/.config/DeepSeekGUI/deepseekgui-bin/dsh-wrapper.cjs',
+    dshBin: '/opt/deepseekgui/resources/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js',
+    dshNodeArgs: ['--expose-internals'],
+    pnpmArgs: ['--expose-internals', '/opt/deepseekgui/resources/dsh/node_modules/pnpm/bin/pnpm.cjs'],
+    activeProfile: '深 度 p',
+  }
+
+  it('生成无扩展名的 node/dsh/pnpm，同一转发协议', () => {
+    const files = terminalShimContentsPosix(facts)
+    expect([...files.keys()].sort()).toEqual(['dsh', 'node', 'pnpm'])
+    for (const content of files.values()) {
+      expect(content.startsWith('#!/bin/sh\n')).toBe(true)
+      expect(content).toContain('/opt/deepseekgui/deepseekgui')
+      expect(content).toContain('export ELECTRON_RUN_AS_NODE=1')
+      expect(content).not.toMatch(/nodejs/i)
+    }
+  })
+
+  it('dsh 转发 wrapper 并注入 active Profile 环境（Unicode 原样、JSON 单引号）', () => {
+    const dsh = terminalShimContentsPosix(facts).get('dsh')!
+    expect(dsh).toContain('dsh-wrapper.cjs')
+    expect(dsh).toContain('export DEEPSEEKGUI_ACTIVE_PROFILE="深 度 p"')
+    expect(dsh).toContain('export DEEPSEEKGUI_WRAPPER_NODE_ARGS=\'["--expose-internals"]\'')
+    expect(dsh).toContain('exec "/opt/deepseekgui/deepseekgui" --expose-internals "/home/u/.config/DeepSeekGUI/deepseekgui-bin/dsh-wrapper.cjs" "$@"')
+  })
+
+  it('node 用 node 形态前缀 args 转发且 argv 原样透传', () => {
+    const node = terminalShimContentsPosix(facts).get('node')!
+    expect(node).toContain('exec "/opt/deepseekgui/deepseekgui" --expose-internals "$@"')
   })
 })
 

@@ -78,6 +78,27 @@ export function resolveTerminalShell(probe: ShellProbe, localAppData: string | u
   return { kind: 'embedded', label: 'cmd', executable: CMD_EXE, args: ['/d'] }
 }
 
+/**
+ * POSIX 终端宿主选择：$SHELL（用户自选 shell，存在才用）→ /bin/bash →
+ * /bin/sh。全部内嵌 PTY——Linux 没有 Windows Terminal 那样可探测的标准
+ * 外置终端（各发行版终端各异），不猜测。与 Windows 链同一契约：exact
+ * executable + argv，一个候选不存在才进入下一候选，启动后的真实失败由
+ * 调用方明确报告。
+ * @param probe - 存在性探测。
+ * @param shellEnv - `$SHELL`（用户登录 shell；可能未设置）。
+ * @returns 第一个存在的宿主。
+ */
+export function resolvePosixTerminalShell(probe: ShellProbe, shellEnv: string | undefined): TerminalShellChoice {
+  if (shellEnv !== undefined && shellEnv !== '' && probe.exists(shellEnv)) {
+    const label = shellEnv.split('/').pop() ?? shellEnv
+    return { kind: 'embedded', label, executable: shellEnv, args: [] }
+  }
+  if (probe.exists('/bin/bash')) {
+    return { kind: 'embedded', label: 'bash', executable: '/bin/bash', args: [] }
+  }
+  return { kind: 'embedded', label: 'sh', executable: '/bin/sh', args: [] }
+}
+
 /** resolveTerminalCwd 的结果：cwd 与 welcome 里要说明的注记。 */
 export interface TerminalCwdChoice {
   /** 终端工作目录（exact 绝对路径）。 */
@@ -228,5 +249,50 @@ export function terminalShimContents(facts: ShimRuntimeFacts): Map<string, strin
   files.set('node.cmd', shimCmd(facts.nodeExecutable, facts.nodePrefixArgs, ['set "ELECTRON_RUN_AS_NODE=1"']))
   files.set('dsh.cmd', dshShimCmd(facts))
   files.set('pnpm.cmd', shimCmd(facts.nodeExecutable, facts.pnpmArgs, ['set "ELECTRON_RUN_AS_NODE=1"']))
+  return files
+}
+
+/** 生成一个 POSIX shim 文件的文本（exact argv 转发；`"$@"` 原样透传）。 */
+function shimSh(
+  executable: string,
+  prefixArgs: readonly string[],
+  envExports: readonly string[],
+): string {
+  const prefix = prefixArgs.length === 0 ? '' : `${prefixArgs.join(' ')} `
+  return `${['#!/bin/sh', ...envExports, `exec "${executable}" ${prefix}"$@"`].join('\n')}\n`
+}
+
+/**
+ * dsh 专用 POSIX 模板：与 dshShimCmd 同一转发协议（wrapper 做 argv 级
+ * Profile 默认并 spawn 真实 dsh）。JSON 值走单引号，路径走双引号——
+ * 与 .cmd 侧同一层级的字面量约定，不做通用转义。
+ * @param facts - 运行时事实。
+ * @returns POSIX shim 文本。
+ */
+function dshShimSh(facts: ShimRuntimeFacts): string {
+  const prefix = facts.nodePrefixArgs.length === 0 ? '' : `${facts.nodePrefixArgs.join(' ')} `
+  return [
+    '#!/bin/sh',
+    'export ELECTRON_RUN_AS_NODE=1',
+    `export DEEPSEEKGUI_WRAPPER_EXE="${facts.nodeExecutable}"`,
+    `export DEEPSEEKGUI_WRAPPER_DSH_BIN="${facts.dshBin}"`,
+    `export DEEPSEEKGUI_WRAPPER_NODE_ARGS='${JSON.stringify(facts.dshNodeArgs)}'`,
+    `export DEEPSEEKGUI_ACTIVE_PROFILE="${facts.activeProfile}"`,
+    `exec "${facts.nodeExecutable}" ${prefix}"${facts.dshWrapperPath}" "$@"`,
+    '',
+  ].join('\n')
+}
+
+/**
+ * terminalShimContents 的 POSIX 形态：同一转发协议，产出无扩展名的
+ * node/dsh/pnpm 三个 shell 脚本（调用方负责 chmod +x）。
+ * @param facts - 运行时事实。
+ * @returns shim 文件名 → 文件文本。
+ */
+export function terminalShimContentsPosix(facts: ShimRuntimeFacts): Map<string, string> {
+  const files = new Map<string, string>()
+  files.set('node', shimSh(facts.nodeExecutable, facts.nodePrefixArgs, ['export ELECTRON_RUN_AS_NODE=1']))
+  files.set('dsh', dshShimSh(facts))
+  files.set('pnpm', shimSh(facts.nodeExecutable, facts.pnpmArgs, ['export ELECTRON_RUN_AS_NODE=1']))
   return files
 }

@@ -28,6 +28,12 @@ const ICO_PATH = fileURLToPath(new URL('../apps/desktop/build/icon.ico', import.
 const PNG_PATH = fileURLToPath(new URL('../apps/desktop/src/chrome/icon.png', import.meta.url))
 /** Output tray ICO path: loaded at runtime by the system tray (multi-resolution). */
 const TRAY_ICO_PATH = fileURLToPath(new URL('../apps/desktop/src/chrome/tray.ico', import.meta.url))
+/**
+ * Output tray PNG path: the Linux tray asset. Linux trays take a single PNG
+ * (no ICO container support); 32px covers HiDPI scaling without going blurry
+ * at the common 22–24px slot.
+ */
+const TRAY_PNG_PATH = fileURLToPath(new URL('../apps/desktop/src/chrome/tray.png', import.meta.url))
 /** Source favicon path. */
 const FAVICON_PATH = fileURLToPath(new URL('../apps/web/public/favicon.svg', import.meta.url))
 
@@ -112,6 +118,9 @@ if (import.meta.main) {
   }
   writeFileSync(TRAY_ICO_PATH, icoContainer(trayImages))
   console.log(`generate-desktop-icon: wrote ${TRAY_ICO_PATH}`)
+  // Linux tray PNG: same source, same run — cannot drift from the ICO.
+  writeFileSync(TRAY_PNG_PATH, await sharp(svg).resize(32, 32).png().toBuffer())
+  console.log(`generate-desktop-icon: wrote ${TRAY_PNG_PATH}`)
   // Same source, same run: the top-bar PNG cannot drift from the ICO.
   writeFileSync(PNG_PATH, await sharp(svg).resize(256, 256).png().toBuffer())
   console.log(`generate-desktop-icon: wrote ${PNG_PATH}`)

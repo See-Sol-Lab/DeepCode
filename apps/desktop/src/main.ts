@@ -12,14 +12,14 @@
  */
 
 import {
-  createReadStream,
+  chmodSync, createReadStream,
   existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync,
   unlinkSync, watch, writeFileSync, type FSWatcher,
 } from 'node:fs'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, delimiter, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir, hostname, release, version as osVersion } from 'node:os'
 import { createServer } from 'node:http'
@@ -94,9 +94,11 @@ import {
 import {
   buildTerminalWelcome,
   hasPowerShell7,
+  resolvePosixTerminalShell,
   resolveTerminalCwd,
   resolveTerminalShell,
   terminalShimContents,
+  terminalShimContentsPosix,
   type ShimRuntimeFacts,
 } from './terminal-service.ts'
 import { createHarnessApi, type HarnessApi } from './harness-api.ts'
@@ -2413,11 +2415,22 @@ void app.whenReady().then(async () => {
         : devPnpm === undefined ? [] : [devPnpm],
       activeProfile,
     }
-    for (const [name, content] of terminalShimContents(facts)) {
-      writeFileSync(join(dir, name), content)
+    // Windows 写 .cmd，POSIX 写无扩展名脚本并补执行位——同一转发协议，
+    // 两种宿主 shell 的字面量形态。
+    const windows = process.platform === 'win32'
+    for (const [name, content] of windows ? terminalShimContents(facts) : terminalShimContentsPosix(facts)) {
+      const target = join(dir, name)
+      writeFileSync(target, content)
+      if (!windows) chmodSync(target, 0o755)
     }
     if (!packaged && devPnpm === undefined) {
-      writeFileSync(join(dir, 'pnpm.cmd'), '@echo off\r\necho [deepseekgui] dev 模式下请经 pnpm script 启动 DeepSeekGUI\r\nexit /b 1\r\n')
+      if (windows) {
+        writeFileSync(join(dir, 'pnpm.cmd'), '@echo off\r\necho [deepseekgui] dev 模式下请经 pnpm script 启动 DeepSeekGUI\r\nexit /b 1\r\n')
+      } else {
+        const hint = join(dir, 'pnpm')
+        writeFileSync(hint, '#!/bin/sh\necho "[deepseekgui] dev 模式下请经 pnpm script 启动 DeepSeekGUI"\nexit 1\n')
+        chmodSync(hint, 0o755)
+      }
     }
     return dir
   }
@@ -2449,7 +2462,7 @@ void app.whenReady().then(async () => {
     // 原样保留；"无系统 Node/pnpm 仍可用"由测试环境的干净 PATH 构造
     // （verify-desktop-dist 门禁），不靠生产代码替换实现。
     const shimDir = ensureTerminalShims(state.active.profile)
-    const shimPath = `${shimDir};${process.env.PATH ?? ''}`
+    const shimPath = `${shimDir}${delimiter}${process.env.PATH ?? ''}`
 
     // pnpm 实际版本（打包态读私有 Runtime 包，dev 从 npm_execpath 解析）。
     let pnpmVersion: string | null = null
@@ -2464,11 +2477,14 @@ void app.whenReady().then(async () => {
       pnpmVersion = pnpmVersionFromExecpath(process.env.npm_execpath)
     }
 
-    // 终端宿主与 cwd：纯函数选择，绝不猜路径。
-    const shell = resolveTerminalShell(
-      { exists: path => existsSync(path) },
-      process.env.LOCALAPPDATA,
-    )
+    // 终端宿主与 cwd：纯函数选择，绝不猜路径。POSIX 走 $SHELL → bash → sh
+    // 的内嵌链（Linux 没有可探测的标准外置终端）。
+    const shell = process.platform === 'win32'
+      ? resolveTerminalShell(
+        { exists: path => existsSync(path) },
+        process.env.LOCALAPPDATA,
+      )
+      : resolvePosixTerminalShell({ exists: path => existsSync(path) }, process.env.SHELL)
     const cwdChoice = resolveTerminalCwd(controlState.discovery, state.active.profile, dshHome, path => existsSync(path), localeOf())
     const welcomeLines = buildTerminalWelcome({
       appVersion: versionInfo.appVersion,
@@ -3525,7 +3541,7 @@ void app.whenReady().then(async () => {
     // dsh.cmd wrapper 的默认 Profile 必须始终是 launcher active——用 target
     // profile 会把开着终端里的 bare dsh 默认悄悄改掉。
     const shimDir = ensureTerminalShims(launcher.read().active.profile)
-    const shimPath = `${shimDir};${process.env.PATH ?? ''}`
+    const shimPath = `${shimDir}${delimiter}${process.env.PATH ?? ''}`
     const op = runDesktopCommand({
       slot: 'maintenance',
       zh: desktopLocaleZh(),
@@ -4997,9 +5013,12 @@ void app.whenReady().then(async () => {
     //
     // 打包态取 resources 下的真实文件（electron-builder 的 extraResources
     // 送过去）：createFromPath 是 C++ 侧读盘，不该指望它去解 asar。
+    // Linux 托盘不认 ICO 容器：同源生成的 tray.png（32px 单图，见
+    // generate-desktop-icon.ts）；Windows 继续用多尺寸 ICO 按 DPI 自选。
+    const trayAsset = process.platform === 'win32' ? 'tray.ico' : 'tray.png'
     const trayIconPath = app.isPackaged
-      ? join(process.resourcesPath, 'tray.ico')
-      : join(trayModuleDir, '..', 'src', 'chrome', 'tray.ico')
+      ? join(process.resourcesPath, trayAsset)
+      : join(trayModuleDir, '..', 'src', 'chrome', trayAsset)
     const trayIcon = nativeImage.createFromPath(trayIconPath)
     if (trayIcon.isEmpty()) throw new Error(`托盘图标资产解码为空：${trayIconPath}`)
     tray = new Tray(trayIcon)
