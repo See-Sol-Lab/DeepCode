@@ -1,22 +1,19 @@
-# DeepSeekGUI Desktop — Linux experimental lane.
+# DeepSeekGUI Desktop — Linux packaged lane.
 #
-# First step of the Linux port: prove the packaging toolchain on a hosted
-# Ubuntu runner before any platform work lands in the app. This lane builds
-# the same compiled payload the Windows distribution starts from and asks
-# electron-builder for an AppImage.
+# Builds the full Linux distribution on a hosted Ubuntu runner: the same
+# build:desktop-dist entry the Windows lane uses, which assembles the DSH
+# runtime into resources/dsh, sanitizes the payload, and wraps it as an
+# AppImage (electron-builder.yml's linux section).
 #
-# What this lane does NOT do yet (tracked as the Linux packaging pass):
-#   - assemble the DSH runtime into resources/dsh (scripts/build-desktop-dist.ts
-#     is NSIS/exe-hardwired; its Linux variant does not exist yet), so the
-#     produced AppImage is a shell-only smoke artifact — it opens, but cannot
-#     start a Harness session;
-#   - Linux tray icon (tray.ico needs a PNG sibling), terminal shell chain
-#     (PowerShell candidates need a bash/zsh branch), deb/rpm targets.
+# Still experimental — not yet a release channel. Known gaps tracked for the
+# Linux port: tray icon (tray.ico needs a PNG sibling on Linux), the DSH
+# Terminal shell chain (PowerShell candidates need a bash/zsh branch), and no
+# packaged parity/acceptance suite runs here yet.
 #
 # Deliberately a separate workflow file: deepseekgui-desktop.yml documents the
 # invariant that its manual dispatches always run the Windows native packaged
-# job, and this experiment must not weaken that. Dispatch-only — a lane this
-# young should never cost a runner on push.
+# job, and this lane must not weaken that. Dispatch-only — a lane this young
+# should never cost a runner on push.
 
 name: DeepSeekGUI Desktop Linux
 
@@ -40,7 +37,7 @@ jobs:
   desktop-linux-appimage:
     name: desktop / linux appimage (experimental)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6
         with:
@@ -57,33 +54,30 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
-      # The compiled payload, mirroring the first three stages of
-      # build:desktop-dist. The fourth stage (runtime assembly + installer)
-      # stays Windows-only until the Linux packaging pass.
-      - name: Build compiled payload (lib, branded web, desktop)
-        run: |
-          pnpm run build:lib
-          pnpm exec tsx scripts/build-web-branded.ts
-          pnpm run build:desktop
+      # Release gate, same reasoning as the Windows lane: build:desktop-dist
+      # compiles the host side on its way to packaging but does not cover the
+      # client side, and a gate that only holds by accident is not a gate.
+      - name: Repository typecheck (release gate)
+        run: pnpm run typecheck
 
-      # pnpm skips electron's postinstall even with allowBuilds granting it —
-      # the Windows assemble script works around the same gap via
-      # ensureElectronDistribution(). Run the packaged installer explicitly so
-      # electronDist (node_modules/electron/dist) exists before packaging.
-      - name: Ensure Electron distribution
-        run: node node_modules/electron/install.js
-
-      # --publish never: electron-builder's CI detection otherwise triggers
-      # implicit publishing, which this smoke lane must never do.
-      - name: Package AppImage (shell-only smoke artifact)
-        run: pnpm exec electron-builder --linux --publish never --config apps/desktop/electron-builder.yml
+      # The full official chain: build:lib, branded web, desktop shell, then
+      # the assemble script — which detects the running platform, assembles
+      # the DSH runtime into resources/dsh, sanitizes, and packages the
+      # AppImage. (It also self-heals the Electron binary download that
+      # pnpm's install skips.)
+      - name: Rebuild and package distribution from current source
+        run: pnpm run build:desktop-dist
 
       - name: List produced artifacts
         run: ls -lh dist/desktop
 
-      - name: Upload AppImage
+      - name: Upload AppImage and SHA-256 manifest
         uses: actions/upload-artifact@v4
         with:
           name: deepseekgui-linux-experimental-${{ github.sha }}
-          path: dist/desktop/DeepSeekGUI-*.AppImage
+          # Hosted-runner artifact quota: the AppImage (~150MB) and the hash
+          # manifest only; the unpacked directory stays on the runner.
+          path: |
+            dist/desktop/DeepSeekGUI-*.AppImage
+            dist/desktop/SHA256SUMS.txt
           if-no-files-found: error

@@ -1,6 +1,6 @@
 /**
- * Platform pruning tests: only non-win32-x64 node-pty prebuilds and debug
- * symbols are removed; everything else survives.
+ * Platform pruning tests: only the other platforms' node-pty binaries and
+ * debug symbols are removed; everything else survives.
  * @module scripts/platform-prune
  */
 
@@ -8,7 +8,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync, existsSync 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { pruneNonWindowsPlatforms } from './platform-prune.ts'
+import { prunePlatforms, pruneNonWindowsPlatforms } from './platform-prune.ts'
 
 let temp: string | undefined
 
@@ -63,5 +63,26 @@ describe('pruneNonWindowsPlatforms', () => {
     temp = mkdtempSync(join(tmpdir(), 'platform-prune-'))
     mkdirSync(join(temp, 'node_modules'), { recursive: true })
     expect(() => pruneNonWindowsPlatforms(temp!)).toThrow(/node-pty prebuilds missing/)
+  })
+})
+
+describe('prunePlatforms (linux)', () => {
+  it('接受源码编译的 pty.node 并清空所有 prebuild 目录', () => {
+    const root = fakeRuntime()
+    // Linux installs compile node-pty at install time; no linux prebuild
+    // directory ever exists in the npm tarball.
+    const release = join(root, 'node_modules', 'node-pty', 'build', 'Release')
+    mkdirSync(release, { recursive: true })
+    writeFileSync(join(release, 'pty.node'), 'binary')
+    const removed = prunePlatforms(root, 'linux-x64')
+    const prebuilds = join(root, 'node_modules', 'node-pty', 'prebuilds')
+    expect(readdirSync(prebuilds)).toEqual([])
+    expect(removed).toContain('node_modules/node-pty/prebuilds/win32-x64')
+    expect(existsSync(join(release, 'pty.node'))).toBe(true)
+  })
+
+  it('目标平台既无 prebuild 也无编译产物时明确失败', () => {
+    const root = fakeRuntime()
+    expect(() => prunePlatforms(root, 'linux-x64')).toThrow(/loadable linux-x64 binary/)
   })
 })

@@ -26,7 +26,7 @@
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
-  closeSync, cpSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync,
+  chmodSync, closeSync, cpSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync,
   statSync, writeFileSync,
 } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
@@ -38,7 +38,7 @@ import { packedIdentity, tarballFiles } from './release/tarball.ts'
 // --patch 会指向一个不存在的文件，而官方对此是启动即失败。
 import { BROWSER_PATCH_FILENAME, PICKER_PATCH_FILENAME, SETTINGS_PATCH_FILENAME, THEME_PATCH_FILENAME } from '../apps/desktop/src/dsh-service.ts'
 import { computeRuntimeClosure, parsePluginNames } from './runtime-closure.ts'
-import { directoryBytes, pruneNonWindowsPlatforms } from './platform-prune.ts'
+import { directoryBytes, prunePlatforms } from './platform-prune.ts'
 import { sanitizeAndVerify } from './leak-scan.ts'
 import { portableLockfileIssues, relativeTarballSpec } from './runtime-lock.ts'
 import { readDevSourceCommit, SOURCE_COMMIT_FILENAME } from '../apps/desktop/src/version-info.ts'
@@ -53,14 +53,26 @@ const PACK_DHS = join(ROOT, 'dist', 'npm-dsh')
 const PACK_VENDOR = join(ROOT, 'dist', 'npm-vendor')
 /** The DSH runtime payload copied into `resources/dsh`. */
 const RUNTIME_DIR = join(DIST_ROOT, 'dsh')
-/** electron-builder `--dir` output. */
-const WIN_UNPACKED = join(DIST_ROOT, 'win-unpacked')
+/**
+ * Build platform. The distribution is always assembled on the platform it
+ * targets (Windows locally and in the Windows CI lane, Linux in the Linux CI
+ * lane): the staging npm install resolves native dependencies for the running
+ * platform, so cross-packaging would ship binaries that cannot load.
+ */
+const IS_WINDOWS = process.platform === 'win32'
+/** electron-builder `--dir` output for the current platform. */
+const UNPACKED = join(DIST_ROOT, IS_WINDOWS ? 'win-unpacked' : 'linux-unpacked')
+/**
+ * The packaged executable inside the unpacked directory. The Linux name is
+ * pinned by `executableName` in electron-builder.yml.
+ */
+const UNPACKED_EXE = join(UNPACKED, IS_WINDOWS ? 'DeepSeekGUI.exe' : 'deepseekgui')
 /** Staging consumer for the npm install; inside dist so tarball specs stay relative and portable. */
 const STAGING = join(DIST_ROOT, 'npm-staging')
 /** The committed runtime lockfile pinning every external registry dependency. */
 const COMMITTED_LOCK = join(ROOT, 'apps', 'desktop', 'runtime.package-lock.json')
 /** Electron executable consumed by electron-builder's configured electronDist. */
-const ELECTRON_EXE = join(ROOT, 'node_modules', 'electron', 'dist', 'electron.exe')
+const ELECTRON_EXE = join(ROOT, 'node_modules', 'electron', 'dist', IS_WINDOWS ? 'electron.exe' : 'electron')
 
 /**
  * The pnpm executable this run uses: `npm_execpath` (pnpm injects its own
@@ -95,7 +107,13 @@ function pnpmShimDirectory(): string {
   mkdirSync(dir, { recursive: true })
   // Always rewritten: a shim left by an earlier build may point at a pnpm
   // module path that no longer exists on this machine.
-  writeFileSync(join(dir, 'pnpm.cmd'), `@echo off\r\nnode "${pnpmModule()}" %*\r\n`)
+  if (IS_WINDOWS) {
+    writeFileSync(join(dir, 'pnpm.cmd'), `@echo off\r\nnode "${pnpmModule()}" %*\r\n`)
+  } else {
+    const shim = join(dir, 'pnpm')
+    writeFileSync(shim, `#!/bin/sh\nexec node "${pnpmModule()}" "$@"\n`)
+    chmodSync(shim, 0o755)
+  }
   return dir
 }
 
@@ -183,7 +201,10 @@ function requirePrerequisites(): void {
  * a direct test of the condition rather than a guess from process names.
  */
 function requireUnlockedOutput(): void {
-  const exe = join(WIN_UNPACKED, 'DeepSeekGUI.exe')
+  // POSIX opens a running executable without complaint, so this check only
+  // ever fires on Windows — which is also the only place the failure mode
+  // it guards against exists.
+  const exe = UNPACKED_EXE
   if (!existsSync(exe)) return
   try {
     closeSync(openSync(exe, 'r+'))
@@ -611,7 +632,7 @@ function assembleRuntime(): void {
     shipPickerPlugin(RUNTIME_DIR)
     shipSettingsPlugin(RUNTIME_DIR)
     shipBrowserPlugin(RUNTIME_DIR)
-    const pruned = pruneNonWindowsPlatforms(RUNTIME_DIR)
+    const pruned = prunePlatforms(RUNTIME_DIR, IS_WINDOWS ? 'win32-x64' : `linux-${process.arch}`)
     console.log(`build-desktop-dist: platform prune removed ${pruned.length} artifacts (${formatBytes(directoryBytes(RUNTIME_DIR))} runtime after prune)`)
     console.log(`build-desktop-dist: DSH runtime assembled at ${RUNTIME_DIR}`)
   } finally {
@@ -621,10 +642,12 @@ function assembleRuntime(): void {
 
 /** Print the distribution summary. */
 function summarize(): void {
-  const exe = join(WIN_UNPACKED, 'DeepSeekGUI.exe')
+  const exe = UNPACKED_EXE
   if (!existsSync(exe)) throw new Error(`build-desktop-dist: ${exe} was not produced`)
-  const totalBytes = directoryBytes(WIN_UNPACKED)
-  const installers = readdirSync(DIST_ROOT).filter(name => name.endsWith('.exe') && name.includes('Setup'))
+  const totalBytes = directoryBytes(UNPACKED)
+  const installers = readdirSync(DIST_ROOT).filter(name => IS_WINDOWS
+    ? name.endsWith('.exe') && name.includes('Setup')
+    : name.endsWith('.AppImage'))
   // 交付身份：installer 文件名必须携带 DeepSeekGUI app version（唯一手写源头
   // 是 apps/desktop/package.json）。文件名与产品版本不一致立即失败。
   let appVersion: unknown
@@ -638,14 +661,14 @@ function summarize(): void {
       throw new Error(`build-desktop-dist: installer ${installer} does not carry the DeepSeekGUI app version ${String(appVersion)}`)
     }
   }
-  console.log(`build-desktop-dist: distribution at ${WIN_UNPACKED}`)
+  console.log(`build-desktop-dist: distribution at ${UNPACKED}`)
   console.log(`build-desktop-dist: executable ${exe} (${formatBytes(statSync(exe).size)})`)
   console.log(`build-desktop-dist: total ${formatBytes(totalBytes)}`)
   for (const installer of installers) {
     const path = join(DIST_ROOT, installer)
     console.log(`build-desktop-dist: installer ${path} (${formatBytes(statSync(path).size)})`)
   }
-  if (installers.length === 0) throw new Error('build-desktop-dist: no NSIS installer produced')
+  if (installers.length === 0) throw new Error(`build-desktop-dist: no ${IS_WINDOWS ? 'NSIS installer' : 'AppImage'} produced`)
 }
 
 /** Windows' classic path limit; the ceiling every shipped file has to fit under. */
@@ -816,7 +839,7 @@ const SHIPPED_LOCALES = new Set(['en-US.pak', 'zh-CN.pak'])
  * rest of the payload itself: keeping the trim in one place makes what ships
  * a property of this script, not of a config key whose Windows semantics
  * differ across electron-builder versions.
- * @param unpackedDir - the win-unpacked directory electron-builder produced.
+ * @param unpackedDir - the unpacked directory electron-builder produced.
  */
 function trimElectronLocales(unpackedDir: string): void {
   const localesDir = join(unpackedDir, 'locales')
@@ -871,8 +894,8 @@ if (import.meta.main) {
   // The DSH runtime lands in resources/dsh, where the main process launches it
   // via ELECTRON_RUN_AS_NODE. Copied here (not via extraResources) so the
   // distribution build owns the copy and its timing.
-  trimElectronLocales(WIN_UNPACKED)
-  const resourcesDsh = join(WIN_UNPACKED, 'resources', 'dsh')
+  trimElectronLocales(UNPACKED)
+  const resourcesDsh = join(UNPACKED, 'resources', 'dsh')
   cpSync(RUNTIME_DIR, resourcesDsh, { recursive: true })
   // The staging copy has served its purpose; dropping it halves disk use and
   // keeps the final release-set scan scoped to what actually ships.
@@ -887,14 +910,17 @@ if (import.meta.main) {
   if (sourceCommit === null) {
     throw new Error('build-desktop-dist: git HEAD is unavailable; a packaged DeepSeekGUI must carry its source/commit identifier')
   }
-  writeFileSync(join(WIN_UNPACKED, 'resources', SOURCE_COMMIT_FILENAME), `${sourceCommit}\n`, 'utf8')
+  writeFileSync(join(UNPACKED, 'resources', SOURCE_COMMIT_FILENAME), `${sourceCommit}\n`, 'utf8')
   console.log(`build-desktop-dist: source/commit identifier ${sourceCommit} written to resources/${SOURCE_COMMIT_FILENAME}`)
   // （终端 shims 在运行时由 main 生成到 userData/deepseekgui-bin——转发当前
   // exact executable，见 apps/desktop/src/terminal-service.ts。）
   // Sanitize and verify BEFORE building the installer: any finding fails the
   // build here, so the NSIS package can only ever wrap a sanitized payload.
-  requirePathLengthHeadroom(WIN_UNPACKED)
-  const findings = sanitizeAndVerify(WIN_UNPACKED, ROOT, homedir())
+  // The path-length gate encodes MAX_PATH and the NSIS $INSTDIR ceiling —
+  // Windows facts with no Linux counterpart (AppImage mounts read-only at a
+  // short fixed path).
+  if (IS_WINDOWS) requirePathLengthHeadroom(UNPACKED)
+  const findings = sanitizeAndVerify(UNPACKED, ROOT, homedir())
   if (findings.length > 0) {
     throw new Error(`build-desktop-dist: distribution leaked sensitive content:\n${findings.join('\n')}`)
   }
@@ -911,7 +937,7 @@ if (import.meta.main) {
     ['deepseekgui-settings', join('lib', 'client.js')],
     ['deepseekgui-browser', join('lib', 'index.js')],
   ] as const) {
-    const file = join(WIN_UNPACKED, 'resources', 'dsh', 'node_modules', '@see-sol-lab', plugin, entry)
+    const file = join(UNPACKED, 'resources', 'dsh', 'node_modules', '@see-sol-lab', plugin, entry)
     if (!existsSync(file) || statSync(file).size === 0) {
       throw new Error(`build-desktop-dist: ${file} is missing or empty — the payload would ship a hollow plugin and every install would fail page-load on first boot`)
     }
@@ -920,7 +946,7 @@ if (import.meta.main) {
   // playwright-core beside it the tools register fine and then fail at the
   // first call. Assert the dependency at packaging time, where the evidence is
   // still on this machine (B3-11 built-in browser).
-  const shippedPlaywright = join(WIN_UNPACKED, 'resources', 'dsh', 'node_modules', 'playwright-core', 'package.json')
+  const shippedPlaywright = join(UNPACKED, 'resources', 'dsh', 'node_modules', 'playwright-core', 'package.json')
   if (!existsSync(shippedPlaywright)) {
     throw new Error(`build-desktop-dist: ${shippedPlaywright} is missing — the bundled browser plugin would ship without its runtime dependency`)
   }
@@ -930,18 +956,21 @@ if (import.meta.main) {
   // installed it once) reads the overlay from there, and its absence kills
   // boot with ENOENT before any window exists. Assert the file the manifest
   // promises (2026-08-24 field failure).
-  const shippedBundlePatch = join(WIN_UNPACKED, 'resources', 'dsh', 'node_modules', '@see-sol-lab', 'deepseekgui-browser', 'cordis.patch.yml')
+  const shippedBundlePatch = join(UNPACKED, 'resources', 'dsh', 'node_modules', '@see-sol-lab', 'deepseekgui-browser', 'cordis.patch.yml')
   if (!existsSync(shippedBundlePatch) || statSync(shippedBundlePatch).size === 0) {
     throw new Error(`build-desktop-dist: ${shippedBundlePatch} is missing — a profile carrying this package in its bundle layer would fail to boot`)
   }
   console.log('build-desktop-dist: bundled plugin payload verified (file-level, browser dependency included)')
-  // The NSIS installer is built from the sanitized win-unpacked
+  // The installer is built from the sanitized unpacked directory
   // (--prepackaged), so resources/dsh and the checked payload are exactly
-  // what ships.
+  // what ships. Linux passes --publish never explicitly: electron-builder's
+  // CI detection otherwise triggers implicit publishing in the Linux lane.
   runNode([join(ROOT, 'node_modules', 'electron-builder', 'out', 'cli', 'cli.js'),
-    '--prepackaged', WIN_UNPACKED, '--win', 'nsis', '--config', join(ROOT, 'apps', 'desktop', 'electron-builder.yml')],
+    '--prepackaged', UNPACKED,
+    ...IS_WINDOWS ? ['--win', 'nsis'] : ['--linux', 'appimage', '--publish', 'never'],
+    '--config', join(ROOT, 'apps', 'desktop', 'electron-builder.yml')],
   ROOT, { env: builderEnv })
-  console.log(`build-desktop-dist: NSIS installer built from sanitized ${WIN_UNPACKED}`)
+  console.log(`build-desktop-dist: ${IS_WINDOWS ? 'NSIS installer' : 'AppImage'} built from sanitized ${UNPACKED}`)
   // electron-builder's debug dump records the full NSIS command line —
   // build-machine repository, user, temp, and cache paths. It is not a
   // release artifact; the release-set scan reports any survivor.
@@ -965,10 +994,12 @@ if (import.meta.main) {
  * 按同一约定解析——两端共用一套路径约定，绝不各写各的。 */
 function writeSha256Manifest(): void {
   const lines: string[] = []
-  const installer = readdirSync(DIST_ROOT).find(name => /^DeepSeekGUI-Setup-.*\.exe$/.test(name))
+  const installer = readdirSync(DIST_ROOT).find(name => IS_WINDOWS
+    ? /^DeepSeekGUI-Setup-.*\.exe$/.test(name)
+    : /^DeepSeekGUI-.*\.AppImage$/.test(name))
   const targets: { rel: string; abs: string }[] = [
     ...installer === undefined ? [] : [{ rel: installer, abs: join(DIST_ROOT, installer) }],
-    { rel: 'win-unpacked/DeepSeekGUI.exe', abs: join(WIN_UNPACKED, 'DeepSeekGUI.exe') },
+    { rel: `${basename(UNPACKED)}/${basename(UNPACKED_EXE)}`, abs: UNPACKED_EXE },
   ]
   for (const target of targets) {
     if (!existsSync(target.abs)) {
