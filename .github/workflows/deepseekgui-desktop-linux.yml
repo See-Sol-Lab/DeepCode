@@ -66,8 +66,17 @@ jobs:
           pnpm exec tsx scripts/build-web-branded.ts
           pnpm run build:desktop
 
+      # pnpm skips electron's postinstall even with allowBuilds granting it —
+      # the Windows assemble script works around the same gap via
+      # ensureElectronDistribution(). Run the packaged installer explicitly so
+      # electronDist (node_modules/electron/dist) exists before packaging.
+      - name: Ensure Electron distribution
+        run: node node_modules/electron/install.js
+
+      # --publish never: electron-builder's CI detection otherwise triggers
+      # implicit publishing, which this smoke lane must never do.
       - name: Package AppImage (shell-only smoke artifact)
-        run: pnpm exec electron-builder --linux --config apps/desktop/electron-builder.yml
+        run: pnpm exec electron-builder --linux --publish never --config apps/desktop/electron-builder.yml
 
       - name: List produced artifacts
         run: ls -lh dist/desktop
