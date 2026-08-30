@@ -25,6 +25,7 @@
   <a href="DEEPSEEKGUI-LICENSE.md"><img alt="源码可见" src="https://img.shields.io/badge/source-available-6f42c1?style=flat-square" /></a>
 </p>
 
+<!-- PRODUCT HUNT BADGE SLOT — 等 launch 有排名后恢复（在那之前 badge 显示 "???"）：
 <p align="center">
   <a href="https://www.producthunt.com/products/deepseekgui?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-deepseekgui" target="_blank" rel="noopener noreferrer">
     <picture>
@@ -33,6 +34,7 @@
     </picture>
   </a>
 </p>
+-->
 
 DeepSeekGUI 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的官方 Web UI 装进了一个 Windows 桌面应用。V1 跑的就是上游原版界面，外面加了桌面集成——安装包、系统托盘、内置浏览器和终端。选个文件夹、给 AI 一个任务，它就能帮你读代码、改文件、跑命令、上网查资料，做完还会跟你解释它干了什么——全程用的是 DeepSeek 自己的模型。
 

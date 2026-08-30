@@ -25,6 +25,7 @@ English | [中文](README.zh.md)
   <a href="DEEPSEEKGUI-LICENSE.md"><img alt="Source available" src="https://img.shields.io/badge/source-available-6f42c1?style=flat-square" /></a>
 </p>
 
+<!-- PRODUCT HUNT BADGE SLOT — restore once the launch has a ranking (the badge shows "???" until then):
 <p align="center">
   <a href="https://www.producthunt.com/products/deepseekgui?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-deepseekgui" target="_blank" rel="noopener noreferrer">
     <picture>
@@ -33,6 +34,7 @@ English | [中文](README.zh.md)
     </picture>
   </a>
 </p>
+-->
 
 DeepSeekGUI packages the [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) Web UI into a native Windows app. V1 runs the official Harness interface inside a desktop shell, with added integration — installer, system tray, built-in browser and terminal. Point it at a folder, give the agent a task, and it reads your code, edits files, runs commands, browses the web, and explains what it did — all through DeepSeek's models.
 
