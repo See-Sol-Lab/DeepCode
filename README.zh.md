@@ -25,7 +25,14 @@
   <a href="DEEPSEEKGUI-LICENSE.md"><img alt="源码可见" src="https://img.shields.io/badge/source-available-6f42c1?style=flat-square" /></a>
 </p>
 
-<!-- PRODUCT HUNT BADGE SLOT: DeepSeekGUI Product Hunt URL 创建后添加官方 post badge。 -->
+<p align="center">
+  <a href="https://www.producthunt.com/products/deepseekgui?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-deepseekgui" target="_blank" rel="noopener noreferrer">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1235736&amp;theme=dark" />
+      <img alt="DeepSeekGUI - DeepSeek's coding agent, on your desktop. | Product Hunt" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1235736&amp;theme=light" width="250" height="54" />
+    </picture>
+  </a>
+</p>
 
 DeepSeekGUI 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的官方 Web UI 装进了一个 Windows 桌面应用。V1 跑的就是上游原版界面，外面加了桌面集成——安装包、系统托盘、内置浏览器和终端。选个文件夹、给 AI 一个任务，它就能帮你读代码、改文件、跑命令、上网查资料，做完还会跟你解释它干了什么——全程用的是 DeepSeek 自己的模型。
 
@@ -43,10 +50,12 @@ DeepSeekGUI 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harne
 
 安装在当前用户下，双击即可。安装包自带运行时，开箱即用。
 
-<details>
-<summary>校验安装包（建议）</summary>
+> **⚠️ 安装提示：** V1 还没做代码签名，双击安装包后 Windows 会弹出"已保护你的电脑"蓝色弹窗。点击 **"更多信息"** → **"仍要运行"** 即可继续安装。这是正常现象，代码签名后续版本会加上。
 
-V1 还没做代码签名，Windows SmartScreen 会弹未知发布者警告。建议先校验 hash 再运行：
+<details>
+<summary>校验安装包（可选）</summary>
+
+校验 hash 再运行：
 
 ```powershell
 gh release download --repo See-Sol-Lab/DeepSeekGUI --pattern 'DeepSeekGUI-Setup-*.exe' --pattern 'SHA256SUMS.txt' --clobber

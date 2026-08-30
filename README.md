@@ -25,7 +25,14 @@ English | [中文](README.zh.md)
   <a href="DEEPSEEKGUI-LICENSE.md"><img alt="Source available" src="https://img.shields.io/badge/source-available-6f42c1?style=flat-square" /></a>
 </p>
 
-<!-- PRODUCT HUNT BADGE SLOT: add the official post badge after the DeepSeekGUI Product Hunt URL exists. -->
+<p align="center">
+  <a href="https://www.producthunt.com/products/deepseekgui?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-deepseekgui" target="_blank" rel="noopener noreferrer">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1235736&amp;theme=dark" />
+      <img alt="DeepSeekGUI - DeepSeek's coding agent, on your desktop. | Product Hunt" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1235736&amp;theme=light" width="250" height="54" />
+    </picture>
+  </a>
+</p>
 
 DeepSeekGUI packages the [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) Web UI into a native Windows app. V1 runs the official Harness interface inside a desktop shell, with added integration — installer, system tray, built-in browser and terminal. Point it at a folder, give the agent a task, and it reads your code, edits files, runs commands, browses the web, and explains what it did — all through DeepSeek's models.
 
@@ -43,10 +50,12 @@ Just the installer and an API key — everything else is bundled.
 
 Installs to your user account — just double-click. The installer bundles its own runtime, ready to go.
 
-<details>
-<summary>Verify the download (recommended)</summary>
+> **⚠️ SmartScreen warning:** V1 isn't code-signed yet, so Windows will show a "Windows protected your PC" popup. Click **"More info"** → **"Run anyway"** to proceed. This is expected and will go away once code signing ships.
 
-V1 isn't code-signed yet, so Windows SmartScreen will warn about an unknown publisher. Verify the installer hash before running it:
+<details>
+<summary>Verify the download (optional)</summary>
+
+Verify the installer hash before running it:
 
 ```powershell
 gh release download --repo See-Sol-Lab/DeepSeekGUI --pattern 'DeepSeekGUI-Setup-*.exe' --pattern 'SHA256SUMS.txt' --clobber
