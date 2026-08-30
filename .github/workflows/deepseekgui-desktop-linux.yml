@@ -1,0 +1,80 @@
+# DeepSeekGUI Desktop — Linux experimental lane.
+#
+# First step of the Linux port: prove the packaging toolchain on a hosted
+# Ubuntu runner before any platform work lands in the app. This lane builds
+# the same compiled payload the Windows distribution starts from and asks
+# electron-builder for an AppImage.
+#
+# What this lane does NOT do yet (tracked as the Linux packaging pass):
+#   - assemble the DSH runtime into resources/dsh (scripts/build-desktop-dist.ts
+#     is NSIS/exe-hardwired; its Linux variant does not exist yet), so the
+#     produced AppImage is a shell-only smoke artifact — it opens, but cannot
+#     start a Harness session;
+#   - Linux tray icon (tray.ico needs a PNG sibling), terminal shell chain
+#     (PowerShell candidates need a bash/zsh branch), deb/rpm targets.
+#
+# Deliberately a separate workflow file: deepseekgui-desktop.yml documents the
+# invariant that its manual dispatches always run the Windows native packaged
+# job, and this experiment must not weaken that. Dispatch-only — a lane this
+# young should never cost a runner on push.
+
+name: DeepSeekGUI Desktop Linux
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PRIMARY_NODE_VERSION: '24'
+  # CI runs must never report to the production telemetry endpoint baked
+  # into apps/cli/cordis.yml (same invariant as ci.yml).
+  DSH_TELEMETRY_DISABLED: '1'
+
+jobs:
+  desktop-linux-appimage:
+    name: desktop / linux appimage (experimental)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      # The compiled payload, mirroring the first three stages of
+      # build:desktop-dist. The fourth stage (runtime assembly + installer)
+      # stays Windows-only until the Linux packaging pass.
+      - name: Build compiled payload (lib, branded web, desktop)
+        run: |
+          pnpm run build:lib
+          pnpm exec tsx scripts/build-web-branded.ts
+          pnpm run build:desktop
+
+      - name: Package AppImage (shell-only smoke artifact)
+        run: pnpm exec electron-builder --linux --config apps/desktop/electron-builder.yml
+
+      - name: List produced artifacts
+        run: ls -lh dist/desktop
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: deepseekgui-linux-experimental-${{ github.sha }}
+          path: dist/desktop/DeepSeekGUI-*.AppImage
+          if-no-files-found: error

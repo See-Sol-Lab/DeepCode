@@ -59,6 +59,18 @@ win:
   # electron-builder 26 path.
   icon: apps/desktop/build/icon.ico
 
+linux:
+  # Same root-relative resolution as win.icon above. 256x256 PNG — the same
+  # source image the window chrome uses.
+  icon: apps/desktop/src/chrome/icon.png
+  category: Development
+  # AppImage only for now: single file, runs on any distribution, closest to
+  # the Windows one-click story. deb/rpm need maintainer identity and desktop
+  # integration decisions, which belong to the full Linux packaging pass.
+  target:
+    - AppImage
+  artifactName: DeepSeekGUI-${version}-${arch}.${ext}
+
 nsis:
   # One-click installer (P8-D4): double-click installs and launches, no wizard —
   # the same shape VS Code, Discord and Slack ship. The audience is developers,
