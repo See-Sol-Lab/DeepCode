@@ -21,6 +21,7 @@ English | [中文](README.zh.md)
 <p align="center">
   <a href="https://github.com/See-Sol-Lab/DeepSeekGUI/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/See-Sol-Lab/DeepSeekGUI?style=flat-square&label=release" /></a>
   <a href="https://github.com/See-Sol-Lab/DeepSeekGUI/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/See-Sol-Lab/DeepSeekGUI/total?style=flat-square" /></a>
+  <a href="https://doi.org/10.5281/zenodo.22205160"><img alt="DOI" src="https://zenodo.org/badge/DOI/10.5281/zenodo.22205160.svg" /></a>
   <img alt="Windows 10 and 11 x64" src="https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-0078D4?style=flat-square&logo=windows" />
   <a href="DEEPSEEKGUI-LICENSE.md"><img alt="Source available" src="https://img.shields.io/badge/source-available-6f42c1?style=flat-square" /></a>
 </p>
