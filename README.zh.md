@@ -11,7 +11,7 @@
 </div>
 
 <p align="center">
-  <em>DeepSeek 的 AI 编程助手，装在桌面上。</em>
+  <em>基于deepSeek harness 的桌面 GUI 原生应用。</em>
 </p>
 
 <p align="center">
