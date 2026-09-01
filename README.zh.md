@@ -11,7 +11,7 @@
 </div>
 
 <p align="center">
-  <em>基于deepSeek harness 的桌面 GUI 原生应用。</em>
+  <em>桌面运行的deepSeek AI助手。</em>
 </p>
 
 <p align="center">
