@@ -1,6 +1,6 @@
 <div align="center">
 
-# <img src="./apps/desktop/src/chrome/icon.png" width="38" alt="" align="absmiddle" /> DeepSeekGUI v1
+# <img src="./apps/desktop/src/chrome/icon.png" width="38" alt="" align="absmiddle" /> DeepSeekGUI v1.0.0
 
 </div>
 
